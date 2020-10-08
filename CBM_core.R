@@ -161,8 +161,6 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "postSpinup")
-      # sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual") ## scheduled in postSpinup?
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 9)
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
     },
     saveSpinup = {
@@ -186,6 +184,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- annual(sim)
       sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual")
       if (time(sim) == end(sim)) {
+        sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot", eventPriority = 9)
         sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last()) ## TODO: schedule saving in init or in savePools event
       }
       # ! ----- STOP EDITING ----- ! #
@@ -200,13 +199,14 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       )
       # sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot")
       sim <- scheduleEvent(sim, time(sim), "CBM_core", "annual") ## TODO: schedule in init
+      sim <- scheduleEvent(sim, time(sim), "CBM_core", "plot", eventPriority = 9)
       # ! ----- STOP EDITING ----- ! #
     },
     plot = {
-      clearPlot()
       if (!time(sim) == start(sim)) {
-        areaPlot(
+        carbonOutPlot(
           cbmPools = sim$cbmPools,
+          emissionsProducts = sim$emissionsProducts,
           masterRaster = sim$masterRaster
         )
 
@@ -215,24 +215,21 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
           masterRaster = sim$masterRaster
         )
 
-        NPPPlot(
-          changeInNPP = sim$NPP,
-          masterRaster = sim$masterRaster,
+        NPPplot(
           spatialDT = sim$spatialDT,
-          time = time(sim)
+          NPP = sim$NPP,
+          masterRaster = sim$masterRaster
         )
       }
 
       spatialPlot(
+        pixelkeep = sim$pixelKeep,
         cbmPools = sim$cbmPools,
         poolsToPlot = P(sim)$poolsToPlot,
-        masterRaster = sim$masterRaster,
-        pixelkeep = sim$pixelKeep,
-        years = time(sim)
+        years = time(sim),
+        masterRaster = sim$masterRaster
       )
-
-
-      sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 9)
+      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 9)
     },
     savePools = {
       # ! ----- EDIT BELOW ----- ! #
