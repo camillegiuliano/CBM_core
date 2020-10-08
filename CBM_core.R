@@ -184,7 +184,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- annual(sim)
       sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual")
       if (time(sim) == end(sim)) {
-        sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot", eventPriority = 9)
+        sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot", eventPriority = 9 )
         sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last()) ## TODO: schedule saving in init or in savePools event
       }
       # ! ----- STOP EDITING ----- ! #
