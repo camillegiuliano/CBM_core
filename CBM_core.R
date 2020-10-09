@@ -394,8 +394,17 @@ annual <- function(sim) {
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
-  cols <- c(3, 5)
-  distPixels$ages[!(distPixels$events %in% cols)] <- 0
+
+  # mySpuDmids was created in spadesCBMinputs
+  mySpuDmids <- sim$mySpuDmids
+  mySpuDmids[, "events" := rasterId][, rasterId := NULL]
+  cols <- c("spatial_unit_id", "events")
+  wholeStandDist<- merge.data.table(distPixels, mySpuDmids, by = cols)
+  # read-in the mySpuDmids, make a vector of 0 and 1 the length of distPixels$events
+  setkey(wholeStandDist,pixelIndex)
+  setkey(distPixels,pixelIndex)
+  distPixels$ages[which(wholeStandDist$wholeStand == 1)] <- 0
+  setkey(distPixels,pixelGroup)
 
   # 5. new pixelGroup----------------------------------------------------
   # make a column of new pixelGroup that includes events and carbon from
@@ -496,11 +505,6 @@ annual <- function(sim) {
 
   # 9. From the events column, create a vector of the disturbance matrix
   # identification so it links back to the CBM default disturbance matrices.
-
-  # mySpuDmids was created in spadesCBMinputs
-  mySpuDmids <- sim$mySpuDmids
-  mySpuDmids[, "events" := rasterId][, rasterId := NULL]
-
   DM <- merge(pixelGroupForAnnual, mySpuDmids, by = c("spatial_unit_id", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
   DM[order(pixelGroup), ]
