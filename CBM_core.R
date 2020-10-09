@@ -596,118 +596,149 @@ annual <- function(sim) {
 
   #-----------------------------------------------------------------------------------
   ############ NPP ####################################################################
+
+  ############ CBM-CFS3 replication NOT USED###########################################
+  ## This section is how CBM-CFS3 calculates NPP: it results in negative NPP
+  ## values we are leaving the calculations here in case somebody wanted to
+  ## verify/explore CBM-CFS3 NPP estimates.
   # Calculating NPP for this year using stockt and stockt1 for undisturbed
   # pixelGroups, and increments for the disturbed pixelGroups
 
-  # 1. NPP for undisturbed pixelGroups in this annual event
-  nonDistline <- which(pixelGroupForAnnual$pixelGroup == maxPixelGroup)
-  stockt <- pixelGroupForAnnual[1:nonDistline, .(
-    pixelGroup,
-    ages,
-    spatial_unit_id,
-    "PastSoftwoodMerch" = SoftwoodMerch,
-    "PastSoftwoodFoliage" = SoftwoodFoliage,
-    "PastSoftwoodOther" = SoftwoodOther,
-    "PastSoftwoodCoarseRoots" = SoftwoodCoarseRoots,
-    "PastSoftwoodFineRoots" = SoftwoodFineRoots,
-    "PastHardwoodMerch" = HardwoodMerch,
-    "PastHardwoodFoliage" = HardwoodFoliage,
-    "PastHardwoodOther" = HardwoodOther,
-    "PastHardwoodCoarseRoots" = HardwoodCoarseRoots,
-    "PastHardwoodFineRoots" = HardwoodFineRoots
-  )]
+  # # 1. NPP for undisturbed pixelGroups in this annual event
+  # nonDistline <- which(pixelGroupForAnnual$pixelGroup == maxPixelGroup)
+  # stockt <- pixelGroupForAnnual[1:nonDistline, .(
+  #   pixelGroup,
+  #   ages,
+  #   spatial_unit_id,
+  #   "PastSoftwoodMerch" = SoftwoodMerch,
+  #   "PastSoftwoodFoliage" = SoftwoodFoliage,
+  #   "PastSoftwoodOther" = SoftwoodOther,
+  #   "PastSoftwoodCoarseRoots" = SoftwoodCoarseRoots,
+  #   "PastSoftwoodFineRoots" = SoftwoodFineRoots,
+  #   "PastHardwoodMerch" = HardwoodMerch,
+  #   "PastHardwoodFoliage" = HardwoodFoliage,
+  #   "PastHardwoodOther" = HardwoodOther,
+  #   "PastHardwoodCoarseRoots" = HardwoodCoarseRoots,
+  #   "PastHardwoodFineRoots" = HardwoodFineRoots
+  # )]
+  #
+  # setkey(stockt, pixelGroup)
+  #
+  # stockt1 <- cbind(pixelGroupForAnnual[1:nonDistline, !(Input:Products)], sim$pools[1:nonDistline, ])[, .(
+  #   pixelGroup,
+  #   ages,
+  #   SoftwoodMerch,
+  #   SoftwoodFoliage,
+  #   SoftwoodOther,
+  #   SoftwoodCoarseRoots,
+  #   SoftwoodFineRoots,
+  #   HardwoodMerch,
+  #   HardwoodFoliage,
+  #   HardwoodOther,
+  #   HardwoodCoarseRoots,
+  #   HardwoodFineRoots
+  # )]
+  # setkey(stockt1, pixelGroup)
+  #
+  # stocks2t <- merge.data.table(stockt[,-c("ages")],stockt1[,-c("ages")], by = "pixelGroup")
+  # grossGrowth <- stocks2t[, .(
+  #   pixelGroup,
+  #   grossGrowthAG = (
+  #     (SoftwoodMerch - PastSoftwoodMerch) +
+  #       (SoftwoodFoliage - PastSoftwoodFoliage) +
+  #       (SoftwoodOther - PastSoftwoodOther) +
+  #       (HardwoodMerch - PastHardwoodMerch) +
+  #       (HardwoodFoliage - PastHardwoodFoliage) +
+  #       (HardwoodOther - PastHardwoodOther)),
+  #   grossGrowthBG = (
+  #     (SoftwoodCoarseRoots - PastSoftwoodCoarseRoots) +
+  #       (SoftwoodFineRoots - PastSoftwoodFineRoots) +
+  #       (HardwoodCoarseRoots - PastHardwoodCoarseRoots) +
+  #       (HardwoodFineRoots - PastHardwoodFineRoots))
+  # )]
+  #
+  # # sim$turnoverRates are calculated in the postspinup event
+  # turnoverRates <- sim$turnoverRates[, spatial_unit_id := SpatialUnitID]
+  # turnoverComponents <- merge(stockt, turnoverRates, by = "spatial_unit_id")
+  # turnover <- turnoverComponents[, .(
+  #   AGturnover = (
+  #     (PastSoftwoodMerch * StemAnnualTurnoverRate) +
+  #       (PastSoftwoodFoliage * SoftwoodFoliageFallRate) +
+  #       (PastSoftwoodOther * SoftwoodBranchTurnoverRate) +
+  #       (PastHardwoodMerch * StemAnnualTurnoverRate) +
+  #       (PastHardwoodFoliage * HardwoodFoliageFallRate) +
+  #       (PastHardwoodOther * HardwoodBranchTurnoverRate)),
+  #   BGturnover = (
+  #     (PastSoftwoodCoarseRoots * CoarseRootTurnProp) +
+  #       (PastSoftwoodFineRoots * FineRootTurnProp) +
+  #       (PastHardwoodCoarseRoots * CoarseRootTurnProp) +
+  #       (PastHardwoodFineRoots * FineRootTurnProp))
+  # ), by = pixelGroup]
+  #
+  # NPPnonDist <- merge(turnover, grossGrowth, by = "pixelGroup")[, .(
+  #   pixelGroup,
+  #   NPP = (
+  #     AGturnover +
+  #       BGturnover +
+  #       grossGrowthAG +
+  #       grossGrowthBG)
+  # )]
+#
+#   # 2. NPP for the disturbed pixels
+#   # NPP for all the pixelGroups that are greater than the maxPixelGroup is calculated as the sum of the
+#   # increments for that pixel group.
+#   ## Note: this will also work for the non-stand-replacing disturbances as we use
+#   ## "inputs" only and not differences between stocks.
+#   # growth matrices in sim$allProcesses$Growth1 are the increments for that pixelGroup at the age in this annual cycle
+#   # make the matrices data.tables
+#   incsListDT <- lapply(sim$allProcesses$Growth1, as.data.table)
+#   incsListDTnrow <- lapply(sim$allProcesses$Growth1, nrow)
+#   incsNrow <- do.call("rbind", incsListDTnrow)
+#   # names(incsListDT) <- pixelGroupForAnnual$pixelGroup#paste0("pg",
+#   incDT <- rbindlist(incsListDT)
+#   # this is not working can't figure out why. This is necessary in case the inc ..so I did it the long way ## TODO speed this up
+#   # incDT$name <- rep(names(incsListDT),each=sapply(incsListDT,"nrow"))
+#   nameVec <- NULL
+#   for (i in 1:length(pixelGroupForAnnual$pixelGroup)) {
+#     thisPg <- rep(pixelGroupForAnnual$pixelGroup[i], times = incsNrow[i])
+#     nameVec <- c(nameVec, thisPg)
+#   }# this data table now has the pixelGroup attached to the 1/2 increment matrix.
+#   incDT$name <- nameVec
+#   # increment values that are <0 do not count towards NPP. NPP, by definition is the fixation of carbon from the atmosphere taking into account autotrophic respiration but NOT heterotrophic respiration. No negative increments in the NPP calculations.
+#   # only the pixelGroups that are disturbed
+#   distNPP <- incDT[name > maxPixelGroup & value < 1, .(NPP = sum(value)), by = name]
+#
+#   names(distNPP) <- names(NPPnonDist)
+#
+#   # 3. All pixel group NPP in one table
+#   # sim$NPP is created in postspinup (as NULL)
+#   NPP <- rbind(NPPnonDist, distNPP)
+#   sim$NPP <- rbind(sim$NPP, cbind(simYear = rep(time(sim)[1], nrow(NPP)), NPP))
+  ############ CBM-CFS3 replication NOT USED###########################################
 
-  setkey(stockt, pixelGroup)
-
-  stockt1 <- cbind(pixelGroupForAnnual[1:nonDistline, !(Input:Products)], sim$pools[1:nonDistline, ])[, .(
-    pixelGroup,
-    ages,
-    SoftwoodMerch,
-    SoftwoodFoliage,
-    SoftwoodOther,
-    SoftwoodCoarseRoots,
-    SoftwoodFineRoots,
-    HardwoodMerch,
-    HardwoodFoliage,
-    HardwoodOther,
-    HardwoodCoarseRoots,
-    HardwoodFineRoots
-  )]
-  setkey(stockt1, pixelGroup)
-
-  stocks2t <- stockt[, -c("ages", "spatial_unit_id")][stockt1]
-  grossGrowth <- stocks2t[, .(
-    pixelGroup,
-    grossGrowthAG = (
-      (SoftwoodMerch - PastSoftwoodMerch) +
-        (SoftwoodFoliage - PastSoftwoodFoliage) +
-        (SoftwoodOther - PastSoftwoodOther) +
-        (HardwoodMerch - PastHardwoodMerch) +
-        (HardwoodFoliage - PastHardwoodFoliage) +
-        (HardwoodOther - PastHardwoodOther)),
-    grossGrowthBG = (
-      (SoftwoodCoarseRoots - PastSoftwoodCoarseRoots) +
-        (SoftwoodFineRoots - PastSoftwoodFineRoots) +
-        (HardwoodCoarseRoots - PastHardwoodCoarseRoots) +
-        (HardwoodFineRoots - PastHardwoodFineRoots))
-  )]
-
-  # sim$turnoverRates are calculated in the postspinup event
-  turnoverRates <- sim$turnoverRates[, spatial_unit_id := SpatialUnitID]
-  turnoverComponents <- merge(stockt, turnoverRates, by = "spatial_unit_id")
-  turnover <- turnoverComponents[, .(
-    AGturnover = (
-      (PastSoftwoodMerch * StemAnnualTurnoverRate) +
-        (PastSoftwoodFoliage * SoftwoodFoliageFallRate) +
-        (PastSoftwoodOther * SoftwoodBranchTurnoverRate) +
-        (PastHardwoodMerch * StemAnnualTurnoverRate) +
-        (PastHardwoodFoliage * HardwoodFoliageFallRate) +
-        (PastHardwoodOther * HardwoodBranchTurnoverRate)),
-    BGturnover = (
-      (PastSoftwoodCoarseRoots * CoarseRootTurnProp) +
-        (PastSoftwoodFineRoots * FineRootTurnProp) +
-        (PastHardwoodCoarseRoots * CoarseRootTurnProp) +
-        (PastHardwoodFineRoots * FineRootTurnProp))
-  ), by = pixelGroup]
-
-  NPPnonDist <- merge(turnover, grossGrowth, by = "pixelGroup")[, .(
-    pixelGroup,
-    NPP = (
-      AGturnover +
-        BGturnover +
-        grossGrowthAG +
-        grossGrowthBG)
-  )]
-
-  # 2. NPP for the disturbed pixels
-  # NPP for all the pixelGroups that are greater than the maxPixelGroup is calculated as the sum of the
-  # increments for that pixel group.
-  ## Note: this will also work for the non-stand-replacing disturbances as we use
-  ## "inputs" only and not differences between stocks.
-
-  # make the matrices data.tables
+  ############## NPP used in building sim$NPP and for plotting ####################################
   incsListDT <- lapply(sim$allProcesses$Growth1, as.data.table)
   incsListDTnrow <- lapply(sim$allProcesses$Growth1, nrow)
   incsNrow <- do.call("rbind", incsListDTnrow)
   # names(incsListDT) <- pixelGroupForAnnual$pixelGroup#paste0("pg",
   incDT <- rbindlist(incsListDT)
-  # this is not working can't figure out why...
+  # this is not working can't figure out why. This is necessary in case the inc ..so I did it the long way ## TODO speed this up
   # incDT$name <- rep(names(incsListDT),each=sapply(incsListDT,"nrow"))
   nameVec <- NULL
   for (i in 1:length(pixelGroupForAnnual$pixelGroup)) {
     thisPg <- rep(pixelGroupForAnnual$pixelGroup[i], times = incsNrow[i])
     nameVec <- c(nameVec, thisPg)
-  }
+  }# this data table now has the pixelGroup attached to the 1/2 increment matrix.
   incDT$name <- nameVec
+  ## TODO could improve the NPP and seperate into AG and BG (AG = merch,
+  ## foliage, other  - for sw cols = 2,3,4, for hw cols = 7,8,9; BG = fineRoots,
+  ## coarseRoots - sw cols = 5, 6, for hw cols = 10,11)
+  NPP <- incDT[value > 0 & value < 1, .(NPP = 2*sum(value)), by = name]
 
-  # only the pixelGroups that are disturbed
-  distNPP <- incDT[name > maxPixelGroup & value < 1, .(NPP = sum(value)), by = name]
-  names(distNPP) <- names(NPPnonDist)
+  names(NPP) <- c("pixelGroup", "NPP")
+  NPP <- cbind(simYear = rep(time(sim)[1], nrow(NPP)), NPP)
 
-  # 3. All pixel group NPP in one table
-  # sim$NPP is created in postspinup (as NULL)
-  NPP <- rbind(NPPnonDist, distNPP)
-  sim$NPP <- rbind(sim$NPP, cbind(simYear = rep(time(sim)[1], nrow(NPP)), NPP))
+  sim$NPP <- rbind(sim$NPP, NPP)
   ######### NPP END HERE ###################################
   #-----------------------------------------------------------------------------------
 
