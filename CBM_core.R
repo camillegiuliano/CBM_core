@@ -302,23 +302,24 @@ spinup <- function(sim) {
   # sim$ages[sim$ages>max(spadesCBMout$growth_increments[,2])] <- max(spadesCBMout$growth_increments[,2])
   ## END AGE
 
-  spinupResult <- Spinup( ## TODO: cache this
-    pools = sim$pools,
-    opMatrix = opMatrix,
-    constantProcesses = sim$processes,
-    growthIncrements = sim$gcHash,
-    ages = sim$ages,
-    gcids = sim$gcids,
-    historicdmids = sim$historicDMIDs,
-    lastPassdmids = sim$lastPassDMIDS,
-    delays = sim$delays,
-    minRotations = sim$minRotations,
-    maxRotations = sim$maxRotations,
-    returnIntervals = sim$returnIntervals$return_interval,
-    rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
-    turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
-    biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
-    debug = P(sim)$spinupDebug
+  spinupResult <- Cache(Spinup,
+                        pools = sim$pools,
+                        opMatrix = opMatrix,
+                        constantProcesses = sim$processes,
+                        growthIncrements = sim$gcHash,
+                        ages = sim$ages,
+                        gcids = sim$gcids,
+                        historicdmids = sim$historicDMIDs,
+                        lastPassdmids = sim$lastPassDMIDS,
+                        delays = sim$delays,
+                        minRotations = sim$minRotations,
+                        maxRotations = sim$maxRotations,
+                        returnIntervals = sim$returnIntervals$return_interval,
+                        rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
+                        turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
+                        biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
+                        debug = P(sim)$spinupDebug,
+                        userTags = c("spinup")
   )
 
   # # setting CO2, CH4, CO and products to 0 before starting the simulations
