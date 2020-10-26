@@ -400,7 +400,7 @@ annual <- function(sim) {
   mySpuDmids <- sim$mySpuDmids
   mySpuDmids[, "events" := rasterId][, rasterId := NULL]
   cols <- c("spatial_unit_id", "events")
-  wholeStandDist<- merge.data.table(distPixels, mySpuDmids, by = cols)
+  wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
   # read-in the mySpuDmids, make a vector of 0 and 1 the length of distPixels$events
   setkey(wholeStandDist,pixelIndex)
   setkey(distPixels,pixelIndex)
@@ -435,11 +435,10 @@ annual <- function(sim) {
     CO2, CH4, CO, Products
   )]
 
-
   distPixelCpools <- merge(distPixels, cPoolsOnly)
 
-  distPixelCpools$newGroup <- LandR::generatePixelGroups(distPixelCpools, maxPixelGroup,
-    columns = c(
+  distPixelCpools$newGroup <- LandR::generatePixelGroups(
+    distPixelCpools, maxPixelGroup, columns = c(
       "ages", "spatial_unit_id",
       "growth_curve_component_id",
       "ecozones", "events", "Input", "SoftwoodMerch",
