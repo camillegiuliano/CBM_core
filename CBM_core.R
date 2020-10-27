@@ -184,7 +184,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- annual(sim)
       sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual")
       if (time(sim) == end(sim)) {
-        sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot", eventPriority = 9 )
+        sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot", eventPriority = 9 ) ## TODO: schedule in plot event
         sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last()) ## TODO: schedule saving in init or in savePools event
       }
       # ! ----- STOP EDITING ----- ! #
@@ -197,9 +197,8 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
         turnoverRates = sim$cbmData@turnoverRates,
         spatialUnitIds = sim$cbmData@spatialUnitIds, spatialUnits = sim$spatialUnits
       )
-      # sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot")
       sim <- scheduleEvent(sim, time(sim), "CBM_core", "annual") ## TODO: schedule in init
-      sim <- scheduleEvent(sim, time(sim), "CBM_core", "plot", eventPriority = 9)
+      sim <- scheduleEvent(sim, time(sim), "CBM_core", "plot", eventPriority = 9) ## TODO: schedule in init
       # ! ----- STOP EDITING ----- ! #
     },
     plot = {
@@ -229,7 +228,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
         years = time(sim),
         masterRaster = sim$masterRaster
       )
-      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 9)
+      #sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 9)  ## TODO: schedule plotting here
     },
     savePools = {
       # ! ----- EDIT BELOW ----- ! #
