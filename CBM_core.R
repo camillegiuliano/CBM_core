@@ -198,7 +198,8 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       # ! ----- STOP EDITING ----- ! #
     },
     plot = {
-      if (!time(sim) == start(sim)) {
+      ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
+      if (time(sim) != start(sim)) {
         carbonOutPlot(
           cbmPools = sim$cbmPools,
           emissionsProducts = sim$emissionsProducts,
@@ -565,7 +566,6 @@ annual <- function(sim) {
   # 4. compute the growth increments that are specific to the number of
   # pixelGroups in this annual event, and feed in the vectors specific to this
   # annual event
-
   growthAndDecline <- ComputeGrowthAndDeclineMatrices2(
     growthIncrements = sim$gcHash,
     ages = sim$ages,
