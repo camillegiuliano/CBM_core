@@ -502,7 +502,8 @@ annual <- function(sim) {
   # identification so it links back to the CBM default disturbance matrices.
   DM <- merge(pixelGroupForAnnual, mySpuDmids, by = c("spatial_unit_id", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
-  DM[order(pixelGroup), ]
+
+  DM <- DM[order(pixelGroup), ]
   ## this is the vector to be fed into the sim$opMatrixCBM[,"disturbance"]<-DMIDS
   DMIDS <- DM$disturbance_matrix_id
 
