@@ -30,7 +30,7 @@ defineModule(sim, list(
     defineParameter(".saveInterval", "numeric", NA, NA, NA, "This describes the simulation time interval between save events"),
     defineParameter(".useCache", "logical", FALSE, NA, NA, "Should this entire module be run with caching activated? This is generally intended for data-type modules, where stochasticity and time are not relevant")
   ),
-  inputObjects = bind_rows(
+  inputObjects = bindrows(
     # expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
     expectsInput(objectName = "cbmData", objectClass = "dataset", desc = NA, sourceURL = NA),
     expectsInput(
@@ -107,7 +107,7 @@ defineModule(sim, list(
       desc = "the table containing one line per pixel"
     )
   ),
-  outputObjects = bind_rows(
+  outputObjects = bindrows(
     createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
     createsOutput(objectName = "spinupResult", objectClass = "data.frame", desc = NA),
     createsOutput(
