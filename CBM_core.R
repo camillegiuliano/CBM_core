@@ -8,7 +8,7 @@ defineModule(sim, list(
   keywords = NA, # c("insert key words here"),
   authors = person("Celine", "Boisvenue", email = "celine.boisvenue@canada.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(SpaDES.core = "1.0.2", CBM_core = "0.0.1"),
+  version = list(CBM_core = "0.0.1"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
@@ -16,7 +16,7 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
-    "CBMutils" # "PredictiveEcology/CBMutils"
+    "PredictiveEcology/CBMutils (>= 0.0.6)"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA, "If TRUE spinupResult will be outputed to a text file (spinup.csv). FALSE means no ouput of the spinupResult"),
