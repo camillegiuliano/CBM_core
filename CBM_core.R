@@ -126,7 +126,8 @@ defineModule(sim, list(
     #               desc = "3 column matrix, PixelGroupID, Year, and DisturbanceMatrixId. Not used in Spinup."),
     createsOutput(
       objectName = "pixelKeep", objectClass = "data.table",
-      desc = "Keeps the pixelIndex from spatialDT with each year's PixelGroupID as a column. This is to enable making maps of yearly output."
+      desc = paste("Keeps the pixelIndex from spatialDT with each year's PixelGroupID as a column.",
+                   "This is to enable making maps of yearly output.")
     ),
     # createsOutput(objectName = "yearEvents", objectClass = "data.frame", desc = NA),
     createsOutput(objectName = "pools", objectClass = "matrix", desc = NA),
@@ -280,11 +281,11 @@ spinup <- function(sim) {
   }
 
   opMatrix <- cbind(
-    1:sim$nStands, # growth 1
+    1:sim$nStands, # growth1
     sim$ecozones, # domturnover
     sim$ecozones, # bioturnover
     1:sim$nStands, # overmature
-    1:sim$nStands, # growth 2
+    1:sim$nStands, # growth2
     sim$spatialUnits, # domDecay
     sim$spatialUnits, # slow decay
     rep(1, sim$nStands) # slow mixing
@@ -752,7 +753,10 @@ annual <- function(sim) {
   # re-zeroed at the end of the spinup event.
 
   # 1. Add the emissions and Products for this year
-  emissionsProducts <- as.data.table(cbind(rep(time(sim)[1], length(pixelGroupForAnnual$pixelGroup)),pixelGroupForAnnual$pixelGroup,sim$pools[,23:26]))
+  emissionsProducts <- as.data.table(cbind(
+    rep(time(sim)[1], length(pixelGroupForAnnual$pixelGroup)),
+    pixelGroupForAnnual$pixelGroup, sim$pools[, 23:26]
+  ))
   names(emissionsProducts) <- c("simYear","pixelGroup", "CO2", "CH4", "CO", "Products")
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
 
