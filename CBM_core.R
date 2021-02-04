@@ -792,7 +792,7 @@ annual <- function(sim) {
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
   updatePools <- cbind(
-    rep(time(sim)[1], length(sim$pixelGroupC$ages)), pixelCount[, 2],
+    rep(time(sim)[1], length(sim$pixelGroupC$ages)), pixelCount[, "N"],
     sim$pixelGroupC$pixelGroup, sim$pixelGroupC$ages,
     sim$pixelGroupC[, Input:Products]
   )
