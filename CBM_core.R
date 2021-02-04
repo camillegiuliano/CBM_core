@@ -290,6 +290,7 @@ spinup <- function(sim) {
     sim$spatialUnits, # slow decay
     rep(1, sim$nStands) # slow mixing
   )
+
   ### NEED TO DEAL WITH THIS HERE
   ## Are there stands over max age in the growth curves?If so, need to set to
   ## the max...may even the oldest stand for 1st spinup might have to be
@@ -299,6 +300,7 @@ spinup <- function(sim) {
   # sim$ages[sim$ages>max(spadesCBMout$growth_increments[,2])] <- max(spadesCBMout$growth_increments[,2])
   ## END AGE
 
+  mod$emissionsProductsCols <- c("CO2", "CH4", "CO", "Products")
   spinupResult <- Cache(Spinup,
                         pools = sim$pools,
                         opMatrix = opMatrix,
@@ -320,7 +322,7 @@ spinup <- function(sim) {
   )
 
   # # setting CO2, CH4, CO and products to 0 before starting the simulations
-  spinupResult[, 23:dim(spinupResult)[2]] <- 0
+  spinupResult[, mod$emissionsProductsCols] <- 0
   sim$spinupResult <- spinupResult
   sim$spinupResult[which(is.na(sim$spinupResult))] <- 0
   return(invisible(sim))
@@ -755,13 +757,13 @@ annual <- function(sim) {
   # 1. Add the emissions and Products for this year
   emissionsProducts <- as.data.table(cbind(
     rep(time(sim)[1], length(pixelGroupForAnnual$pixelGroup)),
-    pixelGroupForAnnual$pixelGroup, sim$pools[, 23:26]
+    pixelGroupForAnnual$pixelGroup, sim$pools[, mod$emissionsProductsCols]
   ))
-  names(emissionsProducts) <- c("simYear","pixelGroup", "CO2", "CH4", "CO", "Products")
+  names(emissionsProducts) <- c("simYear","pixelGroup", mod$emissionsProductsCols)
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
 
   # 2. Re-zero the pools for emissions and Products
-  sim$pools[, 23:dim(sim$pools)[2]] <- 0
+  sim$pools[, mod$emissionsProductsCols] <- 0
   ############# End of update emissions and products ------------------------------------
 
 
