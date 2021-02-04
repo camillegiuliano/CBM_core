@@ -290,7 +290,7 @@ spinup <- function(sim) {
     sim$spatialUnits, # slow decay
     rep(1, sim$nStands) # slow mixing
   )
-
+  ## TODO :
   ### NEED TO DEAL WITH THIS HERE
   ## Are there stands over max age in the growth curves?If so, need to set to
   ## the max...may even the oldest stand for 1st spinup might have to be
@@ -586,14 +586,16 @@ annual <- function(sim) {
 
   ### good check: dim(pools)[1]==dim(opMatrixCBM)[1]
 
-  # 5. All the work happens here: update all the pools.
+  # 5. save the pre-carbon transaction values for emissions and Products
+  emissionsProductsIn <- sim$pools[,mod$emissionsProductsCols]
+
+  # 6. All the work happens here: update all the pools.
   sim$pools <- StepPools(
     pools = sim$pools,
     opMatrix = sim$opMatrixCBM,
     flowMatrices = sim$allProcesses
   )
   sim$pools[which(is.na(sim$pools))] <- 0
-
   ########################## END PROCESSES#########################################
   #-------------------------------------------------------------------------------
 
@@ -746,24 +748,34 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
 
   ############# Update emissions and products -------------------------------------------
-  # Emissions and re-zeroed every year as these pools should not define the
+  # Emissions are re-zeroed every year as these pools should not define the
   # pixelGroups and both these values are most commonly required on a yearly
   # basis.
 
-  # sim$emissionsProducts was first created in postspinup event and is update
+  # sim$emissionsProducts was first created in postspinup event as NULL and is update
   # here for each annual event. The sim$spinupResult emissions and Products was
   # re-zeroed at the end of the spinup event.
 
   # 1. Add the emissions and Products for this year
+  emissionsProductsOut <- sim$pools[,mod$emissionsProductsCols]
+
+  ## assertion
+  if(time(sim) == start(sim)){
+    if(!identical((emissionsProductsOut - emissionsProductsIn), emissionsProductsOut))
+      stop(
+        "The difference between emissionsProductsOut and emissionsProductsIn,",
+        "should be equal to emissionsProductsOut in the first year of simulation.",
+        "That is not the case. The simulation cannot proceed."
+      )
+  }
+
   emissionsProducts <- as.data.table(cbind(
     rep(time(sim)[1], length(pixelGroupForAnnual$pixelGroup)),
-    pixelGroupForAnnual$pixelGroup, sim$pools[, mod$emissionsProductsCols]
+    pixelGroupForAnnual$pixelGroup, (emissionsProductsOut - emissionsProductsIn)
   ))
   names(emissionsProducts) <- c("simYear","pixelGroup", mod$emissionsProductsCols)
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
 
-  # 2. Re-zero the pools for emissions and Products
-  sim$pools[, mod$emissionsProductsCols] <- 0
   ############# End of update emissions and products ------------------------------------
 
 
