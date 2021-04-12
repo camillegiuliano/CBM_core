@@ -376,34 +376,37 @@ annual <- function(sim) {
   # 1. Read-in the disturbances, stack read-in from spadesCBMinputs.R in example.
   spatialDT <- sim$spatialDT
   setkeyv(spatialDT, "pixelIndex")
+  spatialDT[, events := 0L]
 
-  browser()
   if (is(sim$disturbanceRasters, "list")) {
     annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], ".grd$"),
                                      value = TRUE))
     #
-    # pixels <- getValues(sim$masterRaster)
-    # yearEvents <- getValues(annualDisturbance)[!is.na(pixels)]
+    pixels <- getValues(sim$masterRaster)
+    yearEvents <- getValues(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
     # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
 
     # pixelCount <- spatialDT[, .N, by = pixelGroup]
     ## TO DO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
     ### do I have to make it sim$ here?
-    # spatialDT <- spatialDT[, events := yearEvents]
+    newEvents <- yearEvents > 0
+    spatialDT <- spatialDT[newEvents == TRUE, events := yearEvents[newEvents]]
     # this could be big so remove it
-    # rm(yearEvents)
+    rm(yearEvents)
     # 3. get the disturbed pixels only
     distPixels <- spatialDT[events > 0, .(
       pixelIndex, pixelGroup, ages, spatial_unit_id,
       growth_curve_component_id, growth_curve_id,
       ecozones, events
     )]
+
   } else if (is(sim$disturbanceRasters, "data.table")) {
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
     set(annualDisturbance, NULL, "year", NULL)
-    distPixels <- sim$spatialDT[annualDisturbance, on = c("pixelIndex" = "pixels"), nomatch = NULL]
+    distPixels <- spatialDT[annualDisturbance, on = c("pixelIndex" = "pixels"), nomatch = NULL]
     set(distPixels, NULL, "events", 1L) # These are fires i.e., event type 1
+    spatialDT[pixelIndex %in% distPixels$pixelIndex, events := 1L]
   } else {
     stop("sim$disturbancRasters must be a list of filenames of Rasters (in .grd) or a ",
          "single data.table with 2 columns, pixels and year")
@@ -490,7 +493,7 @@ annual <- function(sim) {
 
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
   # disturbed pixels)
-  updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"][, events := 0],
+  updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"],
                            distPixelCpools[, 1:8])
   setkeyv(updateSpatialDT, "pixelIndex")
   pixelCount <- updateSpatialDT[, .N, by = pixelGroup]
