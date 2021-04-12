@@ -94,9 +94,16 @@ defineModule(sim, list(
       objectName = "disturbanceRasters", objectClass = "raster",
       desc = "Character vector of the disturbance rasters for SK"
     ),
-    expectsInput(
-      objectName = "mySpuDmids", objectClass = "data.frame",
-      desc = "the table containing one line per pixel"
+    # expectsInput(
+    #   objectName = "mySpuDmids", objectClass = "data.frame",
+    #   desc = "the table containing one line per pixel"
+    # ),
+    expectsInput( ## URL RIA CORRECT CHECKED
+      objectName = "userDist", objectClass = "data.table",
+      desc = "User provided file that identifies disturbances for simulation (distName),
+      raster Id if applicable, and wholeStand toggle (1 = whole stand disturbance, 0 = partial disturbance),
+      if not there it will use userDistFile",
+      sourceURL = "https://drive.google.com/file/d/1Gr_oIfxR11G1ahynZ5LhjVekOIr2uH8X"
     ),
     # expectsInput(objectName = "disturbanceEvents", objectClass = "matrix",
     #              desc = "3 column matrix, PixelGroupID, Year (that sim year), and DisturbanceMatrixId. Not used in Spinup.", sourceURL = NA),
@@ -275,7 +282,7 @@ spinup <- function(sim) {
       "The inputObjects for CBM_core are not all available:",
       "These are missing:", paste(objectNamesExpected[!available], collapse = ", "),
       ". \n\nHave you run ",
-      paste0("spadesCBM", c("defaults", "inputs", "m3ToBiomass"), collapse = ", "),
+      paste0("spadesCBM", c("defaults", "inputs", "m3ToBiomass", "userDist"), collapse = ", "),
       "?"
     )
   }
@@ -318,7 +325,7 @@ spinup <- function(sim) {
                         turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
                         biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
                         debug = P(sim)$spinupDebug,
-                        userTags = c("spinup")
+                        userTags = c("spinup"), cacheId = "8c44e3e4c7ab293d"
   )
 
   # # setting CO2, CH4, CO and products to 0 before starting the simulations
@@ -331,7 +338,7 @@ spinup <- function(sim) {
 postSpinup <- function(sim) {
   sim$pools <- sim$spinupResult
   # prepping the pixelGroups for processing in the annual event
-  sim$level3DT <- sim$level3DT[order(pixelGroup), ]
+  setorderv(sim$level3DT, "pixelGroup")
   sim$pixelGroupC <- cbind(sim$level3DT, sim$spinupResult)
 
   sim$cbmPools <- NULL
@@ -341,7 +348,7 @@ postSpinup <- function(sim) {
   # Keep the pixels from each simulation year (in the postSpinup event)
   # in the end (cPoolsPixelYear.csv), this should be the same length at this vector
   ## got place for a vector length check!!
-  sim$spatialDT <- sim$spatialDT[order(sim$spatialDT$pixelIndex), ]
+  setorderv(sim$spatialDT, "pixelGroup")
   sim$pixelKeep <- sim$spatialDT[, .(pixelIndex, pixelGroup)]
   setnames(sim$pixelKeep, c("pixelIndex", "pixelGroup0"))
 
@@ -367,37 +374,48 @@ annual <- function(sim) {
   ## from other modules such as rasters they need to be read in here.
 
   # 1. Read-in the disturbances, stack read-in from spadesCBMinputs.R in example.
-  annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], ".grd$"), value = TRUE))
-  ##
-  pixels <- getValues(sim$masterRaster)
-  yearEvents <- getValues(annualDisturbance)[!is.na(pixels)]
-  ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
+  spatialDT <- sim$spatialDT
+  setkeyv(spatialDT, "pixelIndex")
 
-  # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
-  spatialDT <- sim$spatialDT[order(sim$spatialDT$pixelIndex)]
-  pixelCount <- spatialDT[, .N, by = pixelGroup]
-  ## TO DO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
+  browser()
+  if (is(sim$disturbanceRasters, "list")) {
+    annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], ".grd$"),
+                                     value = TRUE))
+    #
+    # pixels <- getValues(sim$masterRaster)
+    # yearEvents <- getValues(annualDisturbance)[!is.na(pixels)]
+    ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
+    # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
 
-  ### do I have to make it sim$ here?
-  spatialDT <- spatialDT[, events := yearEvents]
-  # this could be big so remove it
-  rm(yearEvents)
-
-  # 3. get the disturbed pixels only
-  distPixels <- spatialDT[events > 0, .(
-    pixelIndex, pixelGroup, ages, spatial_unit_id,
-    growth_curve_component_id, growth_curve_id,
-    ecozones, events
-  )]
-  setkey(distPixels, pixelGroup)
+    # pixelCount <- spatialDT[, .N, by = pixelGroup]
+    ## TO DO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
+    ### do I have to make it sim$ here?
+    # spatialDT <- spatialDT[, events := yearEvents]
+    # this could be big so remove it
+    # rm(yearEvents)
+    # 3. get the disturbed pixels only
+    distPixels <- spatialDT[events > 0, .(
+      pixelIndex, pixelGroup, ages, spatial_unit_id,
+      growth_curve_component_id, growth_curve_id,
+      ecozones, events
+    )]
+  } else if (is(sim$disturbanceRasters, "data.table")) {
+    annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
+    set(annualDisturbance, NULL, "year", NULL)
+    distPixels <- sim$spatialDT[annualDisturbance, on = c("pixelIndex" = "pixels"), nomatch = NULL]
+    set(distPixels, NULL, "events", 1L) # These are fires i.e., event type 1
+  } else {
+    stop("sim$disturbancRasters must be a list of filenames of Rasters (in .grd) or a ",
+         "single data.table with 2 columns, pixels and year")
+  }
 
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
 
   # mySpuDmids was created in spadesCBMinputs
-  mySpuDmids <- sim$mySpuDmids
-  mySpuDmids[, "events" := rasterId][, rasterId := NULL]
+  mySpuDmids <- sim$userDist
+  mySpuDmids[, "events" := rasterID][, rasterID := NULL]
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
   # read-in the mySpuDmids, make a vector of 0 and 1 the length of distPixels$events
@@ -472,7 +490,9 @@ annual <- function(sim) {
 
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
   # disturbed pixels)
-  updateSpatialDT <- rbind(spatialDT[events < 1, ], distPixelCpools[, 1:8]) %>% .[order(pixelIndex), ]
+  updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"][, events := 0],
+                           distPixelCpools[, 1:8])
+  setkeyv(updateSpatialDT, "pixelIndex")
   pixelCount <- updateSpatialDT[, .N, by = pixelGroup]
   # adding the new pixelGroup to the pixelKeep. pixelKeep is 1st created in the
   # postspinup event and update in each annual event (in this script).
