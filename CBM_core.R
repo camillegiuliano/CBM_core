@@ -507,7 +507,7 @@ annual <- function(sim) {
   # create the meta data gets updated here.
 
   # only the column pixelIndex is different between distPixelCpools and pixelGroupC
-  metaDT <- unique(updateSpatialDT[, -("pixelIndex")]) %>% .[order(pixelGroup), ]
+  metaDT <- unique(updateSpatialDT[, -("pixelIndex")]) # %>% .[order(pixelGroup), ]
   setkey(metaDT, pixelGroup)
 
   # 8. link the meta data (metaDT) with the appropriate carbon pools
@@ -522,15 +522,16 @@ annual <- function(sim) {
   )
   part2 <- merge(metaDT, distGroupCpools, by = cols)
   # table for this annual event processing
-  pixelGroupForAnnual <- rbind(part1, part2) %>% .[order(pixelGroup), ]
+  pixelGroupForAnnual <- rbind(part1, part2)
+  setkeyv(pixelGroupForAnnual, "pixelGroup")
 
 
   # 9. From the events column, create a vector of the disturbance matrix
   # identification so it links back to the CBM default disturbance matrices.
   DM <- merge(pixelGroupForAnnual, mySpuDmids, by = c("spatial_unit_id", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
+  setkeyv(DM, "pixelGroup")
 
-  DM <- DM[order(pixelGroup), ]
   ## this is the vector to be fed into the sim$opMatrixCBM[,"disturbance"]<-DMIDS
   DMIDS <- DM$disturbance_matrix_id
 
