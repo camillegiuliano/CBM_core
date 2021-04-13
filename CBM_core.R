@@ -21,6 +21,7 @@ defineModule(sim, list(
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA, "If TRUE spinupResult will be outputed to a text file (spinup.csv). FALSE means no ouput of the spinupResult"),
     # defineParameter("noAnnualDisturbances", "logical", FALSE, NA, NA, "If TRUE the sim$allProcesses and sim$opMatrix are created in the postSpinup event, just once. By default, these are recreated everyyear in the annual event"),
+    defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_, "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
     defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
       desc = "which carbon pools to plot, if any. Defaults to total carbon"
     ),
@@ -171,7 +172,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual")
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
       sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 9 )
-      sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last())
+      # sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last())
     },
     saveSpinup = {
       # ! ----- EDIT BELOW ----- ! #
@@ -307,7 +308,6 @@ spinup <- function(sim) {
   # sim$ages[sim$ages>max(spadesCBMout$growth_increments[,2])] <- max(spadesCBMout$growth_increments[,2])
   ## END AGE
 
-  mod$emissionsProductsCols <- c("CO2", "CH4", "CO", "Products")
   spinupResult <- Cache(Spinup,
                         pools = sim$pools,
                         opMatrix = opMatrix,
@@ -329,7 +329,7 @@ spinup <- function(sim) {
   )
 
   # # setting CO2, CH4, CO and products to 0 before starting the simulations
-  spinupResult[, mod$emissionsProductsCols] <- 0
+  spinupResult[, P(sim)$emissionsProductsCols] <- 0
   sim$spinupResult <- spinupResult
   sim$spinupResult[which(is.na(sim$spinupResult))] <- 0
   return(invisible(sim))
@@ -630,7 +630,7 @@ annual <- function(sim) {
   ### good check: dim(pools)[1]==dim(opMatrixCBM)[1]
 
   # 5. save the pre-carbon transaction values for emissions and Products
-  emissionsProductsIn <- sim$pools[,mod$emissionsProductsCols]
+  emissionsProductsIn <- sim$pools[,P(sim)$emissionsProductsCols]
 
   # 6. All the work happens here: update all the pools.
   sim$pools <- StepPools(
@@ -645,10 +645,16 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
   ############ NPP ####################################################################
   ############## NPP used in building sim$NPP and for plotting ####################################
-  incsListDT <- lapply(sim$allProcesses$Growth1, as.data.table)
-  setattr(incsListDT, 'names', pixelGroupForAnnual$pixelGroup)
-  incDT <- rbindlist(incsListDT, idcol = "pixelGroup")
-  set(incDT, NULL, "pixelGroup", as.numeric(incDT[["pixelGroup"]]))
+  # browser()
+  pgs <- rep(pixelGroupForAnnual$pixelGroup, lengths(sim$allProcesses$Growth1)/3)
+  incsMat <- do.call(rbind, sim$allProcesses$Growth1)
+  incDT <- as.data.table(incsMat)
+  set(incDT, NULL, "pixelGroup", pgs)
+
+  # incsListDT <- lapply(sim$allProcesses$Growth1, as.data.table)
+  # setattr(incsListDT, 'names', pixelGroupForAnnual$pixelGroup)
+  # incDT <- rbindlist(incsListDT, idcol = "pixelGroup")
+  # set(incDT, NULL, "pixelGroup", as.numeric(incDT[["pixelGroup"]]))
   ## TODO could improve the NPP and seperate into AG and BG (AG = merch,
   ## foliage, other  - for sw cols = 2,3,4, for hw cols = 7,8,9; BG = fineRoots,
   ## coarseRoots - sw cols = 5, 6, for hw cols = 10,11)
@@ -669,7 +675,7 @@ annual <- function(sim) {
   # re-zeroed at the end of the spinup event.
 
   # 1. Add the emissions and Products for this year
-  emissionsProductsOut <- sim$pools[,mod$emissionsProductsCols]
+  emissionsProductsOut <- sim$pools[,P(sim)$emissionsProductsCols]
 
   ## assertion
   if(time(sim) == start(sim)){
@@ -686,7 +692,8 @@ annual <- function(sim) {
     pixelGroup = pixelGroupForAnnual$pixelGroup,
     (emissionsProductsOut - emissionsProductsIn)
   )
-  sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
+  browser()
+  sim$emissionsProducts <- colSums(emissionsProducts) #rbind(sim$emissionsProducts, emissionsProducts)
 
   ############# End of update emissions and products ------------------------------------
 
@@ -714,7 +721,8 @@ annual <- function(sim) {
     sim$pixelGroupC[, ..pooldef]
   )
 
-  sim$cbmPools <- rbind(sim$cbmPools, updatePools)
+  sim$cbmPools <- updatePools # rbind(sim$cbmPools, updatePools)
+
   ######## END OF UPDATING VECTORS FOR NEXT SIM YEAR #######################################
   #-----------------------------------
 
