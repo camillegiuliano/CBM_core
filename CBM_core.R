@@ -387,7 +387,6 @@ annual <- function(sim) {
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
     # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
 
-    # pixelCount <- spatialDT[, .N, by = pixelGroup]
     ## TO DO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
     ### do I have to make it sim$ here?
     newEvents <- yearEvents > 0
@@ -411,6 +410,7 @@ annual <- function(sim) {
     stop("sim$disturbancRasters must be a list of filenames of Rasters (in .grd) or a ",
          "single data.table with 2 columns, pixels and year")
   }
+  pixelCount <- spatialDT[, .N, by = pixelGroup]
 
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
@@ -648,6 +648,7 @@ annual <- function(sim) {
   incsListDT <- lapply(sim$allProcesses$Growth1, as.data.table)
   setattr(incsListDT, 'names', pixelGroupForAnnual$pixelGroup)
   incDT <- rbindlist(incsListDT, idcol = "pixelGroup")
+  set(incDT, NULL, "pixelGroup", as.numeric(incDT[["pixelGroup"]]))
   ## TODO could improve the NPP and seperate into AG and BG (AG = merch,
   ## foliage, other  - for sw cols = 2,3,4, for hw cols = 7,8,9; BG = fineRoots,
   ## coarseRoots - sw cols = 5, 6, for hw cols = 10,11)
@@ -707,7 +708,7 @@ annual <- function(sim) {
   pooldef <- sim$pooldef
   updatePools <- data.table(
     simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
-    pixelCount = pixelCount[, "N"],
+    pixelCount = pixelCount[["N"]],
     pixelGroup = sim$pixelGroupC$pixelGroup,
     ages = sim$pixelGroupC$ages,
     sim$pixelGroupC[, ..pooldef]
