@@ -26,7 +26,7 @@ defineModule(sim, list(
       desc = "which carbon pools to plot, if any. Defaults to total carbon"
     ),
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA, "This describes the simulation time at which the first plot event should occur"),
-    defineParameter(".plotInterval", "numeric", NA, NA, NA, "This describes the simulation time interval between plot events"),
+    defineParameter(".plotInterval", "numeric", end(sim) - start(sim), NA, NA, "This describes the simulation time interval between plot events"),
     defineParameter(".saveInitialTime", "numeric", NA, NA, NA, "This describes the simulation time at which the first save event should occur"),
     defineParameter(".saveInterval", "numeric", NA, NA, NA, "This describes the simulation time interval between save events"),
     defineParameter(".useCache", "logical", FALSE, NA, NA, "Should this entire module be run with caching activated? This is generally intended for data-type modules, where stochasticity and time are not relevant")
@@ -170,8 +170,13 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       # schedule future event(s)
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "postSpinup")
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual")
+
+      # need this to be after the saving of outputs -- so very low priority
+      sim <- scheduleEvent(sim, min(end(sim), start(sim) + P(sim)$.plotInterval),
+                           "CBM_core", "accumulateResults", eventPriority = 11)
+
       sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
-      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 9 )
+      sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 12 )
       # sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last())
     },
     saveSpinup = {
@@ -206,16 +211,27 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       )
       # ! ----- STOP EDITING ----- ! #
     },
+    accumulateResults = {
+      outputDetails <- as.data.table(outputs(sim))
+      objsToLoad <- c("cbmPools", "NPP")
+      for(objToLoad in objsToLoad)
+        if (any(outputDetails$objectName == objToLoad)) {
+          out <- lapply(outputDetails[objectName == objToLoad & saved == TRUE]$file, function(f) {
+            readRDS(f)
+          })
+          sim[[objToLoad]] <- rbindlist(out)
+        }
+
+    },
     plot = {
       ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
       if (time(sim) != start(sim)) {
         carbonOutPlot(
-          cbmPools = sim$cbmPools,
           emissionsProducts = sim$emissionsProducts,
           masterRaster = sim$masterRaster
         )
 
-        barPlot(
+         barPlot(
           cbmPools = sim$cbmPools,
           masterRaster = sim$masterRaster
         )
@@ -234,7 +250,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
         years = time(sim),
         masterRaster = sim$masterRaster
       )
-      sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 9)
+      sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 12)
     },
     savePools = {
       # ! ----- EDIT BELOW ----- ! #
@@ -645,7 +661,6 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
   ############ NPP ####################################################################
   ############## NPP used in building sim$NPP and for plotting ####################################
-  # browser()
   pgs <- rep(pixelGroupForAnnual$pixelGroup, lengths(sim$allProcesses$Growth1)/3)
   incsMat <- do.call(rbind, sim$allProcesses$Growth1)
   incDT <- as.data.table(incsMat)
@@ -661,7 +676,7 @@ annual <- function(sim) {
   NPP <- incDT[value > 0 & value < 1, .(NPP = 2*sum(value)), by = "pixelGroup"]
   set(NPP, NULL, "simYear", time(sim)[1])
 
-  sim$NPP <- rbind(sim$NPP, NPP)
+  sim$NPP <- NPP
   ######### NPP END HERE ###################################
   #-----------------------------------------------------------------------------------
 
@@ -687,13 +702,15 @@ annual <- function(sim) {
       )
   }
 
-  emissionsProducts <- data.table(
+  emissionsProducts1 <-(emissionsProductsOut - emissionsProductsIn)
+  emissionsProducts2 <- colSums(emissionsProducts1 * prod(res(sim$masterRaster)) / 10000 *
+                                  pixelCount[["N"]])
+  emissionsProducts <-  c(
     simYear = time(sim)[1],
-    pixelGroup = pixelGroupForAnnual$pixelGroup,
-    (emissionsProductsOut - emissionsProductsIn)
+    emissionsProducts2
   )
-  browser()
-  sim$emissionsProducts <- colSums(emissionsProducts) #rbind(sim$emissionsProducts, emissionsProducts)
+
+  sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
 
   ############# End of update emissions and products ------------------------------------
 
