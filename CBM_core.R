@@ -419,9 +419,19 @@ annual <- function(sim) {
   } else if (is(sim$disturbanceRasters, "data.table")) {
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
     set(annualDisturbance, NULL, "year", NULL)
-    distPixels <- spatialDT[annualDisturbance, on = c("pixelIndex" = "pixels"), nomatch = NULL]
-    set(distPixels, NULL, "events", 1L) # These are fires i.e., event type 1
-    spatialDT[pixelIndex %in% distPixels$pixelIndex, events := 1L]
+    distPixels <- spatialDT[annualDisturbance, on = "pixelIndex", nomatch = NULL]
+    # had to change this for the presentDay runs (and harvest scenarios b/c
+    # there are two types of dists)
+    # set(distPixels, NULL, "events", 1L) # These are fires i.e., event type 1
+    distPixels[, "events" := NULL]
+    setnames(distPixels, "i.events", "events")
+    # make sure there are no double disturbance
+    countDist <- distPixels[, .N, by = "pixelIndex"]
+    rowsWfireOut <- countDist[N>1]$pixelIndex
+    distPixels <- distPixels[!(pixelIndex %in% rowsWfireOut & events == 1)]
+    setorder(distPixels, pixelIndex)
+    setorder(spatialDT, pixelIndex)
+    spatialDT[pixelIndex %in% distPixels$pixelIndex, ]$events <- distPixels$events
   } else {
     stop("sim$disturbancRasters must be a list of filenames of Rasters (in .grd) or a ",
          "single data.table with 2 columns, pixels and year")
@@ -437,7 +447,7 @@ annual <- function(sim) {
   mySpuDmids[, "events" := rasterID][, rasterID := NULL]
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
-  # read-in the mySpuDmids, make a vector of 0 and 1 the length of distPixels$events
+  # read-in the mySpuDmids, make a vector of 0 and 1 or 2 the length of distPixels$events
   setkey(wholeStandDist,pixelIndex)
   setkey(distPixels,pixelIndex)
   distPixels$ages[which(wholeStandDist$wholeStand == 1)] <- 0
