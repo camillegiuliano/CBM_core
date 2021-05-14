@@ -418,7 +418,7 @@ annual <- function(sim) {
 
   } else if (is(sim$disturbanceRasters, "data.table")) {
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
-    setnames(annualDisturbance, "pixels", "pixelIndex", skip_absent = TRUE)
+    setnames(annualDisturbance, names(annualDisturbance)[1], "pixelIndex", skip_absent = TRUE)
     set(annualDisturbance, NULL, "year", NULL)
     distPixels <- spatialDT[annualDisturbance, on = "pixelIndex", nomatch = NULL]
     # had to change this for the presentDay runs (and harvest scenarios b/c
