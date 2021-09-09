@@ -53,6 +53,10 @@ defineModule(sim, list(
     ),
     expectsInput(
       objectName = "ages", objectClass = "numeric",
+      desc = "Ages of the stands from the inventory in 1990 with ages <+1 replaces by 2", sourceURL = NA
+    ),
+    expectsInput(
+      objectName = "realAges", objectClass = "numeric",
       desc = "Ages of the stands from the inventory in 1990", sourceURL = NA
     ),
     expectsInput(
@@ -324,27 +328,33 @@ spinup <- function(sim) {
   # sim$ages[sim$ages>max(spadesCBMout$growth_increments[,2])] <- max(spadesCBMout$growth_increments[,2])
   ## END AGE
 
-  spinupResult <- Cache(Spinup,
-                        pools = sim$pools,
-                        opMatrix = opMatrix,
-                        constantProcesses = sim$processes,
-                        growthIncrements = sim$gcHash,
-                        ages = sim$ages,
-                        gcids = sim$gcids,
-                        historicdmids = sim$historicDMIDs,
-                        lastPassdmids = sim$lastPassDMIDS,
-                        delays = sim$delays,
-                        minRotations = sim$minRotations,
-                        maxRotations = sim$maxRotations,
-                        returnIntervals = sim$returnIntervals$return_interval,
-                        rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
-                        turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
-                        biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
-                        debug = P(sim)$spinupDebug,
-                        userTags = c("spinup"), cacheId = "8c44e3e4c7ab293d"
-  )
+  ## note that ~32000 pixelGroups with min rotations of 10 and max of 15 takes 1hour 09min 49sec
+  # this next line to compare long spinup versus max 30 year.
+  #sim$maxRotations <- rep.int(500, sim$nStands)
 
-  # # setting CO2, CH4, CO and products to 0 before starting the simulations
+  spinupResult <- Cache(
+          Spinup,
+          pools = sim$pools,
+          opMatrix = opMatrix,
+          constantProcesses = sim$processes,
+          growthIncrements = sim$gcHash,
+          ages = sim$ages,
+          gcids = sim$gcids,
+          historicdmids = sim$historicDMIDs,
+          lastPassdmids = sim$lastPassDMIDS,
+          delays = sim$delays,
+          minRotations = sim$minRotations,
+          maxRotations = sim$maxRotations,
+          returnIntervals = sim$returnIntervals$return_interval,
+          rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
+          turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
+          biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
+          debug = P(sim)$spinupDebug,# spinup debugging,
+          userTags = c("spinup"),
+          cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
+          # note that if you need to re-run/change the Spinup(), the cacheId needs to be removed.
+        )
+# # setting CO2, CH4, CO and products to 0 before starting the simulations
   spinupResult[, P(sim)$emissionsProductsCols] <- 0
   sim$spinupResult <- spinupResult
   sim$spinupResult[which(is.na(sim$spinupResult))] <- 0
@@ -352,7 +362,9 @@ spinup <- function(sim) {
 }
 
 postSpinup <- function(sim) {
+
   sim$pools <- sim$spinupResult
+  sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event
   setorderv(sim$level3DT, "pixelGroup")
   sim$pixelGroupC <- cbind(sim$level3DT, sim$spinupResult)
@@ -373,6 +385,7 @@ postSpinup <- function(sim) {
 }
 
 annual <- function(sim) {
+
   ################################### -----------------------------------
   # DISTURBANCES: which pixels are disturbed and update the pixelGroup and data
   # tables in consequence
@@ -520,6 +533,7 @@ annual <- function(sim) {
 
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
   # disturbed pixels)
+
   updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"],
                            distPixelCpools[, 1:8])
   setkeyv(updateSpatialDT, "pixelIndex")
@@ -638,7 +652,9 @@ annual <- function(sim) {
 
   # 4. compute the growth increments that are specific to the number of
   # pixelGroups in this annual event, and feed in the vectors specific to this
-  # annual event
+  # annual event. Note: remember that the "id" column in sim$growth_increments
+  # which is the non-hashed version of sim$gchash is the result of
+  # as.numeric(increments[["gcids"]])
   growthAndDecline <- ComputeGrowthAndDeclineMatrices2(
     growthIncrements = sim$gcHash,
     ages = sim$ages,
