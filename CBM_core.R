@@ -350,10 +350,21 @@ spinup <- function(sim) {
           turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
           biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
           debug = P(sim)$spinupDebug,# spinup debugging,
-          userTags = c("spinup"),
-          cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
+          userTags = c("spinup")#,
+          ## Note: if multiple runs for the same study area all start with the
+          ## same age raster, a cacheID for the Spinup() can be added
+          ## here. Example for the RIA, three modules start with the
+          ## same ages raster (RIAharvest1Runs, RIAharvest2Runs, RIAfriRuns
+          ## start in 2020). But the RIApresentDayRuns starts in 1985 and will
+          ## not have the same Spinup() as the three others because "ages" are
+          ## part of the unique identifier that make picelGroups (they have to
+          ## be). Therefore, the line below will be commented out for the
+          ## RIApresentDayRUns. cacheID for RIApresentDayRuns $spinupResults is
+          #cacheId =
+          #cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
           # note that if you need to re-run/change the Spinup(), the cacheId needs to be removed.
         )
+
 # # setting CO2, CH4, CO and products to 0 before starting the simulations
   spinupResult[, P(sim)$emissionsProductsCols] <- 0
   sim$spinupResult <- spinupResult
@@ -362,7 +373,6 @@ spinup <- function(sim) {
 }
 
 postSpinup <- function(sim) {
-
   sim$pools <- sim$spinupResult
   sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event
