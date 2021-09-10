@@ -143,16 +143,24 @@ defineModule(sim, list(
     ),
     # createsOutput(objectName = "yearEvents", objectClass = "data.frame", desc = NA),
     createsOutput(objectName = "pools", objectClass = "matrix", desc = NA),
-    createsOutput(objectName = "ages", objectClass = "numeric", desc = "Ages of the stands after simulation"),
-    createsOutput(objectName = "NPP", objectClass = "data.table", desc = "NPP for each pixelGroup"),
-    createsOutput(objectName = "emissionsProducts", objectClass = "data.table", desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
-    createsOutput(objectName = "spatialDT", objectClass = "data.table", desc = "this is modified to associate the right pixel group to the pixel id after disturbances"),
-    createsOutput(objectName = "level3DT", objectClass = "data.table", desc = "this is modified: ordered by pixelGroup"),
-    createsOutput(objectName = "nStands", objectClass = "integer", desc = "number of pixelGroup in this annual run"),
-    createsOutput(objectName = "gcids", objectClass = "vector", desc = "growth component id associated with each pixelGroup"),
-    createsOutput(objectName = "spatialUnits", objectClass = "vector", desc = "spatial unit for each pixelGroup"),
-    createsOutput(objectName = "ecozones", objectClass = "vector", desc = "ecozone for each pixelGroup"),
-    createsOutput(objectName = "turnoverRates", objectClass = "data.table", desc = "table with turnover rates for SPUs")
+    createsOutput(objectName = "ages", objectClass = "numeric",
+                  desc = "Ages of the stands after simulation"),
+    createsOutput(objectName = "NPP", objectClass = "data.table",
+                  desc = "NPP for each pixelGroup"),
+    createsOutput(objectName = "emissionsProducts", objectClass = "data.table",
+                  desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
+    createsOutput(objectName = "spatialDT", objectClass = "data.table",
+                  desc = "this is modified to associate the right pixel group to the pixel id after disturbances"),
+    createsOutput(objectName = "nStands", objectClass = "integer",
+                  desc = "number of pixelGroup in this annual run"),
+    createsOutput(objectName = "gcids", objectClass = "vector",
+                  desc = "growth component id associated with each pixelGroup"),
+    createsOutput(objectName = "spatialUnits", objectClass = "vector",
+                  desc = "spatial unit for each pixelGroup"),
+    createsOutput(objectName = "ecozones", objectClass = "vector",
+                  desc = "ecozone for each pixelGroup"),
+    createsOutput(objectName = "turnoverRates", objectClass = "data.table",
+                  desc = "table with turnover rates for SPUs")
   )
 ))
 
@@ -361,7 +369,7 @@ spinup <- function(sim) {
           ## be). Therefore, the line below will be commented out for the
           ## RIApresentDayRUns. cacheID for RIApresentDayRuns $spinupResults is
           #cacheId = "0c1dafdd126a4805". The one for the other three RIA runs is
-          cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
+          #cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
           # note that if you need to re-run/change the Spinup(), the cacheId needs to be removed.
         )
 
