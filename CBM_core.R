@@ -350,7 +350,7 @@ spinup <- function(sim) {
           turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
           biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
           debug = P(sim)$spinupDebug,# spinup debugging,
-          userTags = c("spinup")#,
+          userTags = c("spinup"),
           ## Note: if multiple runs for the same study area all start with the
           ## same age raster, a cacheID for the Spinup() can be added
           ## here. Example for the RIA, three modules start with the
@@ -360,8 +360,8 @@ spinup <- function(sim) {
           ## part of the unique identifier that make picelGroups (they have to
           ## be). Therefore, the line below will be commented out for the
           ## RIApresentDayRUns. cacheID for RIApresentDayRuns $spinupResults is
-          #cacheId = "0c1dafdd126a4805"
-          #cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
+          #cacheId = "0c1dafdd126a4805". The one for the other three RIA runs is
+          cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
           # note that if you need to re-run/change the Spinup(), the cacheId needs to be removed.
         )
 
