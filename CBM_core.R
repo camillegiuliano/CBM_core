@@ -358,7 +358,7 @@ spinup <- function(sim) {
           turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
           biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
           debug = P(sim)$spinupDebug,# spinup debugging,
-          userTags = c("spinup"),
+          userTags = c("spinup")#,
           ## Note: if multiple runs for the same study area all start with the
           ## same age raster, a cacheID for the Spinup() can be added
           ## here. Example for the RIA, three modules start with the
