@@ -425,7 +425,7 @@ annual <- function(sim) {
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
 
-  if (is(sim$disturbanceRasters, "list")) {
+  if (is(sim$disturbanceRasters, "character")) {
     annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], ".grd$"),
                                      value = TRUE))
     #
@@ -474,8 +474,8 @@ annual <- function(sim) {
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
 
-  # mySpuDmids was created in spadesCBMinputs
-  mySpuDmids <- sim$userDist
+  # mySpuDmids was created in CBM_dataPrep_XX
+  mySpuDmids <- sim$mySpuDmids
   mySpuDmids[, "events" := rasterID][, rasterID := NULL]
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
