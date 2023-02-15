@@ -16,7 +16,7 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
-    "PredictiveEcology/CBMutils (>= 0.0.6)"
+    "PredictiveEcology/CBMutils@development"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA, "If TRUE spinupResult will be outputed to a text file (spinup.csv). FALSE means no ouput of the spinupResult"),
