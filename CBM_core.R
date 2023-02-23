@@ -19,9 +19,11 @@ defineModule(sim, list(
     "PredictiveEcology/CBMutils@development"
   ),
   parameters = rbind(
-    defineParameter("spinupDebug", "logical", FALSE, NA, NA, "If TRUE spinupResult will be outputed to a text file (spinup.csv). FALSE means no ouput of the spinupResult"),
+    defineParameter("spinupDebug", "logical", FALSE, NA, NA,
+                    "If TRUE spinupResult will be outputed to a text file (spinup.csv). FALSE means no output of the spinupResult"),
     # defineParameter("noAnnualDisturbances", "logical", FALSE, NA, NA, "If TRUE the sim$allProcesses and sim$opMatrix are created in the postSpinup event, just once. By default, these are recreated everyyear in the annual event"),
-    defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_, "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
+    defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
+                    "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
     defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
       desc = "which carbon pools to plot, if any. Defaults to total carbon"
     ),
@@ -36,7 +38,7 @@ defineModule(sim, list(
     expectsInput(objectName = "cbmData", objectClass = "dataset", desc = NA, sourceURL = NA),
     expectsInput(
       objectName = "masterRaster", objectClass = "raster",
-      desc = "Raster has NAs where there are no species and the pixel groupID where the pixels were simulated. It is used to map results"
+      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"
     ),
     expectsInput(objectName = "processes", objectClass = "dataset", desc = NA, sourceURL = NA),
     expectsInput(
