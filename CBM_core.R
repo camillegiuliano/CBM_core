@@ -228,14 +228,14 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
     accumulateResults = {
       outputDetails <- as.data.table(outputs(sim))
       objsToLoad <- c("cbmPools", "NPP")
-      for(objToLoad in objsToLoad)
+      for (objToLoad in objsToLoad) {
         if (any(outputDetails$objectName == objToLoad)) {
           out <- lapply(outputDetails[objectName == objToLoad & saved == TRUE]$file, function(f) {
             readRDS(f)
           })
           sim[[objToLoad]] <- rbindlist(out)
         }
-
+      }
     },
     plot = {
       ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
@@ -341,7 +341,7 @@ spinup <- function(sim) {
   ## note that ~32000 pixelGroups with min rotations of 10 and max of 15 takes 1hour 09min 49sec
   # this next line to compare long spinup versus max 30 year.
   #sim$maxRotations <- rep.int(500, sim$nStands)
-
+browser()
   spinupResult <- Cache(
           Spinup,
           pools = sim$pools,
@@ -461,7 +461,7 @@ annual <- function(sim) {
     setnames(distPixels, "i.events", "events")
     # make sure there are no double disturbance
     countDist <- distPixels[, .N, by = "pixelIndex"]
-    rowsWfireOut <- countDist[N>1]$pixelIndex
+    rowsWfireOut <- countDist[N > 1]$pixelIndex
     distPixels <- distPixels[!(pixelIndex %in% rowsWfireOut & events == 1)]
     setorder(distPixels, pixelIndex)
     setorder(spatialDT, pixelIndex)
@@ -740,8 +740,8 @@ annual <- function(sim) {
   emissionsProductsOut <- sim$pools[,P(sim)$emissionsProductsCols]
 
   ## assertion
-  if(time(sim) == start(sim)){
-    if(!identical((emissionsProductsOut - emissionsProductsIn), emissionsProductsOut))
+  if (time(sim) == start(sim)) {
+    if (!identical((emissionsProductsOut - emissionsProductsIn), emissionsProductsOut))
       stop(
         "The difference between emissionsProductsOut and emissionsProductsIn,",
         "should be equal to emissionsProductsOut in the first year of simulation.",
@@ -749,7 +749,7 @@ annual <- function(sim) {
       )
   }
 
-  emissionsProducts1 <-(emissionsProductsOut - emissionsProductsIn)
+  emissionsProducts1 <- (emissionsProductsOut - emissionsProductsIn)
   emissionsProducts2 <- colSums(emissionsProducts1 * prod(res(sim$masterRaster)) / 10000 *
                                   pixelCount[["N"]])
   emissionsProducts <-  c(
