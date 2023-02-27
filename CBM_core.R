@@ -121,8 +121,7 @@ defineModule(sim, list(
       desc = "the table containing one line per pixel"
     ),
     expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(objectName = "mySpuDmids", objectClass = "", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(objectName = "pixelGroup", objectClass = "", desc = NA, sourceURL = NA) ## TODO
+    expectsInput(objectName = "mySpuDmids", objectClass = "", desc = NA, sourceURL = NA) ## TODO
   ),
   outputObjects = bindrows(
     createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
