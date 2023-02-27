@@ -114,12 +114,15 @@ defineModule(sim, list(
     ),
     # expectsInput(objectName = "disturbanceEvents", objectClass = "matrix",
     #              desc = "3 column matrix, PixelGroupID, Year (that sim year), and DisturbanceMatrixId. Not used in Spinup.", sourceURL = NA),
-    expectsInput(objectName = "dbPath", objectClass = "character", desc = NA, sourceURL = NA),
-    expectsInput(objectName = "level3DT", objectClass = "data.table", desc = NA, sourceURL = NA),
+    expectsInput(objectName = "dbPath", objectClass = "character", desc = NA, sourceURL = NA), ## TODO
+    expectsInput(objectName = "level3DT", objectClass = "data.table", desc = NA, sourceURL = NA), ## TODO
     expectsInput(
       objectName = "spatialDT", objectClass = "data.table",
       desc = "the table containing one line per pixel"
-    )
+    ),
+    expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
+    expectsInput(objectName = "mySpuDmids", objectClass = "", desc = NA, sourceURL = NA), ## TODO
+    expectsInput(objectName = "pixelGroup", objectClass = "", desc = NA, sourceURL = NA) ## TODO
   ),
   outputObjects = bindrows(
     createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
@@ -140,27 +143,27 @@ defineModule(sim, list(
     #               desc = "3 column matrix, PixelGroupID, Year, and DisturbanceMatrixId. Not used in Spinup."),
     createsOutput(
       objectName = "pixelKeep", objectClass = "data.table",
-      desc = paste("Keeps the pixelIndex from spatialDT with each year's PixelGroupID as a column.",
+      desc = paste("Keeps the pixelIndex from spatialDT with each year's `PixelGroupID` as a column.",
                    "This is to enable making maps of yearly output.")
     ),
     # createsOutput(objectName = "yearEvents", objectClass = "data.frame", desc = NA),
-    createsOutput(objectName = "pools", objectClass = "matrix", desc = NA),
+    createsOutput(objectName = "pools", objectClass = "matrix", desc = NA), ## TODO
     createsOutput(objectName = "ages", objectClass = "numeric",
                   desc = "Ages of the stands after simulation"),
     createsOutput(objectName = "NPP", objectClass = "data.table",
-                  desc = "NPP for each pixelGroup"),
+                  desc = "NPP for each `pixelGroup`"),
     createsOutput(objectName = "emissionsProducts", objectClass = "data.table",
                   desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
     createsOutput(objectName = "spatialDT", objectClass = "data.table",
                   desc = "this is modified to associate the right pixel group to the pixel id after disturbances"),
     createsOutput(objectName = "nStands", objectClass = "integer",
-                  desc = "number of pixelGroup in this annual run"),
+                  desc = "number of `pixelGroup` in this annual run"),
     createsOutput(objectName = "gcids", objectClass = "vector",
-                  desc = "growth component id associated with each pixelGroup"),
+                  desc = "growth component id associated with each `pixelGroup`"),
     createsOutput(objectName = "spatialUnits", objectClass = "vector",
-                  desc = "spatial unit for each pixelGroup"),
+                  desc = "spatial unit for each `pixelGroup`"),
     createsOutput(objectName = "ecozones", objectClass = "vector",
-                  desc = "ecozone for each pixelGroup"),
+                  desc = "ecozone for each `pixelGroup`"),
     createsOutput(objectName = "turnoverRates", objectClass = "data.table",
                   desc = "table with turnover rates for SPUs")
   )
