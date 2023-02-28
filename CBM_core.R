@@ -450,7 +450,6 @@ annual <- function(sim) {
       growth_curve_component_id, growth_curve_id,
       ecozones, events
     )]
-
   } else if (is(sim$disturbanceRasters, "data.table")) {
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
     setnames(annualDisturbance, names(annualDisturbance)[1], "pixelIndex", skip_absent = TRUE)
