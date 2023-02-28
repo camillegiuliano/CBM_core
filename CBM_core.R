@@ -478,7 +478,7 @@ annual <- function(sim) {
 
   # mySpuDmids was created in CBM_dataPrep_XX
   mySpuDmids <- sim$mySpuDmids
-  mySpuDmids[, "events" := rasterID][, rasterID := NULL]
+  mySpuDmids[, "events" := rasterID][, rasterID := NULL] ## TODO:  object 'rasterID' not found
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
   # read-in the mySpuDmids, make a vector of 0 and 1 or 2 the length of distPixels$events
