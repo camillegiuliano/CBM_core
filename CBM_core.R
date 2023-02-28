@@ -242,10 +242,13 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
     plot = {
       ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
       if (time(sim) != start(sim)) {
-        carbonOutPlot(
-          emissionsProducts = sim$emissionsProducts,
-          masterRaster = sim$masterRaster ## TODO: not used in this function
-        )
+        ## TODO: for some reason the plot fails the first time, but not subsequently
+        retry(quote({
+          carbonOutPlot(
+            emissionsProducts = sim$emissionsProducts,
+            masterRaster = sim$masterRaster ## TODO: not used in this function
+          )
+        }), retries = 2)
 
         barPlot(
           cbmPools = sim$cbmPools,
