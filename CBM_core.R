@@ -16,7 +16,7 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
-    "PredictiveEcology/CBMutils@development"
+    "PredictiveEcology/CBMutils@development (>= 0.0.7.9011)"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA,
@@ -244,12 +244,12 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       if (time(sim) != start(sim)) {
         carbonOutPlot(
           emissionsProducts = sim$emissionsProducts,
-          masterRaster = sim$masterRaster
+          masterRaster = sim$masterRaster ## TODO: not used in this function
         )
 
-         barPlot(
+        barPlot(
           cbmPools = sim$cbmPools,
-          masterRaster = sim$masterRaster
+          masterRaster = sim$masterRaster ## TODO: not used in this function
         )
 
         NPPplot(
@@ -266,6 +266,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
         years = time(sim),
         masterRaster = sim$masterRaster
       )
+
       sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 12)
     },
     savePools = {
@@ -343,7 +344,7 @@ spinup <- function(sim) {
   ## note that ~32000 pixelGroups with min rotations of 10 and max of 15 takes 1hour 09min 49sec
   # this next line to compare long spinup versus max 30 year.
   #sim$maxRotations <- rep.int(500, sim$nStands)
-browser()
+
   spinupResult <- Cache(
           Spinup,
           pools = sim$pools,
@@ -407,7 +408,6 @@ postSpinup <- function(sim) {
 }
 
 annual <- function(sim) {
-
   ################################### -----------------------------------
   # DISTURBANCES: which pixels are disturbed and update the pixelGroup and data
   # tables in consequence
@@ -430,10 +430,9 @@ annual <- function(sim) {
   spatialDT[, events := 0L]
 
   if (is(sim$disturbanceRasters, "character")) {
-    annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], ".grd$"),
+    annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], "[.]grd$"),
                                      value = TRUE))
-    #
-    pixels <- getValues(sim$masterRaster)
+    pixels <- values(sim$masterRaster)
     yearEvents <- getValues(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
     # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
