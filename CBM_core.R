@@ -431,14 +431,15 @@ annual <- function(sim) {
   spatialDT <- sim$spatialDT
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
-
+## SK example has a character
   if (is(sim$disturbanceRasters, "character")) {
     annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], "[.]grd$"),
                                      value = TRUE))
     pixels <- values(sim$masterRaster)
     yearEvents <- getValues(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
-    # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
+
+  # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
 
     ## TO DO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
     ### do I have to make it sim$ here?
@@ -446,13 +447,14 @@ annual <- function(sim) {
     spatialDT <- spatialDT[newEvents == TRUE, events := yearEvents[newEvents]]
     # this could be big so remove it
     rm(yearEvents)
-    # 3. get the disturbed pixels only
+
+  # 3. get the disturbed pixels only
     distPixels <- spatialDT[events > 0, .(
       pixelIndex, pixelGroup, ages, spatial_unit_id,
       growth_curve_component_id, growth_curve_id,
       ecozones, events
     )]
-  } else if (is(sim$disturbanceRasters, "data.table")) {
+  } else if (is(sim$disturbanceRasters, "data.table")) { # RIA project had a data.table
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
     setnames(annualDisturbance, names(annualDisturbance)[1], "pixelIndex", skip_absent = TRUE)
     set(annualDisturbance, NULL, "year", NULL)
@@ -472,6 +474,7 @@ annual <- function(sim) {
   } else {
     stop("sim$disturbancRasters must be a list of filenames of Rasters (in .grd) or a ",
          "single data.table with 2 columns, pixels and year")
+    ##TODO: need to add an option to read disturbances from rasters directly
   }
   pixelCount <- spatialDT[, .N, by = pixelGroup]
 
@@ -480,7 +483,7 @@ annual <- function(sim) {
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
 
   # mySpuDmids was created in CBM_dataPrep_XX
-  mySpuDmids <- sim$mySpuDmids
+  mySpuDmids <- copy(sim$mySpuDmids)
   mySpuDmids[, "events" := rasterID][, rasterID := NULL] ## TODO:  object 'rasterID' not found
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
