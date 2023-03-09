@@ -790,11 +790,8 @@ annual <- function(sim) {
     ages = sim$pixelGroupC$ages,
     sim$pixelGroupC[, ..pooldef]
   )
-##TODO: need a user parameter to say "save pools every year" or save only the
-##last one (other years can be saved via outputs). Note that
-##CBMutils::checkTransactions will only work if you keep at least the two lat
-##years of sims.
-  sim$cbmPools <- rbind(sim$cbmPools, updatePools) #updatePools
+
+  sim$cbmPools <- updatePools #rbind(sim$cbmPools, updatePools)
 
   ######## END OF UPDATING VECTORS FOR NEXT SIM YEAR #######################################
   #-----------------------------------
