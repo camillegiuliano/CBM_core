@@ -443,11 +443,27 @@ annual <- function(sim) {
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
 ## SK example has a character
-  if (is(sim$disturbanceRasters, "character")) {
-    annualDisturbance <- raster(grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], "[.]grd$"),
-                                     value = TRUE))
+  if (is(sim$disturbanceRasters, "character") ||
+      is(sim$disturbanceRasters, "SpatRaster") ||
+      is(sim$disturbanceRasters, "RasterStack")) {
+    if (is(sim$disturbanceRasters, "character") )
+      annualDisturbance <- try(
+        prepInputs(destinationPath = ".",
+                   targetFile = grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], "[.]grd$"),
+                                     value = TRUE)
+                   , to = sim$masterRaster, method = "near"
+                  ))
+    else {
+      if (time(sim) %in% names(sim$disturbanceRasters))
+        annualDisturbance <- sim$disturbanceRasters[[as.character(time(sim)[1])]]
+      else
+        stop("disturbanceRasters, if a SpatRaster, must have names by 4 digit year, e.g., 1998, 1999")
+      annualDisturbance <- postProcess(annualDisturbance, to = sim$masterRaster, method = "near")
+    }
+    if (is(annualDisturbance, "try-error")) browser()
+
     pixels <- values(sim$masterRaster)
-    yearEvents <- getValues(annualDisturbance)[!is.na(pixels)]
+    yearEvents <- values(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
 
   # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
