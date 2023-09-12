@@ -17,6 +17,8 @@ defineModule(sim, list(
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
     "PredictiveEcology/CBMutils@development (>= 0.0.7.9011)"
+    "PredictiveEcology/reproducible@development (>= 2.0.8.9001)",
+    "PredictiveEcology/SpaDES.core@useCache2 (>= 2.0.2.9003)"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA,
@@ -65,6 +67,11 @@ defineModule(sim, list(
       objectName = "gcids", objectClass = "numeric",
       desc = "The identification of which growth curves to use on the specific stands provided by...", sourceURL = NA
     ),
+    expectsInput("gcHash", objectClass = "environment",
+                  desc = paste("Environment pointing to each gcID, that is itself an environment,",
+                               "pointing to each year of growth for all AG pools.Hashed matrix of the 1/2 growth increment.",
+                               "This is used in the c++ functions to increment AG pools two times in an annual event (in the CBM_core module.")
+    ),
     expectsInput(
       objectName = "historicDMIDs", objectClass = "numeric",
       desc = "Vector, one for each stand, indicating historical disturbance type, linked to the S4 table called cbmData. Only Spinup.", sourceURL = NA
@@ -98,8 +105,12 @@ defineModule(sim, list(
       desc = "Vector, one for each stand, indicating the numeric represenation of the Canadian ecozones, as used in CBM-CFS3", sourceURL = NA
     ),
     expectsInput(
-      objectName = "disturbanceRasters", objectClass = "raster",
-      desc = "Character vector of the disturbance rasters for SK"
+      objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table",
+      desc = paste0(
+        "If a character vector, it should be the file paths of the disturbance rasters. ",
+      "If a SpatRaster, it must have multiple layers, one for each year, and it must have names ",
+      "by 4 digit year, e.g., 1998, 1999. If a data.table, it must have a column named 'year', with ",
+      "entries for each year of the simulation, e.g., 1998, 1999")
     ),
     # expectsInput(
     #   objectName = "mySpuDmids", objectClass = "data.frame",
