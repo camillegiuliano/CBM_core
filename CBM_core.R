@@ -4,9 +4,9 @@
 # in R packages. If exact location is required, functions will be: sim$<moduleName>$FunctionName
 defineModule(sim, list(
   name = "CBM_core",
-  description = NA, # "insert module description here",
-  keywords = NA, # c("insert key words here"),
-  authors = person("Celine", "Boisvenue", email = "celine.boisvenue@canada.ca", role = c("aut", "cre")),
+  description = "Modules that simulated the annual events as described in the CBM-CFS model", # "insert module description here",
+  keywords = c("carbon", "CBM-CFS"),
+  authors = person("Celine", "Boisvenue", email = "celine.boisvenue@nrcan-rncan.gc.ca", role = c("aut", "cre")),
   childModules = character(0),
   version = list(CBM_core = "0.0.1"),
   spatialExtent = raster::extent(rep(NA_real_, 4)),
@@ -16,10 +16,11 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
-    "PredictiveEcology/CBMutils@development (>= 0.0.7.9011)",
+    "PredictiveEcology/CBMutils (>= 0.0.7.9011)",
     "PredictiveEcology/reproducible@development (>= 2.0.8.9001)",
     "PredictiveEcology/SpaDES.core@useCache2 (>= 2.0.2.9003)",
-    "PredictiveEcology/LandR@development"
+    "PredictiveEcology/LandR@development",
+    "reticulate", "smorken/libcbmr", "box"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA,
@@ -336,6 +337,12 @@ spinup <- function(sim) {
       "?"
     )
   }
+browser()
+
+##trying to see if I can access the python modules
+libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
+##TODO this took 7 seconds to load...
+
 
   opMatrix <- cbind(
     1:sim$nStands, # growth1
@@ -835,6 +842,24 @@ annual <- function(sim) {
 
 
 .inputObjects<- function(sim) {
+
+  ##TODO check python virtual environments...
+  # First try at dealing with the python virtual environment that needs to be
+  # create via reticulate. THis is needed to run the python functions which are
+  # the link to the CAT efforts
+  reticulate::virtualenv_list()
+  reticulate::use_virtualenv("r-reticulate")
+  reticulate::import("sys")$executable
+  ## This imports the libcbm Python scripts maintained by Scott Morken for the
+  ## CAT and checks the version.
+  libcbm <- reticulate::import("libcbm")
+  #print(reticulate::py_get_attr(libcbm, "__version__"))
+  #'2.6.0'
+  # Error in reticulate::use_virtualenv("r-reticulate") :
+  # Directory ~/.virtualenvs/r-reticulate is not a Python virtualenv
+  ########
+
+##TODO review each of the objects.
   P(sim)$spinupDebug <- FALSE
   P(sim)$emissionsProductsCols <- c("CO2", "CH4", "CO", "Products")
   P(sim)$poolsToPlot <- "totalCarbon"
