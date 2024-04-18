@@ -16,11 +16,8 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
-    "PredictiveEcology/CBMutils (>= 0.0.7.9011)",
-    "PredictiveEcology/reproducible@development (>= 2.0.8.9001)",
-    "PredictiveEcology/SpaDES.core@useCache2 (>= 2.0.2.9003)",
-    "PredictiveEcology/LandR@development",
-    "reticulate", "smorken/libcbmr", "box"
+    "CBMutils", "PredictiveEcology/reproducible@development (>= 2.0.8.9001)",
+    "PredictiveEcology/SpaDES.core@useCache2 (>= 2.0.2.9003)"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA,
@@ -42,8 +39,7 @@ defineModule(sim, list(
     expectsInput(objectName = "cbmData", objectClass = "dataset", desc = NA, sourceURL = NA),
     expectsInput(
       objectName = "masterRaster", objectClass = "raster",
-      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results",
-      sourceURL = "https://drive.google.com/file/d/1zUyFH8k6Ef4c_GiWMInKbwAl6m6gvLJW"
+      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"
     ),
     expectsInput(objectName = "processes", objectClass = "dataset", desc = NA, sourceURL = NA),
     expectsInput(
