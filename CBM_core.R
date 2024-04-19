@@ -838,24 +838,6 @@ annual <- function(sim) {
 
 
 .inputObjects<- function(sim) {
-
-  ##TODO check python virtual environments...
-  # First try at dealing with the python virtual environment that needs to be
-  # create via reticulate. THis is needed to run the python functions which are
-  # the link to the CAT efforts
-  reticulate::virtualenv_list()
-  reticulate::use_virtualenv("r-reticulate")
-  reticulate::import("sys")$executable
-  ## This imports the libcbm Python scripts maintained by Scott Morken for the
-  ## CAT and checks the version.
-  libcbm <- reticulate::import("libcbm")
-  #print(reticulate::py_get_attr(libcbm, "__version__"))
-  #'2.6.0'
-  # Error in reticulate::use_virtualenv("r-reticulate") :
-  # Directory ~/.virtualenvs/r-reticulate is not a Python virtualenv
-  ########
-
-##TODO review each of the objects.
   P(sim)$spinupDebug <- FALSE
   P(sim)$emissionsProductsCols <- c("CO2", "CH4", "CO", "Products")
   P(sim)$poolsToPlot <- "totalCarbon"
