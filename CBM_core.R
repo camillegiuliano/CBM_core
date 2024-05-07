@@ -333,12 +333,39 @@ spinup <- function(sim) {
       "?"
     )
   }
-browser()
+  browser()
 
-##trying to see if I can access the python modules
-libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
-##TODO this took 7 seconds to load...
+  gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
+  # merge the growth curve sw/hw df onto the spatial inventory
+  spatial_inv_gc_merge <- sim$spatialDT[gcid_is_sw_hw, on = c("growth_curve_id" = "gcid")]
 
+  spinup_parameters <- data.frame(
+    pixelGroup = spatial_inv_gc_merge$pixelGroup,
+    age = spatial_inv_gc_merge$ages,
+    area = 1.0,
+    delay = sim$delays,
+    return_interval = sim$returnIntervals,
+    min_rotations = sim$minRotations,
+    max_rotations = sim$maxRotations,
+    spatial_unit_id = spatial_inv_gc_merge$spatial_unit_id,
+    sw_hw = as.integer(spatial_inv_gc_merge$is_sw),
+    species = ifelse(spatial_inv_gc_merge$is_sw, 1, 62),
+    mean_annual_temperature = 2.55,
+    historical_disturbance_type = sim$historicDMIDs,
+    last_pass_disturbance_type = sim$lastPassDMIDS
+  )
+
+  #drop duplicated rows - per libcmr - duplicated from pixelIndex
+  spinup_parameters_dedup <- spinup_parameters[!duplicated(spinup_parameters)]
+
+  spinup_parameters_dedup[, spinup_record_idx := as.integer(rownames(spinup_parameters_dedup))]
+
+  ##trying to see if I can access the python modules
+  libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
+  ##TODO this took 7 seconds to load...
+
+
+  #code for old method below
 
   opMatrix <- cbind(
     1:sim$nStands, # growth1
