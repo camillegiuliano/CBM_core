@@ -339,12 +339,12 @@ spinup <- function(sim) {
   # merge the growth curve sw/hw df onto the spatial inventory
   spatial_inv_gc_merge <- sim$spatialDT[gcid_is_sw_hw, on = c("growth_curve_id" = "gcid")]
 
-  spinup_parameters <- data.frame(
+  spinup_parameters <- data.table(
     pixelGroup = spatial_inv_gc_merge$pixelGroup,
     age = spatial_inv_gc_merge$ages,
     area = 1.0,
     delay = sim$delays,
-    return_interval = sim$returnIntervals,
+    return_interval = sim$returnIntervals$return_interval,
     min_rotations = sim$minRotations,
     max_rotations = sim$maxRotations,
     spatial_unit_id = spatial_inv_gc_merge$spatial_unit_id,
@@ -356,7 +356,7 @@ spinup <- function(sim) {
   )
 
   #drop duplicated rows - per libcmr - duplicated from pixelIndex
-  spinup_parameters_dedup <- spinup_parameters[!duplicated(spinup_parameters)]
+  spinup_parameters_dedup <- unique(spinup_parameters)
 
   spinup_parameters_dedup[, spinup_record_idx := as.integer(rownames(spinup_parameters_dedup))]
 
@@ -364,9 +364,18 @@ spinup <- function(sim) {
   libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
   ##TODO this took 7 seconds to load...
 
+  #TODO: I can't imagine there is any good reason to do this
+  spinup_parameter_redup <- merge(
+    spinup_parameters_dedup,
+    spinup_parameters,
+    by = spinup_data_cols
+  )[c("spinup_record_idx", "pixelGroup.y")]
+  colnames(spinup_parameter_redup) <- c("spinup_record_idx", "pixelGroup")
 
-  #code for old method below
 
+  ##########################################
+  ######### code for old method below ######
+  ##########################################
   opMatrix <- cbind(
     1:sim$nStands, # growth1
     sim$ecozones, # domturnover
