@@ -360,22 +360,67 @@ spinup <- function(sim) {
 
   spinup_parameters_dedup[, spinup_record_idx := as.integer(rownames(spinup_parameters_dedup))]
 
-  ##trying to see if I can access the python modules
-  libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
-  ##TODO this took 7 seconds to load...
+  #TODO: I can't imagine there is any good reason to do this- and the objct is unused
+  # spinup_parameter_redup <- merge(
+  #   spinup_parameters_dedup,
+  #   spinup_parameters,
+  #   by = spinup_data_cols
+  # )[c("spinup_record_idx", "pixelGroup.y")]
+  # colnames(spinup_parameter_redup) <- c("spinup_record_idx", "pixelGroup")
 
-  #TODO: I can't imagine there is any good reason to do this
-  spinup_parameter_redup <- merge(
+  growth_increment_pre_merge <- spatial_inv_gc_merge[, .(gcid = unique(growth_curve_id),
+                                                         sw_hw = as.integer(unique(is_sw))),
+                                                     .(pixelGroup)]
+  #note sw_hw exists in both tables
+  #sw_hw.x is used repeatedly throughout so presumably this distinction is necessary...
+
+  #anyway - below will add gcid and sw_hw.y and sw_hw.y
+  growth_increments_merge_1 <- merge(
+    growth_increment_pre_merge,
     spinup_parameters_dedup,
-    spinup_parameters,
-    by = spinup_data_cols
-  )[c("spinup_record_idx", "pixelGroup.y")]
-  colnames(spinup_parameter_redup) <- c("spinup_record_idx", "pixelGroup")
+    by = c("pixelGroup")
+  )
 
+  growth_increments_merge_2 <- merge(
+    growth_increments_merge_1[, c("spinup_record_idx", "gcid", "sw_hw.x")],
+    gc_df,
+    by = "gcid",
+    allow.cartesian = TRUE #multiple gcid per pixelGroup/spinup_record_idx in
+    #growth_increments_merge_1 and multiple ages per gcid in gc_df
+  )
 
-  ##########################################
-  ######### code for old method below ######
-  ##########################################
+  growth_increments <-
+    growth_increments_merge_2[, .(row_idx = spinup_record_idx,
+                                 age,
+                                 merch_inc =  sw_merch_inc + hw_merch_inc,
+                                 foliage_inc = sw_foliage_inc + hw_foliage_inc,
+                                 other_inc = sw_other_inc + hw_other_inc)]
+  #drop growth increments age 0
+  growth_increments <- growth_increments[age > 0,]
+
+  spinup_input <- list(
+    parameters = spinup_parameters_dedup,
+    increments = growth_increments
+  )
+  #
+  libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
+  spinup_op_seq <- libcbmr::cbm_exn_get_spinup_op_sequence()
+
+  spinup_ops <- libcbmr::cbm_exn_spinup_ops(
+    spinup_input, libcbm_default_model_config
+  )
+
+  #TODO: ask Celine if cbm_vars$parameters are supposed to be NaN
+  cbm_vars <- libcbmr::cbm_exn_spinup(
+    spinup_input,
+    spinup_ops,
+    spinup_op_seq,
+    libcbm_default_model_config
+  )
+
+  #####################################################################
+  ######### code for old method below ################################
+  ####################################################################
   opMatrix <- cbind(
     1:sim$nStands, # growth1
     sim$ecozones, # domturnover
