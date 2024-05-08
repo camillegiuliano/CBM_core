@@ -339,7 +339,28 @@ spinup <- function(sim) {
   # merge the growth curve sw/hw df onto the spatial inventory
   spatial_inv_gc_merge <- sim$spatialDT[gcid_is_sw_hw, on = c("growth_curve_id" = "gcid")]
 
-  spinup_parameters <- data.table(
+  #TODO: determine how mySpuDM is created - and whether rasterID is the correct field
+  #this entire join is likely unnecessary - it is being done to prevent vector recycling
+  # but this happens regardless due to rotation, etc. Must determine WHY 41
+  historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
+  #this is unique because sim$lastPassDMIDS was length 41 but I don't have
+  # enough information to join it with gcid, this will have to change
+  historicalDMIDs <- unique(sim$mySpuDmids[historicalDMIDs, on = c("disturbance_matrix_id" = "dmid")])
+  spatial_inv_gc_merge <- spatial_inv_gc_merge[historicalDMIDs[, .(spatial_unit_id, rasterID)],
+                                               on = c("spatial_unit_id")]
+  setnames(spatial_inv_gc_merge, "rasterID", "historicalDMIDs")
+
+  lastPassDMIDs <- data.table(dmid = sim$lastPassDMIDS)
+  lastPassDMIDs <- unique(sim$mySpuDmids[lastPassDMIDs, on = c("disturbance_matrix_id" = "dmid")])
+  spatial_inv_gc_merge <- spatial_inv_gc_merge[lastPassDMIDs[, .(spatial_unit_id, rasterID)],
+                                               on = c("spatial_unit_id")]
+  setnames(spatial_inv_gc_merge, "rasterID", "lastPassDMIDS")
+
+  #join spatial_inv_gc_m
+
+  #TODO: lastPassDMIDs need to be joined by spatial_unit_id and whatever other column
+  #to produce vectors of length 6763, so that the 41 values aren't recycled...
+    spinup_parameters <- data.table(
     pixelGroup = spatial_inv_gc_merge$pixelGroup,
     age = spatial_inv_gc_merge$ages,
     area = 1.0,
@@ -351,8 +372,8 @@ spinup <- function(sim) {
     sw_hw = as.integer(spatial_inv_gc_merge$is_sw),
     species = ifelse(spatial_inv_gc_merge$is_sw, 1, 62),
     mean_annual_temperature = 2.55,
-    historical_disturbance_type = sim$historicDMIDs,
-    last_pass_disturbance_type = sim$lastPassDMIDS
+    historical_disturbance_type = spatial_inv_gc_merge$historicalDMIDs,
+    last_pass_disturbance_type =  spatial_inv_gc_merge$lastPassDMIDS
   )
 
   #drop duplicated rows - per libcmr - duplicated from pixelIndex
@@ -383,7 +404,7 @@ spinup <- function(sim) {
 
   growth_increments_merge_2 <- merge(
     growth_increments_merge_1[, c("spinup_record_idx", "gcid", "sw_hw.x")],
-    gc_df,
+    sim$gc_df,
     by = "gcid",
     allow.cartesian = TRUE #multiple gcid per pixelGroup/spinup_record_idx in
     #growth_increments_merge_1 and multiple ages per gcid in gc_df
@@ -418,19 +439,23 @@ spinup <- function(sim) {
     libcbm_default_model_config
   )
 
+  #I don't know how this is used yet - evidently different from old spin up output
+  browser()
+  sim$cbm_vars <- cbm_vars
+  return(invisible(sim))
   #####################################################################
   ######### code for old method below ################################
   ####################################################################
-  opMatrix <- cbind(
-    1:sim$nStands, # growth1
-    sim$ecozones, # domturnover
-    sim$ecozones, # bioturnover
-    1:sim$nStands, # overmature
-    1:sim$nStands, # growth2
-    sim$spatialUnits, # domDecay
-    sim$spatialUnits, # slow decay
-    rep(1, sim$nStands) # slow mixing
-  )
+  # opMatrix <- cbind(
+  #   1:sim$nStands, # growth1
+  #   sim$ecozones, # domturnover
+  #   sim$ecozones, # bioturnover
+  #   1:sim$nStands, # overmature
+  #   1:sim$nStands, # growth2
+  #   sim$spatialUnits, # domDecay
+  #   sim$spatialUnits, # slow decay
+  #   rep(1, sim$nStands) # slow mixing
+  # )
   ## TODO :
   ### NEED TO DEAL WITH THIS HERE
   ## Are there stands over max age in the growth curves?If so, need to set to
@@ -444,45 +469,46 @@ spinup <- function(sim) {
   ## note that ~32000 pixelGroups with min rotations of 10 and max of 15 takes 1hour 09min 49sec
   # this next line to compare long spinup versus max 30 year.
   #sim$maxRotations <- rep.int(500, sim$nStands)
+#
+#   spinupResult <- Cache(
+#     Spinup,
+#     pools = sim$pools,
+#     opMatrix = opMatrix,
+#     constantProcesses = sim$processes,
+#     growthIncrements = sim$gcHash,
+#     ages = sim$ages,
+#     gcids = sim$gcids,
+#     historicdmids = sim$historicDMIDs,
+#     lastPassdmids = sim$lastPassDMIDS,
+#     delays = sim$delays,
+#     minRotations = sim$minRotations,
+#     maxRotations = sim$maxRotations,
+#     returnIntervals = sim$returnIntervals$return_interval,
+#     rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
+#     turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
+#     biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
+#     debug = P(sim)$spinupDebug,# spinup debugging,
+#     userTags = c("spinup")#,
+    ## Note: if multiple runs for the same study area all start with the
+    ## same age raster, a cacheID for the Spinup() can be added
+    ## here. Example for the RIA, three modules start with the
+    ## same ages raster (RIAharvest1Runs, RIAharvest2Runs, RIAfriRuns
+    ## start in 2020). But the RIApresentDayRuns starts in 1985 and will
+    ## not have the same Spinup() as the three others because "ages" are
+    ## part of the unique identifier that make picelGroups (they have to
+    ## be). Therefore, the line below will be commented out for the
+    ## RIApresentDayRUns. cacheID for RIApresentDayRuns $spinupResults is
+    #cacheId = "0c1dafdd126a4805". The one for the other three RIA runs is
+    #cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
+    # note that if you need to re-run/change the Spinup(), the cacheId needs to be removed.
+  #   , useCache = "overwrite"
+  # )
 
-  spinupResult <- Cache(
-          Spinup,
-          pools = sim$pools,
-          opMatrix = opMatrix,
-          constantProcesses = sim$processes,
-          growthIncrements = sim$gcHash,
-          ages = sim$ages,
-          gcids = sim$gcids,
-          historicdmids = sim$historicDMIDs,
-          lastPassdmids = sim$lastPassDMIDS,
-          delays = sim$delays,
-          minRotations = sim$minRotations,
-          maxRotations = sim$maxRotations,
-          returnIntervals = sim$returnIntervals$return_interval,
-          rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
-          turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
-          biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
-          debug = P(sim)$spinupDebug,# spinup debugging,
-          userTags = c("spinup")#,
-          ## Note: if multiple runs for the same study area all start with the
-          ## same age raster, a cacheID for the Spinup() can be added
-          ## here. Example for the RIA, three modules start with the
-          ## same ages raster (RIAharvest1Runs, RIAharvest2Runs, RIAfriRuns
-          ## start in 2020). But the RIApresentDayRuns starts in 1985 and will
-          ## not have the same Spinup() as the three others because "ages" are
-          ## part of the unique identifier that make picelGroups (they have to
-          ## be). Therefore, the line below will be commented out for the
-          ## RIApresentDayRUns. cacheID for RIApresentDayRuns $spinupResults is
-          #cacheId = "0c1dafdd126a4805". The one for the other three RIA runs is
-          #cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
-          # note that if you need to re-run/change the Spinup(), the cacheId needs to be removed.
-        )
-
-# # setting CO2, CH4, CO and products to 0 before starting the simulations
-  spinupResult[, P(sim)$emissionsProductsCols] <- 0
-  sim$spinupResult <- spinupResult
-  sim$spinupResult[which(is.na(sim$spinupResult))] <- 0
-  return(invisible(sim))
+  # # setting CO2, CH4, CO and products to 0 before starting the simulations
+  # spinupResult[, P(sim)$emissionsProductsCols] <- 0
+  # sim$spinupResult <- spinupResult
+  # sim$spinupResult[which(is.na(sim$spinupResult))] <- 0
+  # return(invisible(sim))
 }
 
 postSpinup <- function(sim) {
