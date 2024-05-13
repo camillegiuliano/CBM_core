@@ -434,7 +434,7 @@ spinup <- function(sim) {
 }
 
 postSpinup <- function(sim) {
-  sim$pools <- sim$spinupResult
+  sim$pools <- sim$cbm_vars$pools
   #TODO: confirm if real
   sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event
