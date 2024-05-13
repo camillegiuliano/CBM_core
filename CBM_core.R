@@ -439,7 +439,8 @@ postSpinup <- function(sim) {
   sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event
   setorderv(sim$level3DT, "pixelGroup")
-  sim$pixelGroupC <- cbind(sim$level3DT, sim$spinupResult)
+  #TODO: confirm with Celine this is correct
+  sim$pixelGroupC <- cbind(sim$level3DT, sim$pools)
 
   sim$cbmPools <- NULL
   sim$NPP <- NULL
@@ -571,6 +572,10 @@ annual <- function(sim) {
   # the end of each annual event (in this script).
   pixelGroupC <- sim$pixelGroupC
   setkey(pixelGroupC, pixelGroup)
+
+
+  browser()
+  #TODO: ian - this is ~line 277 of libcmr run spatial test
 
   cPoolsOnly <- pixelGroupC[, .(
     pixelGroup, Input, SoftwoodMerch, SoftwoodFoliage,
