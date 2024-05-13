@@ -333,7 +333,6 @@ spinup <- function(sim) {
       "?"
     )
   }
-  browser()
 
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
   # merge the growth curve sw/hw df onto the spatial inventory
@@ -360,7 +359,7 @@ spinup <- function(sim) {
 
   #TODO: lastPassDMIDs need to be joined by spatial_unit_id and whatever other column
   #to produce vectors of length 6763, so that the 41 values aren't recycled...
-    spinup_parameters <- data.table(
+  spinup_parameters <- data.table(
     pixelGroup = spatial_inv_gc_merge$pixelGroup,
     age = spatial_inv_gc_merge$ages,
     area = 1.0,
@@ -380,14 +379,6 @@ spinup <- function(sim) {
   spinup_parameters_dedup <- unique(spinup_parameters)
 
   spinup_parameters_dedup[, spinup_record_idx := as.integer(rownames(spinup_parameters_dedup))]
-
-  #TODO: I can't imagine there is any good reason to do this- and the objct is unused
-  # spinup_parameter_redup <- merge(
-  #   spinup_parameters_dedup,
-  #   spinup_parameters,
-  #   by = spinup_data_cols
-  # )[c("spinup_record_idx", "pixelGroup.y")]
-  # colnames(spinup_parameter_redup) <- c("spinup_record_idx", "pixelGroup")
 
   growth_increment_pre_merge <- spatial_inv_gc_merge[, .(gcid = unique(growth_curve_id),
                                                          sw_hw = as.integer(unique(is_sw))),
@@ -412,10 +403,10 @@ spinup <- function(sim) {
 
   growth_increments <-
     growth_increments_merge_2[, .(row_idx = spinup_record_idx,
-                                 age,
-                                 merch_inc =  sw_merch_inc + hw_merch_inc,
-                                 foliage_inc = sw_foliage_inc + hw_foliage_inc,
-                                 other_inc = sw_other_inc + hw_other_inc)]
+                                  age,
+                                  merch_inc =  sw_merch_inc + hw_merch_inc,
+                                  foliage_inc = sw_foliage_inc + hw_foliage_inc,
+                                  other_inc = sw_other_inc + hw_other_inc)]
   #drop growth increments age 0
   growth_increments <- growth_increments[age > 0,]
 
@@ -431,7 +422,6 @@ spinup <- function(sim) {
     spinup_input, libcbm_default_model_config
   )
 
-  #TODO: ask Celine if cbm_vars$parameters are supposed to be NaN
   cbm_vars <- libcbmr::cbm_exn_spinup(
     spinup_input,
     spinup_ops,
@@ -439,80 +429,13 @@ spinup <- function(sim) {
     libcbm_default_model_config
   )
 
-  #I don't know how this is used yet - evidently different from old spin up output
-  browser()
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
-  #####################################################################
-  ######### code for old method below ################################
-  ####################################################################
-  # opMatrix <- cbind(
-  #   1:sim$nStands, # growth1
-  #   sim$ecozones, # domturnover
-  #   sim$ecozones, # bioturnover
-  #   1:sim$nStands, # overmature
-  #   1:sim$nStands, # growth2
-  #   sim$spatialUnits, # domDecay
-  #   sim$spatialUnits, # slow decay
-  #   rep(1, sim$nStands) # slow mixing
-  # )
-  ## TODO :
-  ### NEED TO DEAL WITH THIS HERE
-  ## Are there stands over max age in the growth curves?If so, need to set to
-  ## the max...may even the oldest stand for 1st spinup might have to be
-  ## changed. This means that we are not tracking old
-  ## stands but also, this problem will go away once we use LandR for the
-  ## biomass increments
-  # sim$ages[sim$ages>max(spadesCBMout$growth_increments[,2])] <- max(spadesCBMout$growth_increments[,2])
-  ## END AGE
-
-  ## note that ~32000 pixelGroups with min rotations of 10 and max of 15 takes 1hour 09min 49sec
-  # this next line to compare long spinup versus max 30 year.
-  #sim$maxRotations <- rep.int(500, sim$nStands)
-#
-#   spinupResult <- Cache(
-#     Spinup,
-#     pools = sim$pools,
-#     opMatrix = opMatrix,
-#     constantProcesses = sim$processes,
-#     growthIncrements = sim$gcHash,
-#     ages = sim$ages,
-#     gcids = sim$gcids,
-#     historicdmids = sim$historicDMIDs,
-#     lastPassdmids = sim$lastPassDMIDS,
-#     delays = sim$delays,
-#     minRotations = sim$minRotations,
-#     maxRotations = sim$maxRotations,
-#     returnIntervals = sim$returnIntervals$return_interval,
-#     rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
-#     turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
-#     biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
-#     debug = P(sim)$spinupDebug,# spinup debugging,
-#     userTags = c("spinup")#,
-    ## Note: if multiple runs for the same study area all start with the
-    ## same age raster, a cacheID for the Spinup() can be added
-    ## here. Example for the RIA, three modules start with the
-    ## same ages raster (RIAharvest1Runs, RIAharvest2Runs, RIAfriRuns
-    ## start in 2020). But the RIApresentDayRuns starts in 1985 and will
-    ## not have the same Spinup() as the three others because "ages" are
-    ## part of the unique identifier that make picelGroups (they have to
-    ## be). Therefore, the line below will be commented out for the
-    ## RIApresentDayRUns. cacheID for RIApresentDayRuns $spinupResults is
-    #cacheId = "0c1dafdd126a4805". The one for the other three RIA runs is
-    #cacheId = "2f19f95c26470b12" ## this is the cacheID for the maxRotation 30
-    # note that if you need to re-run/change the Spinup(), the cacheId needs to be removed.
-  #   , useCache = "overwrite"
-  # )
-
-  # # setting CO2, CH4, CO and products to 0 before starting the simulations
-  # spinupResult[, P(sim)$emissionsProductsCols] <- 0
-  # sim$spinupResult <- spinupResult
-  # sim$spinupResult[which(is.na(sim$spinupResult))] <- 0
-  # return(invisible(sim))
 }
 
 postSpinup <- function(sim) {
   sim$pools <- sim$spinupResult
+  #TODO: confirm if real
   sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event
   setorderv(sim$level3DT, "pixelGroup")
