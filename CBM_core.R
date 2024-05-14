@@ -573,55 +573,28 @@ annual <- function(sim) {
   pixelGroupC <- sim$pixelGroupC
   setkey(pixelGroupC, pixelGroup)
 
+  cPoolNames <- c("Input", "Merch", "Foliage", "Other", "CoarseRoots", "FineRoots",
+                  "AboveGroundVeryFastSoil", "BelowGroundVeryFastSoil",
+                  "AboveGroundFastSoil", "BelowGroundFastSoil",
+                  "MediumSoil", "AboveGroundSlowSoil", "BelowGroundSlowSoil",
+                  "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
+  cPoolsOnly <- pixelGroupC[, .SD, .SDcols = c("pixelGroup", cPoolNames)]
 
-  browser()
-  #TODO: ian - this is ~line 277 of libcmr run spatial test
-
-  cPoolsOnly <- pixelGroupC[, .(
-    pixelGroup, Input, SoftwoodMerch, SoftwoodFoliage,
-    SoftwoodOther, SoftwoodCoarseRoots, SoftwoodFineRoots,
-    HardwoodMerch, HardwoodFoliage, HardwoodOther,
-    HardwoodCoarseRoots, HardwoodFineRoots, AboveGroundVeryFastSoil,
-    BelowGroundVeryFastSoil, AboveGroundFastSoil, BelowGroundFastSoil,
-    MediumSoil, AboveGroundSlowSoil, BelowGroundSlowSoil, SoftwoodStemSnag,
-    SoftwoodBranchSnag, HardwoodStemSnag, HardwoodBranchSnag,
-    CO2, CH4, CO, Products
-  )]
-
-  distPixelCpools <- merge(distPixels, cPoolsOnly)
+  distPixelCpools <- distPixels[cPoolsOnly, on = c("pixelGroup")]
 
   distPixelCpools$newGroup <- LandR::generatePixelGroups(
-    distPixelCpools, maxPixelGroup, columns = c(
-      "ages", "spatial_unit_id",
-      "growth_curve_component_id",
-      "ecozones", "events", "Input", "SoftwoodMerch",
-      "SoftwoodFoliage", "SoftwoodOther", "SoftwoodCoarseRoots",
-      "SoftwoodFineRoots",
-      "HardwoodMerch", "HardwoodFoliage", "HardwoodOther",
-      "HardwoodCoarseRoots", "HardwoodFineRoots", "AboveGroundVeryFastSoil",
-      "BelowGroundVeryFastSoil", "AboveGroundFastSoil", "BelowGroundFastSoil",
-      "MediumSoil", "AboveGroundSlowSoil", "BelowGroundSlowSoil", "SoftwoodStemSnag",
-      "SoftwoodBranchSnag", "HardwoodStemSnag", "HardwoodBranchSnag",
-      "CO2", "CH4", "CO", "Products"
-    )
+    distPixelCpools, maxPixelGroup,
+    columns = setdiff(colnames(distPixelCpools),
+                               c("pixelGroup", "pixelIndex"))
   )
-
-  distPixelCpools <- distPixelCpools[, .(
-    newGroup, pixelGroup, pixelIndex, events, ages, spatial_unit_id,
-    growth_curve_component_id, growth_curve_id, ecozones, Input, SoftwoodMerch,
-    SoftwoodFoliage, SoftwoodOther,
-    SoftwoodCoarseRoots, SoftwoodFineRoots,
-    HardwoodMerch, HardwoodFoliage,
-    HardwoodOther, HardwoodCoarseRoots,
-    HardwoodFineRoots, AboveGroundVeryFastSoil,
-    BelowGroundVeryFastSoil, AboveGroundFastSoil,
-    BelowGroundFastSoil, MediumSoil,
-    AboveGroundSlowSoil, BelowGroundSlowSoil,
-    SoftwoodStemSnag, SoftwoodBranchSnag,
-    HardwoodStemSnag, HardwoodBranchSnag,
-    CO2, CH4, CO, Products
-  )]
+  #TODO: Celine check
+  #remove unnecessary cols from generatePixelGroups
+  distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
+    "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
+    "growth_curve_component_id", "growth_curve_id", "ecozones", cPoolNames)
+  ]
   cols <- c("pixelGroup", "newGroup")
+  browser()
   distPixelCpools[, (cols) := list((newGroup), NULL)]
 
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
