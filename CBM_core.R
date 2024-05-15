@@ -580,7 +580,7 @@ annual <- function(sim) {
                   "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
   cPoolsOnly <- pixelGroupC[, .SD, .SDcols = c("pixelGroup", cPoolNames)]
 
-  distPixelCpools <- distPixels[cPoolsOnly, on = c("pixelGroup")]
+  distPixelCpools <- cPoolsOnly[distPixels, on = c("pixelGroup")]
 
   distPixelCpools$newGroup <- LandR::generatePixelGroups(
     distPixelCpools, maxPixelGroup,
@@ -601,7 +601,7 @@ annual <- function(sim) {
   # disturbed pixels)
 
   updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"],
-                           distPixelCpools[, 1:8])
+                           distPixelCpools[, .SD, .SDcols = colnames(spatialDT)])
   setkeyv(updateSpatialDT, "pixelIndex")
   pixelCount <- updateSpatialDT[, .N, by = pixelGroup]
   # adding the new pixelGroup to the pixelKeep. pixelKeep is 1st created in the
