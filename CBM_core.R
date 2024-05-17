@@ -594,12 +594,11 @@ annual <- function(sim) {
     "growth_curve_component_id", "growth_curve_id", "ecozones", cPoolNames)
   ]
   cols <- c("pixelGroup", "newGroup")
-  browser()
+
   distPixelCpools[, (cols) := list((newGroup), NULL)]
 
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
   # disturbed pixels)
-
   updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"],
                            distPixelCpools[, .SD, .SDcols = colnames(spatialDT)])
   setkeyv(updateSpatialDT, "pixelIndex")
@@ -611,8 +610,7 @@ annual <- function(sim) {
 
   # 7. Update the meta data for the pixelGroups. The first meta data is the
   # $level3DT created in the spadesCBMinputs module. When new pixels groups are
-  # create the meta data gets updated here.
-
+  # created, the meta data gets updated here.
   # only the column pixelIndex is different between distPixelCpools and pixelGroupC
   metaDT <- unique(updateSpatialDT[, -("pixelIndex")]) # %>% .[order(pixelGroup), ]
   setkey(metaDT, pixelGroup)
@@ -650,9 +648,9 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------
   # RUN ALL PROCESSES FOR ALL NEW PIXEL GROUPS#############################
   #########################################################################
-
+  #TODO: this is approximately line 284 in run_spatial_test (you can delete this comment eventually)
   # 1. Changing the vectors and matrices that need to be changed to process this year's growth
-  sim$pools <- as.matrix(pixelGroupForAnnual[, Input:Products])
+  sim$pools <- as.matrix(pixelGroupForAnnual[, .SD, .SDcols = cPoolNames])
   sim$ecozones <- pixelGroupForAnnual$ecozones
   sim$ages <- pixelGroupForAnnual[, ages]
   sim$nStands <- length(sim$ages)
@@ -698,6 +696,29 @@ annual <- function(sim) {
     stop("opMatrixCBM has ", NROW(sim$opMatrixCBM), " rows; it is expecting that many ",
          "unique values for growth 1, growth 2 and overmature. Please correct.")
   }
+
+  #update sim$state which has the following columns
+  # c("area", "spatial_unit_id", "land_class_id", "age", "species"
+  #   "sw_hw", "time_since_last_disturbance", "time_since_land_use_change",
+  #   "last_disturbance_type", "enabled")
+
+  ##I think we make cbm_vars up with sim$pools, flux, parameters, state
+  #manually calculate the increments, then calculate the "cbm_exn_step_ops"
+  #and then the step
+  # step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, libcbm_default_model_config)
+  #
+  # cbm_vars <- libcbmr::cbm_exn_step(
+  #   cbm_vars,
+  #   step_ops,
+  #   libcbmr::cbm_exn_get_step_disturbance_ops_sequence(),
+  #   libcbmr::cbm_exn_get_step_ops_sequence(),
+  #   libcbm_default_model_config
+  # )
+
+  browser()
+
+
+
 
   # 3. select the matrices that apply to this annual event and specific sim
   # allProcesses contains all the default matrices for disturbances in CBM, gets
