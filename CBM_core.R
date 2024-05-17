@@ -415,6 +415,8 @@ spinup <- function(sim) {
                                   other_inc = sw_other_inc + hw_other_inc)]
   #drop growth increments age 0
   growth_increments <- growth_increments[age > 0,]
+  sim$growth_increments <- growth_increments
+  #assign to sim for now as needed in annual...
 
   spinup_input <- list(
     parameters = spinup_parameters_dedup,
@@ -636,13 +638,12 @@ annual <- function(sim) {
   pixelGroupForAnnual <- rbind(part1, part2)
   setkeyv(pixelGroupForAnnual, "pixelGroup")
 
-
+  browser()
   # 9. From the events column, create a vector of the disturbance matrix
   # identification so it links back to the CBM default disturbance matrices.
   DM <- merge(pixelGroupForAnnual, mySpuDmids, by = c("spatial_unit_id", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
   setkeyv(DM, "pixelGroup")
-
   ## this is the vector to be fed into the sim$opMatrixCBM[,"disturbance"]<-DMIDS
   DMIDS <- DM$disturbance_matrix_id
 
@@ -708,9 +709,36 @@ annual <- function(sim) {
   #   "sw_hw", "time_since_last_disturbance", "time_since_land_use_change",
   #   "last_disturbance_type", "enabled")
 
-  ##I think we make cbm_vars up with sim$pools, flux, parameters, state
-  #manually calculate the increments, then calculate the "cbm_exn_step_ops"
-  #and then the step
+  # annual event from libcbmr:
+  # I think we remake cbm_vars up with sim$pools, flux, parameters, state etc,
+  #now that pixelGroups are updated to reflect the newly disturbed pixels.
+  # calculate the increments from sim$growth_increments , then calculate the "cbm_exn_step_ops"
+  # and then the step
+
+  #This is merging growth_increments (incremental changes in AG C) by pixelGroup
+  #with the spinup result.
+  # cbm_increments <- merge(
+  #   cbm_simulation_records[c("cbm_record_id", "spinup_record_idx")],
+  #   growth_increments,
+  #   by.x = "spinup_record_idx",
+  #   by.y = "row_idx"
+  # )
+  # annual_increments <- merge(
+  #   cbm_increments,
+  #   cbm_vars$state,
+  #   by.x = c("cbm_record_id", "age"),
+  #   by.y = c("record_idx", "age")
+  # )
+  # annual_increments <- annual_increments[
+  #   order(annual_increments$cbm_record_id),
+  # ]
+  #
+  # cbm_vars$parameters$mean_annual_temperature <- 1.0
+  # cbm_vars$parameters$disturbance_type <- unlist(
+  #   unname(
+  #     cbm_simulation_records[as.character(year)]
+  #   )
+  # )
   # step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, libcbm_default_model_config)
   #
   # cbm_vars <- libcbmr::cbm_exn_step(
