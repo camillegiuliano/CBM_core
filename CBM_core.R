@@ -333,14 +333,20 @@ spinup <- function(sim) {
       "?"
     )
   }
-
+  browser()
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
   # merge the growth curve sw/hw df onto the spatial inventory
   spatial_inv_gc_merge <- sim$spatialDT[gcid_is_sw_hw, on = c("growth_curve_id" = "gcid")]
 
-  #TODO: determine how mySpuDM is created - and whether rasterID is the correct field
-  #this entire join is likely unnecessary - it is being done to prevent vector recycling
-  # but this happens regardless due to rotation, etc. Must determine WHY 41
+  ##TODO: mySpuDmids is created in CBM_dataPrep_SK. rasterID is a user-provided
+  #for SK, and numbers 1 to 5 identify the disturbance type (1=wildfire,
+  #2=clearcut, 3=deforestation, 4&5=20%mortality). These are the same
+  #disturbances as used in the Boisvenue et al 2016 paper (spatial simulation of
+  #CBM). We generally expect yearly disturbance rasters that only should one
+  #disturbance (not 5 like is the case for SK). Must determine WHY 41? There are
+  #41 pixelGroups in the spinup, so 41 pixelGroups at time 0 of the simulation.
+  #This can be checked here simCoreAlone$level3DT.
+
   historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
   #this is unique because sim$lastPassDMIDS was length 41 but I don't have
   # enough information to join it with gcid, this will have to change
