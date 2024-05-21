@@ -333,7 +333,8 @@ spinup <- function(sim) {
       "?"
     )
   }
-  browser()
+  ##TODO see comment on line 421 - from here on would be in either
+  ##CBM_vol2biomass or CBM_dataPrepXX
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
   # merge the growth curve sw/hw df onto the spatial inventory
   spatial_inv_gc_merge <- sim$spatialDT[gcid_is_sw_hw, on = c("growth_curve_id" = "gcid")]
@@ -341,7 +342,7 @@ spinup <- function(sim) {
   ##TODO: mySpuDmids is created in CBM_dataPrep_SK. rasterID is a user-provided
   #for SK, and numbers 1 to 5 identify the disturbance type (1=wildfire,
   #2=clearcut, 3=deforestation, 4&5=20%mortality). These are the same
-  #disturbances as used in the Boisvenue et al 2016 paper (spatial simulation of
+  #disturbances as used in the Boisvenue et al. 2016 paper (spatial simulation of
   #CBM). We generally expect yearly disturbance rasters that only should one
   #disturbance (not 5 like is the case for SK). Must determine WHY 41? There are
   #41 pixelGroups in the spinup, so 41 pixelGroups at time 0 of the simulation.
@@ -359,6 +360,8 @@ spinup <- function(sim) {
   lastPassDMIDs <- unique(sim$mySpuDmids[lastPassDMIDs, on = c("disturbance_matrix_id" = "dmid")])
   spatial_inv_gc_merge <- spatial_inv_gc_merge[lastPassDMIDs[, .(spatial_unit_id, rasterID)],
                                                on = c("spatial_unit_id")]
+  ###TODO I am unsure why we would need the rasterID, which identify the
+  ###user-provided disturbances for the annual events, for the spinup
   setnames(spatial_inv_gc_merge, "rasterID", "lastPassDMIDS")
 
   #join spatial_inv_gc_m
@@ -415,7 +418,13 @@ spinup <- function(sim) {
                                   other_inc = sw_other_inc + hw_other_inc)]
   #drop growth increments age 0
   growth_increments <- growth_increments[age > 0,]
-
+##TODO this next object is the important one that we need to create for the
+##spinup event.  Columns "pixelGroup", "age", "area"  will come from the
+##inventory information (user provided in CBM_dataPrepXX). From that we can get
+##the "spatial_unit_id". "delay" is user defined (usually set to 0 by default,
+##this means no delay in regeneration in the spinup). "return_interval" is
+##associatewith ecozones (so from the libcbm_default_model_config? but I don't
+##see it there...have to figure that out from codeForDefaultsModule.R)
   spinup_input <- list(
     parameters = spinup_parameters_dedup,
     increments = growth_increments
