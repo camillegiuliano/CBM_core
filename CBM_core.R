@@ -415,8 +415,6 @@ spinup <- function(sim) {
                                   other_inc = sw_other_inc + hw_other_inc)]
   #drop growth increments age 0
   growth_increments <- growth_increments[age > 0,]
-  sim$growth_increments <- growth_increments
-  #assign to sim for now as needed in annual...
 
   spinup_input <- list(
     parameters = spinup_parameters_dedup,
@@ -602,11 +600,12 @@ annual <- function(sim) {
     "growth_curve_component_id", "growth_curve_id", "ecozones", cPoolNames)
   ]
   cols <- c("pixelGroup", "newGroup")
-
+  browser()
   distPixelCpools[, (cols) := list((newGroup), NULL)]
 
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
   # disturbed pixels)
+
   updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"],
                            distPixelCpools[, .SD, .SDcols = colnames(spatialDT)])
   setkeyv(updateSpatialDT, "pixelIndex")
@@ -618,7 +617,8 @@ annual <- function(sim) {
 
   # 7. Update the meta data for the pixelGroups. The first meta data is the
   # $level3DT created in the spadesCBMinputs module. When new pixels groups are
-  # created, the meta data gets updated here.
+  # create the meta data gets updated here.
+
   # only the column pixelIndex is different between distPixelCpools and pixelGroupC
   metaDT <- unique(updateSpatialDT[, -("pixelIndex")]) # %>% .[order(pixelGroup), ]
   setkey(metaDT, pixelGroup)
@@ -638,12 +638,13 @@ annual <- function(sim) {
   pixelGroupForAnnual <- rbind(part1, part2)
   setkeyv(pixelGroupForAnnual, "pixelGroup")
 
-  browser()
+
   # 9. From the events column, create a vector of the disturbance matrix
   # identification so it links back to the CBM default disturbance matrices.
   DM <- merge(pixelGroupForAnnual, mySpuDmids, by = c("spatial_unit_id", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
   setkeyv(DM, "pixelGroup")
+
   ## this is the vector to be fed into the sim$opMatrixCBM[,"disturbance"]<-DMIDS
   DMIDS <- DM$disturbance_matrix_id
 
@@ -655,9 +656,9 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------
   # RUN ALL PROCESSES FOR ALL NEW PIXEL GROUPS#############################
   #########################################################################
-  #TODO: this is approximately line 284 in run_spatial_test (you can delete this comment eventually)
+
   # 1. Changing the vectors and matrices that need to be changed to process this year's growth
-  sim$pools <- as.matrix(pixelGroupForAnnual[, .SD, .SDcols = cPoolNames])
+  sim$pools <- as.matrix(pixelGroupForAnnual[, Input:Products])
   sim$ecozones <- pixelGroupForAnnual$ecozones
   sim$ages <- pixelGroupForAnnual[, ages]
   sim$nStands <- length(sim$ages)
