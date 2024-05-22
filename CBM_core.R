@@ -329,25 +329,37 @@ spinup <- function(sim) {
       "The inputObjects for CBM_core are not all available:",
       "These are missing:", paste(objectNamesExpected[!available], collapse = ", "),
       ". \n\nHave you run ",
-      paste0("spadesCBM", c("defaults", "inputs", "m3ToBiomass", "userDist"), collapse = ", "),
+      paste0("spadesCBM", c("defaults", "dataPrep", "vol2biomass"), collapse = ", "),
       "?"
     )
   }
-  ##TODO see comment on line 421 - from here on would be in either
-  ##CBM_vol2biomass or CBM_dataPrepXX
+  ##TODO see comment on line 421 - from here to line 421, I (Celine) identify
+  ##where that object should be created and passed on to this module via the
+  ##sim$
+  ## this should be in identified in CBM_vol2biomass, when the gcMeta (from user) is read in
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
   # merge the growth curve sw/hw df onto the spatial inventory
-  spatial_inv_gc_merge <- sim$spatialDT[gcid_is_sw_hw, on = c("growth_curve_id" = "gcid")]
+  ##NOTE: This should be merged to level3DT (provided to Scott) instead of sim$spatialDT.
+  ###HERE: need to make this merge work. It is important to keep the growth
+  ###curve ids (and do we really need three??) because we create the factors
+  ###(unique identifiers for the growth curves) from a set a columns provided by
+  ###the user. NOT SOLVED YET
+  gcid_is_sw_hw[, 'gcid'] <- gcid_is_sw_hw[, 'gcid']
+  spatial_inv_gc_merge1 <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
 
   ##TODO: mySpuDmids is created in CBM_dataPrep_SK. rasterID is a user-provided
   #for SK, and numbers 1 to 5 identify the disturbance type (1=wildfire,
   #2=clearcut, 3=deforestation, 4&5=20%mortality). These are the same
   #disturbances as used in the Boisvenue et al. 2016 paper (spatial simulation of
   #CBM). We generally expect yearly disturbance rasters that only should one
-  #disturbance (not 5 like is the case for SK). Must determine WHY 41? There are
+  #disturbance (not 5 like is the case here for SK). WHY 41? Because there are
   #41 pixelGroups in the spinup, so 41 pixelGroups at time 0 of the simulation.
   #This can be checked here simCoreAlone$level3DT.
 
+  ## historicDMIDs will be fire in Canada. So need to list the DMIDs for the
+  ## given SPU and search for the term "wildfire" in the name. That will be the
+  ## DMID we are looking for for the historicDMIDs for this pixelGroup. This is
+  ## currently done on lines 406-427 in CBM_dataPrep_SK.R.
   historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
   #this is unique because sim$lastPassDMIDS was length 41 but I don't have
   # enough information to join it with gcid, this will have to change
@@ -355,34 +367,48 @@ spinup <- function(sim) {
   spatial_inv_gc_merge <- spatial_inv_gc_merge[historicalDMIDs[, .(spatial_unit_id, rasterID)],
                                                on = c("spatial_unit_id")]
   setnames(spatial_inv_gc_merge, "rasterID", "historicalDMIDs")
-
+  ##lastPassDMIDs will be either user provided or from a raster (NTEMS for
+  ##example). This is the last known disturbance for each pixelGroup.
   lastPassDMIDs <- data.table(dmid = sim$lastPassDMIDS)
   lastPassDMIDs <- unique(sim$mySpuDmids[lastPassDMIDs, on = c("disturbance_matrix_id" = "dmid")])
   spatial_inv_gc_merge <- spatial_inv_gc_merge[lastPassDMIDs[, .(spatial_unit_id, rasterID)],
                                                on = c("spatial_unit_id")]
-  ###TODO I am unsure why we would need the rasterID, which identify the
+  ###TODO I am unsure why we would need the rasterID, which identifies the
   ###user-provided disturbances for the annual events, for the spinup
   setnames(spatial_inv_gc_merge, "rasterID", "lastPassDMIDS")
-
+browser()
   #join spatial_inv_gc_m
 
-  #TODO: lastPassDMIDs need to be joined by spatial_unit_id and whatever other column
-  #to produce vectors of length 6763, so that the 41 values aren't recycled...
+  ##TODO NOTES FROM IAN: lastPassDMIDs need to be joined by spatial_unit_id and whatever other column
+  #to produce vectors of length 6763, so that the 41 values aren't
+  #recycled...ANSWER FROM CELINE: it is the opposite, spinup_parameters whould
+  #have 41 lines, we are just spining-up the pixelGroups
   spinup_parameters <- data.table(
     pixelGroup = spatial_inv_gc_merge$pixelGroup,
     age = spatial_inv_gc_merge$ages,
-    area = 1.0,
-    delay = sim$delays,
+    area = 1.0, ##TODO ask Scott if this is supposed to be the pixel size? and why is it set to 1?
+    delay = sim$delays, ##user defined so CBM_dataPrep_SK
+    ##TODO The fire return intervals were in sim$cbmData (so ArchiveIndex) in spadesCBM, but are not
+    ##in the sqllite database that I can find. Ask Scott. These are spatial
+    ##unit/ecozone specific.
     return_interval = sim$returnIntervals$return_interval,
-    min_rotations = sim$minRotations,
-    max_rotations = sim$maxRotations,
+    min_rotations = sim$minRotations, ##same as return Intervals
+    max_rotations = sim$maxRotations, ##same as return Intervals
     spatial_unit_id = spatial_inv_gc_merge$spatial_unit_id,
-    sw_hw = as.integer(spatial_inv_gc_merge$is_sw),
+    sw_hw = as.integer(spatial_inv_gc_merge$is_sw), ##this is new and added above in the CBM_vol2biomass
     species = ifelse(spatial_inv_gc_merge$is_sw, 1, 62),
+    ## this is assigning the species number, so species comes formuser or
+    ## inventory and will be in CBM_dataPrep_SK, but the species number will
+    ## come from libcbmr::cbm_exn_get_default_parameters() species (see
+    ## trackCBM_core) or directly from the ArchiveIndex
     mean_annual_temperature = 2.55,
+    ##TODO Ask Scott: this is usually associated with ecozone and is in the
+    ##ArchiveIndex. It is not in the sqllit we access.
     historical_disturbance_type = spatial_inv_gc_merge$historicalDMIDs,
     last_pass_disturbance_type =  spatial_inv_gc_merge$lastPassDMIDS
   )
+  ##this is an artifact of not perfect understanding. Once growth_increments
+  ##will come from CBM_vol2biomass, this will be easier.
 
   #drop duplicated rows - per libcmr - duplicated from pixelIndex
   spinup_parameters_dedup <- unique(spinup_parameters)
