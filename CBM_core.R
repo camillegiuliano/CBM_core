@@ -340,13 +340,15 @@ spinup <- function(sim) {
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
   # merge the growth curve sw/hw df onto the spatial inventory
   ##NOTE: This should be merged to level3DT (provided to Scott) instead of sim$spatialDT.
-  ###HERE: need to make this merge work. It is important to keep the growth
-  ###curve ids (and do we really need three??) because we create the factors
-  ###(unique identifiers for the growth curves) from a set a columns provided by
-  ###the user. NOT SOLVED YET
-  gcid_is_sw_hw[, 'gcid'] <- gcid_is_sw_hw[, 'gcid']
-  spatial_inv_gc_merge1 <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
+  ###need to make this merge work. It is important to keep the growth
+  ###curve ids as factors (and do we really need three??) because we create the
+  ###factors (unique identifiers for the growth curves) from a set a columns
+  ###provided by the user. NOT SOLVED YET
+  browser()
+  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcid, levels(sim$level3DT$gcids))
 
+  spatial_inv_gc_merge1 <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
+  ###CELINE HERE
   ##TODO: mySpuDmids is created in CBM_dataPrep_SK. rasterID is a user-provided
   #for SK, and numbers 1 to 5 identify the disturbance type (1=wildfire,
   #2=clearcut, 3=deforestation, 4&5=20%mortality). These are the same
