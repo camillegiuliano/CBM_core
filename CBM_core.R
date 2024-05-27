@@ -344,11 +344,11 @@ spinup <- function(sim) {
   ###curve ids as factors (and do we really need three??) because we create the
   ###factors (unique identifiers for the growth curves) from a set a columns
   ###provided by the user. NOT SOLVED YET
-  browser()
+
   gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcid, levels(sim$level3DT$gcids))
 
-  spatial_inv_gc_merge1 <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
-  ###CELINE HERE
+  spatial_inv_gc_merge <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
+
   ##TODO: mySpuDmids is created in CBM_dataPrep_SK. rasterID is a user-provided
   #for SK, and numbers 1 to 5 identify the disturbance type (1=wildfire,
   #2=clearcut, 3=deforestation, 4&5=20%mortality). These are the same
@@ -357,28 +357,31 @@ spinup <- function(sim) {
   #disturbance (not 5 like is the case here for SK). WHY 41? Because there are
   #41 pixelGroups in the spinup, so 41 pixelGroups at time 0 of the simulation.
   #This can be checked here simCoreAlone$level3DT.
+  ###CELINE NOTE: spatial_inv_gc_merge currently matches simCoreAlone$level3DT
+  ###with the additional column that identifies `is_sw`
 
   ## historicDMIDs will be fire in Canada. So need to list the DMIDs for the
   ## given SPU and search for the term "wildfire" in the name. That will be the
   ## DMID we are looking for for the historicDMIDs for this pixelGroup. This is
   ## currently done on lines 406-427 in CBM_dataPrep_SK.R.
-  historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
-  #this is unique because sim$lastPassDMIDS was length 41 but I don't have
-  # enough information to join it with gcid, this will have to change
-  historicalDMIDs <- unique(sim$mySpuDmids[historicalDMIDs, on = c("disturbance_matrix_id" = "dmid")])
-  spatial_inv_gc_merge <- spatial_inv_gc_merge[historicalDMIDs[, .(spatial_unit_id, rasterID)],
-                                               on = c("spatial_unit_id")]
-  setnames(spatial_inv_gc_merge, "rasterID", "historicalDMIDs")
+  ###CELINE: because we don't need the rasterID until the annual event, I am skipping this.
+  ###historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
+
+  ###historicalDMIDs <- unique(sim$mySpuDmids[historicalDMIDs, on = c("disturbance_matrix_id" = "dmid")])
+  ###spatial_inv_gc_merge <- spatial_inv_gc_merge[historicalDMIDs[, .(spatial_unit_id, rasterID)],
+  ###                                             on = c("spatial_unit_id")]
+  ###setnames(spatial_inv_gc_merge, "rasterID", "historicalDMIDs")
+
   ##lastPassDMIDs will be either user provided or from a raster (NTEMS for
   ##example). This is the last known disturbance for each pixelGroup.
-  lastPassDMIDs <- data.table(dmid = sim$lastPassDMIDS)
-  lastPassDMIDs <- unique(sim$mySpuDmids[lastPassDMIDs, on = c("disturbance_matrix_id" = "dmid")])
-  spatial_inv_gc_merge <- spatial_inv_gc_merge[lastPassDMIDs[, .(spatial_unit_id, rasterID)],
-                                               on = c("spatial_unit_id")]
+  ###lastPassDMIDs <- data.table(dmid = sim$lastPassDMIDS)
+  ###lastPassDMIDs <- unique(sim$mySpuDmids[lastPassDMIDs, on = c("disturbance_matrix_id" = "dmid")])
+  ###spatial_inv_gc_merge <- spatial_inv_gc_merge[lastPassDMIDs[, .(spatial_unit_id, rasterID)],
+  ###                                             on = c("spatial_unit_id")]
   ###TODO I am unsure why we would need the rasterID, which identifies the
   ###user-provided disturbances for the annual events, for the spinup
-  setnames(spatial_inv_gc_merge, "rasterID", "lastPassDMIDS")
-browser()
+  ###setnames(spatial_inv_gc_merge, "rasterID", "lastPassDMIDS")
+
   #join spatial_inv_gc_m
 
   ##TODO NOTES FROM IAN: lastPassDMIDs need to be joined by spatial_unit_id and whatever other column
@@ -398,21 +401,23 @@ browser()
     max_rotations = sim$maxRotations, ##same as return Intervals
     spatial_unit_id = spatial_inv_gc_merge$spatial_unit_id,
     sw_hw = as.integer(spatial_inv_gc_merge$is_sw), ##this is new and added above in the CBM_vol2biomass
+    ###TODO species attribution is hard coded, need to sort this out!
     species = ifelse(spatial_inv_gc_merge$is_sw, 1, 62),
-    ## this is assigning the species number, so species comes formuser or
+    ## this is assigning the species number, so species comes form user or
     ## inventory and will be in CBM_dataPrep_SK, but the species number will
     ## come from libcbmr::cbm_exn_get_default_parameters() species (see
     ## trackCBM_core) or directly from the ArchiveIndex
     mean_annual_temperature = 2.55,
     ##TODO Ask Scott: this is usually associated with ecozone and is in the
-    ##ArchiveIndex. It is not in the sqllit we access.
-    historical_disturbance_type = spatial_inv_gc_merge$historicalDMIDs,
-    last_pass_disturbance_type =  spatial_inv_gc_merge$lastPassDMIDS
+    ##ArchiveIndex. It is not in the sqllight we access.
+    historical_disturbance_type = sim$historicDMIDs,
+    last_pass_disturbance_type =  sim$lastPassDMIDS
   )
   ##this is an artifact of not perfect understanding. Once growth_increments
   ##will come from CBM_vol2biomass, this will be easier.
 
   #drop duplicated rows - per libcmr - duplicated from pixelIndex
+  ### There are no more duplicates
   spinup_parameters_dedup <- unique(spinup_parameters)
 
   spinup_parameters_dedup[, spinup_record_idx := as.integer(rownames(spinup_parameters_dedup))]
@@ -429,11 +434,18 @@ browser()
     spinup_parameters_dedup,
     by = c("pixelGroup")
   )
+###This won't be needed once we get the correct class out of CBM_vol2biomass and
+###CBM_dataPrep_SK
 
-  growth_increments_merge_2 <- merge(
-    growth_increments_merge_1[, c("spinup_record_idx", "gcid", "sw_hw.x")],
+ sim$gc_df$gcid <- factor(sim$gc_df$gcid, levels(sim$level3DT$gcids))
+ setkey(sim$gc_df, "gcid")
+ setkey(growth_increments_merge_1, "gcid")
+  growth_increments_merge_2 <- merge.data.table(
+    #growth_increments_merge_1[, c("spinup_record_idx", "gcid", "sw_hw.x")],
+    growth_increments_merge_1[, .(spinup_record_idx, gcid, sw_hw.x)],
     sim$gc_df,
-    by = "gcid",
+  #  by = "gcid"
+
     allow.cartesian = TRUE #multiple gcid per pixelGroup/spinup_record_idx in
     #growth_increments_merge_1 and multiple ages per gcid in gc_df
   )
@@ -453,6 +465,15 @@ browser()
 ##this means no delay in regeneration in the spinup). "return_interval" is
 ##associatewith ecozones (so from the libcbm_default_model_config? but I don't
 ##see it there...have to figure that out from codeForDefaultsModule.R)
+
+  ###TRYING TO FIGURE OUT WHY IT IS NOT MAKING IT THROUGH THE PYTHON FUNCTIONS
+  spinup_parameters_dedup[ , "historical_disturbance_type"] <- 1L
+  spinup_parameters_dedup$last_pass_disturbance_type <- 1L
+  #### THIS IS A HUGE PROBLEM: the two columns are only taking the values from
+  #### the rasters that match the disturance type to the raster values. THis is
+  #### NEVER going to be done like this again, we need to match to the
+  #### disturbance matrix number (so we can match for names).
+
   spinup_input <- list(
     parameters = spinup_parameters_dedup,
     increments = growth_increments
@@ -471,20 +492,96 @@ browser()
     spinup_op_seq,
     libcbm_default_model_config
   )
-
+##TODO this needs to be called $spinupResults because we will hopefully have
+##real data to replace this soon.
+  ###PROBLEM: not of these have the pixelGroup. I did a check with the ages to get an idea if they were in the same order:
+  # Browse[1]> cbm_vars$state$age == spinup_input$parameters$age
+  # [1] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
+  # [18] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
+  # [35] TRUE TRUE TRUE TRUE TRUE TRUE TRUE
+  ###PROBLEM: these are orders of magnitude higher then our original spinup:
+  # Browse[1]> head(simCoreAlone$spinupResult)
+  # Input SoftwoodMerch SoftwoodFoliage SoftwoodOther SoftwoodCoarseRoots SoftwoodFineRoots
+  # [1,]     1      9.018817     0.026589240    0.44986358           1.3604480         0.3778418
+  # [2,]     1      6.492249     0.011452733    0.41525916           0.9618249         0.2910026
+  # [3,]     1     14.213983     0.008096681    0.04342577           2.1427526         0.5129604
+  # [4,]     1     16.132112     0.032905672    0.65111998           2.5888743         0.5743172
+  # [5,]     1      9.001756     0.025486262    0.43391934           1.3549403         0.3767364
+  # [6,]     1      6.477340     0.010794409    0.39994341           0.9570796         0.2898767
+  # HardwoodMerch HardwoodFoliage HardwoodOther HardwoodCoarseRoots HardwoodFineRoots
+  # [1,]             0               0             0                   0                 0
+  # [2,]             0               0             0                   0                 0
+  # [3,]             0               0             0                   0                 0
+  # [4,]             0               0             0                   0                 0
+  # [5,]             0               0             0                   0                 0
+  # [6,]             0               0             0                   0                 0
+  # AboveGroundVeryFastSoil BelowGroundVeryFastSoil AboveGroundFastSoil BelowGroundFastSoil
+  # [1,]               1.2029515               0.5411285           0.6007360           0.1864821
+  # [2,]               0.9266990               0.4182496           0.5272865           0.1340970
+  # [3,]               1.5918933               0.7313747           0.3657926           0.2855185
+  # [4,]               1.8072332               0.8199837           0.8803080           0.3499173
+  # [5,]               1.1987080               0.5396007           0.5871197           0.1858550
+  # [6,]               0.9225308               0.4166529           0.5139579           0.1334881
+  # MediumSoil AboveGroundSlowSoil BelowGroundSlowSoil SoftwoodStemSnag SoftwoodBranchSnag
+  # [1,]   3.532445          0.05514748          0.03326871        1.1700422        0.044462072
+  # [2,]   2.548617          0.04272481          0.02558344        0.8452926        0.041609003
+  # [3,]   5.644753          0.07067682          0.04537946        1.8614506        0.005347947
+  # [4,]   6.371460          0.08647611          0.05131075        2.1028507        0.061129517
+  # [5,]   3.503236          0.05474311          0.03317196        1.1667707        0.042930180
+  # [6,]   2.527578          0.04235391          0.02548325        0.8428067        0.040117022
+  # HardwoodStemSnag HardwoodBranchSnag CO2 CH4 CO Products
+  # [1,]                0                  0   0   0  0        0
+  # [2,]                0                  0   0   0  0        0
+  # [3,]                0                  0   0   0  0        0
+  # [4,]                0                  0   0   0  0        0
+  # [5,]                0                  0   0   0  0        0
+  # [6,]                0                  0   0   0  0        0
+  # Browse[1]> head(cbm_vars$pools)
+  # Input     Merch  Foliage    Other CoarseRoots FineRoots AboveGroundVeryFastSoil
+  # 1     1 12.329532 3.283875 8.784035    6.907029  1.700458               17.614549
+  # 2     1 12.357636 3.285513 8.786127    6.913469  1.700924               17.625114
+  # 3     1 12.384898 3.287083 8.788109    6.919701  1.701373               17.635247
+  # 4     1 12.554141 3.296402 8.799353    6.958033  1.704122               17.695516
+  # 5     1  1.940386 1.553422 4.126114    3.007458  1.200383                6.065366
+  # 6     1  2.171359 1.636021 4.378734    3.164162  1.233304                6.601400
+  # BelowGroundVeryFastSoil AboveGroundFastSoil BelowGroundFastSoil MediumSoil
+  # 1               1.2806751            4.161752           0.7256811   3.231070
+  # 2               1.2810644            4.164942           0.7267328   3.203080
+  # 3               1.2814404            4.167994           0.7277523   3.175735
+  # 4               1.2837382            4.185946           0.7340617   3.001483
+  # 5               0.8352238            4.097583           1.6410350   6.591535
+  # 6               0.8596967            3.985672           1.5287425   6.664677
+  # AboveGroundSlowSoil BelowGroundSlowSoil StemSnag BranchSnag      CO2      CH4       CO NO2
+  # 1            43.98619            86.92752 1.409978  0.6053798 4796.849 5.936824 53.42948   0
+  # 2            44.15711            87.01102 1.410659  0.6056065 4801.368 5.936824 53.42948   0
+  # 3            44.32609            87.09531 1.411448  0.6058212 4805.891 5.936824 53.42948   0
+  # 4            45.45593            87.70611 1.419315  0.6070399 4837.631 5.936824 53.42948   0
+  # 5            26.29761            84.51220 7.039405  1.0287375 4445.779 5.936824 53.42948   0
+  # 6            26.30789            84.47830 6.748279  0.9269304 4448.323 5.936824 53.42948   0
+  # Products
+  # 1        0
+  # 2        0
+  # 3        0
+  # 4        0
+  # 5        0
+  # 6        0
+  browser()
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
 }
 
 postSpinup <- function(sim) {
+  ###CELINE NOTES: not sure if any of this is needed now.
   sim$pools <- sim$cbm_vars$pools
-  #TODO: confirm if real
+  ##TODO: confirm if this is still the case where CBM_vol2biomass won't
+  ##translate <3 years old.
   sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event
   setorderv(sim$level3DT, "pixelGroup")
-  #TODO: confirm with Celine this is correct
+  #TODO: confirm with Celine this is correct - Celine: this will depend what is needed below!
   sim$pixelGroupC <- cbind(sim$level3DT, sim$pools)
 
+  ##TODO the Python scripts track this differently...need to check if correct.
   sim$cbmPools <- NULL
   sim$NPP <- NULL
   sim$emissionsProducts <- NULL
