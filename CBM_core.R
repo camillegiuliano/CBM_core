@@ -339,9 +339,9 @@ spinup <- function(sim) {
   ## this should be in identified in CBM_vol2biomass, when the gcMeta (from user) is read in
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
   # merge the growth curve sw/hw df onto the spatial inventory
-  ##NOTE: This should be merged to level3DT (provided to Scott) instead of sim$spatialDT.
-  ###need to make this merge work. It is important to keep the growth
-  ###curve ids as factors (and do we really need three??) because we create the
+  ##NOTE: This was a mistake, it should be merged to level3DT (provided to
+  ##Scott) instead of sim$spatialDT. It is important to keep the growth curve
+  ##ids as factors (and do we really need three??) because we create the
   ###factors (unique identifiers for the growth curves) from a set a columns
   ###provided by the user. NOT SOLVED YET
 
@@ -357,16 +357,21 @@ spinup <- function(sim) {
   #disturbance (not 5 like is the case here for SK). WHY 41? Because there are
   #41 pixelGroups in the spinup, so 41 pixelGroups at time 0 of the simulation.
   #This can be checked here simCoreAlone$level3DT.
+
   ###CELINE NOTE: spatial_inv_gc_merge currently matches simCoreAlone$level3DT
   ###with the additional column that identifies `is_sw`
 
   ## historicDMIDs will be fire in Canada. So need to list the DMIDs for the
-  ## given SPU and search for the term "wildfire" in the name. That will be the
-  ## DMID we are looking for for the historicDMIDs for this pixelGroup. This is
-  ## currently done on lines 406-427 in CBM_dataPrep_SK.R.
-  ###CELINE: because we don't need the rasterID until the annual event, I am skipping this.
-  ###historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
+  ## given SPU and search for the term "wildfire" in the name (CBMutils::spuDist
+  ## is a function that gets all the dist in a specific spu - it would need to
+  ## be modified to work with the new SQLite). That will be the DMID we are
+  ## looking for for the historicDMIDs for this pixelGroup. This is currently
+  ## done on lines 406-427 in CBM_dataPrep_SK.R.
+  ###CELINE: because we don't need the rasterID until the annual event, I am
+  ###skipping this. Restating: rasterID is specific to this study area, we
+  ###expect disturbances to each have their own rasters or polygons.
 
+  ###historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
   ###historicalDMIDs <- unique(sim$mySpuDmids[historicalDMIDs, on = c("disturbance_matrix_id" = "dmid")])
   ###spatial_inv_gc_merge <- spatial_inv_gc_merge[historicalDMIDs[, .(spatial_unit_id, rasterID)],
   ###                                             on = c("spatial_unit_id")]
@@ -384,37 +389,47 @@ spinup <- function(sim) {
 
   #join spatial_inv_gc_m
 
-  ##TODO NOTES FROM IAN: lastPassDMIDs need to be joined by spatial_unit_id and whatever other column
-  #to produce vectors of length 6763, so that the 41 values aren't
-  #recycled...ANSWER FROM CELINE: it is the opposite, spinup_parameters whould
-  #have 41 lines, we are just spining-up the pixelGroups
+  ##TODO NOTES FROM IAN: lastPassDMIDs need to be joined by spatial_unit_id and
+  ##whatever other column to produce vectors of length 6763, so that the 41
+  #values aren't recycled...ANSWER FROM CELINE: it is the opposite,
+  #spinup_parameters should have 41 lines, we are just spining-up the
+  #pixelGroups
   spinup_parameters <- data.table(
     pixelGroup = spatial_inv_gc_merge$pixelGroup,
     age = spatial_inv_gc_merge$ages,
     area = 1.0, ##TODO ask Scott if this is supposed to be the pixel size? and why is it set to 1?
     delay = sim$delays, ##user defined so CBM_dataPrep_SK
-    ##TODO The fire return intervals were in sim$cbmData (so ArchiveIndex) in spadesCBM, but are not
-    ##in the sqllite database that I can find. Ask Scott. These are spatial
-    ##unit/ecozone specific.
+    ##TODO The fire return intervals were in sim$cbmData (so SQLite) in
+    ##spadesCBM, but are not in spinup_input$parameters. Ask Scott to add or go
+    ##get them from the SQLite (but that repeats the Python work). These are
+    ##spatial unit/ecozone specific. IMPORTANT: these to not match the current
+    ##literature values for ecozones.
     return_interval = sim$returnIntervals$return_interval,
+    #both simCoreAlone and this sim have 75 FRI but the spinupSQL says SPU 28 is
+    #83...(sigh). Make sure we get this from the SQLite/or
+    #libcbmr::cbm_exn_get_default_parameters()
     min_rotations = sim$minRotations, ##same as return Intervals
     max_rotations = sim$maxRotations, ##same as return Intervals
     spatial_unit_id = spatial_inv_gc_merge$spatial_unit_id,
-    sw_hw = as.integer(spatial_inv_gc_merge$is_sw), ##this is new and added above in the CBM_vol2biomass
-    ###TODO species attribution is hard coded, need to sort this out!
+    sw_hw = as.integer(spatial_inv_gc_merge$is_sw),
+    ##this is new and added above, it will be in the CBM_vol2biomass
+    ###TODO species attribution is hard coded, need to sort this out! Species
+    ###matches are in the CBM_dataPrep_SK
     species = ifelse(spatial_inv_gc_merge$is_sw, 1, 62),
     ## this is assigning the species number, so species comes form user or
     ## inventory and will be in CBM_dataPrep_SK, but the species number will
     ## come from libcbmr::cbm_exn_get_default_parameters() species (see
-    ## trackCBM_core) or directly from the ArchiveIndex
+    ## trackCBM_core) or directly from the SQLite
     mean_annual_temperature = 2.55,
-    ##TODO Ask Scott: this is usually associated with ecozone and is in the
-    ##ArchiveIndex. It is not in the sqllight we access.
+    ##TODO Ask Scott: this is usually associated with ecozone/spu but this doesn't
+    ##match SPU 28 (if the id columns are spus, which I think they are since
+    ##there are 48 of them). Why?
     historical_disturbance_type = sim$historicDMIDs,
     last_pass_disturbance_type =  sim$lastPassDMIDS
   )
-  ##this is an artifact of not perfect understanding. Once growth_increments
-  ##will come from CBM_vol2biomass, this will be easier.
+  ### the next section is an artifact of not perfect understanding of the data
+  ##provided. Once growth_increments will come from CBM_vol2biomass, this will
+  ##be easier.
 
   #drop duplicated rows - per libcmr - duplicated from pixelIndex
   ### There are no more duplicates
@@ -441,11 +456,8 @@ spinup <- function(sim) {
  setkey(sim$gc_df, "gcid")
  setkey(growth_increments_merge_1, "gcid")
   growth_increments_merge_2 <- merge.data.table(
-    #growth_increments_merge_1[, c("spinup_record_idx", "gcid", "sw_hw.x")],
     growth_increments_merge_1[, .(spinup_record_idx, gcid, sw_hw.x)],
     sim$gc_df,
-  #  by = "gcid"
-
     allow.cartesian = TRUE #multiple gcid per pixelGroup/spinup_record_idx in
     #growth_increments_merge_1 and multiple ages per gcid in gc_df
   )
@@ -456,6 +468,7 @@ spinup <- function(sim) {
                                   merch_inc =  sw_merch_inc + hw_merch_inc,
                                   foliage_inc = sw_foliage_inc + hw_foliage_inc,
                                   other_inc = sw_other_inc + hw_other_inc)]
+  ### the above "growth_increments will come from CBM_vol2biomass
   #drop growth increments age 0
   growth_increments <- growth_increments[age > 0,]
 ##TODO this next object is the important one that we need to create for the
@@ -463,22 +476,24 @@ spinup <- function(sim) {
 ##inventory information (user provided in CBM_dataPrepXX). From that we can get
 ##the "spatial_unit_id". "delay" is user defined (usually set to 0 by default,
 ##this means no delay in regeneration in the spinup). "return_interval" is
-##associatewith ecozones (so from the libcbm_default_model_config? but I don't
-##see it there...have to figure that out from codeForDefaultsModule.R)
+##associatewith ecozones (so from the libcbmr::cbm_exn_get_default_parameters()
+##or SQLite (see codeForDefaultsModule.R)
 
   ###TRYING TO FIGURE OUT WHY IT IS NOT MAKING IT THROUGH THE PYTHON FUNCTIONS
   spinup_parameters_dedup[ , "historical_disturbance_type"] <- 1L
   spinup_parameters_dedup$last_pass_disturbance_type <- 1L
   #### THIS IS A HUGE PROBLEM: the two columns are only taking the values from
-  #### the rasters that match the disturance type to the raster values. THis is
-  #### NEVER going to be done like this again, we need to match to the
-  #### disturbance matrix number (so we can match for names).
+  #### the rasters that match the disturance type to the raster values. This is
+  #### a quirk of the data provided by White and Wulder for the 2016
+  #### publications. It is NEVER going to be done like this again, we need to
+  #### match to the disturbance matrix number (so we can match for names).
 
   spinup_input <- list(
     parameters = spinup_parameters_dedup,
     increments = growth_increments
   )
-  #
+  ##This takes a long time...and it will have to be loaded in
+  ##CBM_defaults...unless we go straight to the SQLite
   libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
   spinup_op_seq <- libcbmr::cbm_exn_get_spinup_op_sequence()
 
@@ -492,9 +507,10 @@ spinup <- function(sim) {
     spinup_op_seq,
     libcbm_default_model_config
   )
+
 ##TODO this needs to be called $spinupResults because we will hopefully have
 ##real data to replace this soon.
-  ###PROBLEM: not of these have the pixelGroup. I did a check with the ages to get an idea if they were in the same order:
+  ###PROBLEM: none of these have the pixelGroup. I did a check with the ages to get an idea if they were in the same order:
   # Browse[1]> cbm_vars$state$age == spinup_input$parameters$age
   # [1] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
   # [18] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
