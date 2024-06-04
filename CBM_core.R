@@ -333,35 +333,31 @@ spinup <- function(sim) {
       "?"
     )
   }
-  ##TODO see comment on line 421 - from here to line 421, I (Celine) identify
-  ##where that object should be created and passed on to this module via the
-  ##sim$
-  ## this should be in identified in CBM_vol2biomass, when the gcMeta (from user) is read in
+
+  ##TODO object below should be in identified in CBM_vol2biomass, when the
+  ##gcMeta (from user) is read in
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
-  # merge the growth curve sw/hw df onto the spatial inventory
-  ##NOTE: This was a mistake, it should be merged to level3DT (provided to
-  ##Scott) instead of sim$spatialDT. It is important to keep the growth curve
-  ##ids as factors (and do we really need three??) because we create the
-  ###factors (unique identifiers for the growth curves) from a set a columns
-  ###provided by the user. NOT SOLVED YET
+
+  # merge the growth curve sw/hw df onto the pixelGroup-level spatial inventory
+  ##NOTE: It is important to keep the growth curve ids as factors (and do we
+  ##really need three??) because we create the #factors (unique identifiers for
+  ##the growth curves) from a set a columns #provided by the user (these factors
+  ##are create with CBMutils::gcidsCreate(), line 299 CBM_dataPrep_SK.
 
   gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcid, levels(sim$level3DT$gcids))
 
   spatial_inv_gc_merge <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
 
-  ##TODO: mySpuDmids is created in CBM_dataPrep_SK. rasterID is a user-provided
-  #for SK, and numbers 1 to 5 identify the disturbance type (1=wildfire,
-  #2=clearcut, 3=deforestation, 4&5=20%mortality). These are the same
-  #disturbances as used in the Boisvenue et al. 2016 paper (spatial simulation of
-  #CBM). We generally expect yearly disturbance rasters that only should one
-  #disturbance (not 5 like is the case here for SK). WHY 41? Because there are
-  #41 pixelGroups in the spinup, so 41 pixelGroups at time 0 of the simulation.
-  #This can be checked here simCoreAlone$level3DT.
+  ##WHY 41? Because there are 41 pixelGroups in the spinup, so 41 pixelGroups at
+  #time 0 of the simulation. This can be checked here simCoreAlone$level3DT.
 
   ###CELINE NOTE: spatial_inv_gc_merge currently matches simCoreAlone$level3DT
   ###with the additional column that identifies `is_sw`
 
-  ## historicDMIDs will be fire in Canada. So need to list the DMIDs for the
+  ##NEW SECRET KNOWLEDGE: disturbance_type_ref_en_CA.csv. Scott will eventually
+  ##put this table somewhere where we can access it via URL.
+
+
   ## given SPU and search for the term "wildfire" in the name (CBMutils::spuDist
   ## is a function that gets all the dist in a specific spu - it would need to
   ## be modified to work with the new SQLite). That will be the DMID we are
@@ -419,13 +415,25 @@ spinup <- function(sim) {
     ## this is assigning the species number, so species comes form user or
     ## inventory and will be in CBM_dataPrep_SK, but the species number will
     ## come from libcbmr::cbm_exn_get_default_parameters() species (see
-    ## trackCBM_core) or directly from the SQLite
-    mean_annual_temperature = 2.55,
+    ## trackCBM_core) or directly from the SQLite -
+    ##TODO how are these used if increments (based on species for Boudewyn
+    ##translation) are already provided.
+    mean_annual_temperature = -0.02307,
     ##TODO Ask Scott: this is usually associated with ecozone/spu but this doesn't
     ##match SPU 28 (if the id columns are spus, which I think they are since
     ##there are 48 of them). Why?
-    historical_disturbance_type = sim$historicDMIDs,
-    last_pass_disturbance_type =  sim$lastPassDMIDS
+    historical_disturbance_type = 1L,
+    last_pass_disturbance_type =  1L
+    ##IMPORTANT: this value comes from a table provided by Scott Morking
+    ##(disturbance_type_ref_en_CA.csv). A value of 1 represents "Wildfire".
+    ##Three columns are used to determine the disturbance matrix ID internally
+    ##in the `libcbm::` function calls: spatial_unit_id, disturbance_type_id,
+    ##and sw_hw. With those three you can find the disturbance matrix id in
+    ##reticulate::py_to_r(libcbm_default_model_config$disturbance_matrix_association)[0:5,].
+    ##Celine made a tracking sheet for disturbance tables in the SQLite database
+    ##here
+    ##https://docs.google.com/spreadsheets/d/1TFBQiRH4z54l8ROX1N02OOiCHXMe20GSaExiuUqsC0Q/edit?usp=sharing,
+    ##on the sheet "disturbanceMatrices"
   )
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
@@ -436,6 +444,7 @@ spinup <- function(sim) {
   spinup_parameters_dedup <- unique(spinup_parameters)
 
   spinup_parameters_dedup[, spinup_record_idx := as.integer(rownames(spinup_parameters_dedup))]
+  #spinup_parameters_dedup <-   spinup_parameters_dedup[, area := NULL]
 
   growth_increment_pre_merge <- spatial_inv_gc_merge[, .(gcid = unique(growth_curve_id),
                                                          sw_hw = as.integer(unique(is_sw))),
@@ -479,14 +488,6 @@ spinup <- function(sim) {
 ##associatewith ecozones (so from the libcbmr::cbm_exn_get_default_parameters()
 ##or SQLite (see codeForDefaultsModule.R)
 
-  ###TRYING TO FIGURE OUT WHY IT IS NOT MAKING IT THROUGH THE PYTHON FUNCTIONS
-  spinup_parameters_dedup[ , "historical_disturbance_type"] <- 1L
-  spinup_parameters_dedup$last_pass_disturbance_type <- 1L
-  #### THIS IS A HUGE PROBLEM: the two columns are only taking the values from
-  #### the rasters that match the disturance type to the raster values. This is
-  #### a quirk of the data provided by White and Wulder for the 2016
-  #### publications. It is NEVER going to be done like this again, we need to
-  #### match to the disturbance matrix number (so we can match for names).
 
   spinup_input <- list(
     parameters = spinup_parameters_dedup,
