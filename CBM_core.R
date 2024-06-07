@@ -16,10 +16,10 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
-    "PredictiveEcology/CBMutils@development (>= 0.0.7.9011)",
-    "PredictiveEcology/reproducible@development (>= 2.0.8.9001)",
-    "PredictiveEcology/SpaDES.core@useCache2 (>= 2.0.2.9003)",
-    "PredictiveEcology/LandR@development"
+    "PredictiveEcology/CBMutils@main",
+    "PredictiveEcology/reproducible",
+    "PredictiveEcology/SpaDES.core",
+    "PredictiveEcology/LandR"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA,
