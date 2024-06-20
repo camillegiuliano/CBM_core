@@ -501,7 +501,7 @@ spinup <- function(sim) {
   spinup_ops <- libcbmr::cbm_exn_spinup_ops(
     spinup_input, libcbm_default_model_config
   )
-
+##TODO need to try to cache this
   cbm_vars <- libcbmr::cbm_exn_spinup(
     spinup_input,
     spinup_ops,
@@ -509,9 +509,10 @@ spinup <- function(sim) {
     libcbm_default_model_config
   )
 
-##TODO this needs to be called $spinupResults because we will hopefully have
+##TODO this needs to be called $spinupResults because we will hopefully have - or do we?
 ##real data to replace this soon.
-  ###PROBLEM: none of these have the pixelGroup. I did a check with the ages to get an idea if they were in the same order:
+  ###PROBLEM: none of these have the pixelGroup. I did a check with the ages to
+  ###get an idea if they were in the same order:
   # Browse[1]> cbm_vars$state$age == spinup_input$parameters$age
   # [1] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
   # [18] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
@@ -582,23 +583,26 @@ spinup <- function(sim) {
   # 4        0
   # 5        0
   # 6        0
-  browser()
+
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
 }
 
 postSpinup <- function(sim) {
-  ###CELINE NOTES: not sure if any of this is needed now.
+  ###CELINE NOTES: not sure if any of this is needed now...
+  ###Just in case we dont' need it, set all the atm gases and products to 0
+  sim$cbm_vars$pools[,c('CO2', 'CH4', 'CO', 'NO2', 'Products')] <- 0L
   sim$pools <- sim$cbm_vars$pools
   ##TODO: confirm if this is still the case where CBM_vol2biomass won't
-  ##translate <3 years old.
+  ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
   sim$level3DT$ages <- sim$realAges
-  # prepping the pixelGroups for processing in the annual event
+  # prepping the pixelGroups for processing in the annual event (same order)
   setorderv(sim$level3DT, "pixelGroup")
-  #TODO: confirm with Celine this is correct - Celine: this will depend what is needed below!
+  #TODO: track this below! Do we need this seperate object now?
   sim$pixelGroupC <- cbind(sim$level3DT, sim$pools)
 
   ##TODO the Python scripts track this differently...need to check if correct.
+  ## creating these objects here...will be usefull for comparison?
   sim$cbmPools <- NULL
   sim$NPP <- NULL
   sim$emissionsProducts <- NULL
@@ -623,15 +627,17 @@ annual <- function(sim) {
   # 1. Read-in the disturbances
   # The example simulation (SK) has a raster stack covering 1984-2011 for an
   # area in SK. The raster stack like all inputs from user, is read in the
-  # spadesCBMinputs module. However, one raster at a time is read in this annual
+  # spadesCBM_dataPrep_SK module. However, one raster at a time is read in this annual
   # event, permitting the raters to come for each annual event from another
   # source.
 
-  ## TO DO: disturbances for both SK and RIA were read-in for the whole
-  ## simulation horizon in spadesCBMinputs. To permit "on-the-fly" disturbances,
-  ## from other modules such as rasters they need to be read in here.
-
-  # 1. Read-in the disturbances, stack read-in from spadesCBMinputs.R in example.
+  ##TODO: disturbances for both SK and RIA were read-in for the whole simulation
+  ##horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
+  ##modules such as rasters they need to be read in here. We need to build this
+  ##in.
+browser()
+  # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
+  # example. First add a column for disturbed pixels to the spatialDT
   spatialDT <- sim$spatialDT
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
@@ -653,15 +659,15 @@ annual <- function(sim) {
         stop("disturbanceRasters, if a SpatRaster, must have names by 4 digit year, e.g., 1998, 1999")
       annualDisturbance <- postProcess(annualDisturbance, to = sim$masterRaster, method = "near")
     }
-    if (is(annualDisturbance, "try-error")) browser()
-
+    if (is(annualDisturbance, "try-error"))  browser()
+browser()
     pixels <- values(sim$masterRaster)
     yearEvents <- values(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
 
   # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
 
-    ## TO DO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
+    ##TODO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
     ### do I have to make it sim$ here?
     newEvents <- yearEvents > 0
     spatialDT <- spatialDT[newEvents == TRUE, events := yearEvents[newEvents]]
@@ -696,8 +702,9 @@ annual <- function(sim) {
          "single data.table with 2 columns, pixels and year")
     ##TODO: need to add an option to read disturbances from rasters directly
   }
+  browser()
   pixelCount <- spatialDT[, .N, by = pixelGroup]
-
+###CELINE NOTES: all ok up to here.
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
