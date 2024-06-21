@@ -16,8 +16,9 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
-    "CBMutils", "PredictiveEcology/reproducible@development (>= 2.0.8.9001)",
-    "PredictiveEcology/SpaDES.core@useCache2 (>= 2.0.2.9003)"
+    "CBMutils", "PredictiveEcology/reproducible",
+    "PredictiveEcology/SpaDES.core@development",
+    "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
   parameters = rbind(
     defineParameter("spinupDebug", "logical", FALSE, NA, NA,
@@ -702,7 +703,7 @@ browser()
          "single data.table with 2 columns, pixels and year")
     ##TODO: need to add an option to read disturbances from rasters directly
   }
-  browser()
+
   pixelCount <- spatialDT[, .N, by = pixelGroup]
 ###CELINE NOTES: all ok up to here.
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
@@ -734,6 +735,7 @@ browser()
   # Get the carbon info from the pools in from previous year. The
   # sim$pixelGroupC is created in the postspinup event, and then updated at
   # the end of each annual event (in this script).
+  ###CELINE NOTE: currently, pixelGroupC comes from postSpinup
   pixelGroupC <- sim$pixelGroupC
   setkey(pixelGroupC, pixelGroup)
 
@@ -745,7 +747,7 @@ browser()
   cPoolsOnly <- pixelGroupC[, .SD, .SDcols = c("pixelGroup", cPoolNames)]
 
   distPixelCpools <- cPoolsOnly[distPixels, on = c("pixelGroup")]
-
+  browser()
   distPixelCpools$newGroup <- LandR::generatePixelGroups(
     distPixelCpools, maxPixelGroup,
     columns = setdiff(colnames(distPixelCpools),
