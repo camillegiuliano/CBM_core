@@ -620,12 +620,13 @@ postSpinup <- function(sim) {
 }
 
 annual <- function(sim) {
+  browser()
   ################################### -----------------------------------
   # DISTURBANCES: which pixels are disturbed and update the pixelGroup and data
   # tables in consequence
-  ###################################
-  #
-  # 1. Read-in the disturbances
+
+
+  # 1. Read-in the disturbances ----
   # The example simulation (SK) has a raster stack covering 1984-2011 for an
   # area in SK. The raster stack like all inputs from user, is read in the
   # spadesCBM_dataPrep_SK module. However, one raster at a time is read in this annual
@@ -636,13 +637,15 @@ annual <- function(sim) {
   ##horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
   ##modules such as rasters they need to be read in here. We need to build this
   ##in.
-browser()
-  # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
+
+  #Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in #
   # example. First add a column for disturbed pixels to the spatialDT
   spatialDT <- sim$spatialDT
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
-## SK example has a character
+  ## SK example has a character
+
+  #make sure raster is read correctly, whether filename or SpatRaster, Stack or Layer
   if (is(sim$disturbanceRasters, "character") ||
       is(sim$disturbanceRasters, "SpatRaster") ||
       is(sim$disturbanceRasters, "RasterStack")) {
@@ -661,12 +664,14 @@ browser()
       annualDisturbance <- postProcess(annualDisturbance, to = sim$masterRaster, method = "near")
     }
     if (is(annualDisturbance, "try-error"))  browser()
-browser()
+
+    #get disturbance values
     pixels <- values(sim$masterRaster)
     yearEvents <- values(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
 
-  # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
+  # 2. Add this year's events to the spatialDT ---
+  # so each disturbed pixels has its event
 
     ##TODO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
     ### do I have to make it sim$ here?
@@ -760,7 +765,6 @@ browser()
     "growth_curve_component_id", "growth_curve_id", "ecozones", cPoolNames)
   ]
   cols <- c("pixelGroup", "newGroup")
-  browser()
   distPixelCpools[, (cols) := list((newGroup), NULL)]
 
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
@@ -910,9 +914,6 @@ browser()
   #   libcbm_default_model_config
   # )
 
-  browser()
-
-
 
 
   # 3. select the matrices that apply to this annual event and specific sim
@@ -956,7 +957,7 @@ browser()
 
   # 5. save the pre-carbon transaction values for emissions and Products
   emissionsProductsIn <- sim$pools[,P(sim)$emissionsProductsCols]
-
+  browser()
   # 6. All the work happens here: update all the pools.
   sim$pools <- StepPools(
     pools = sim$pools,
