@@ -636,7 +636,7 @@ annual <- function(sim) {
   ##horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
   ##modules such as rasters they need to be read in here. We need to build this
   ##in.
-browser()
+
   # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
   # example. First add a column for disturbed pixels to the spatialDT
   spatialDT <- sim$spatialDT
@@ -661,7 +661,7 @@ browser()
       annualDisturbance <- postProcess(annualDisturbance, to = sim$masterRaster, method = "near")
     }
     if (is(annualDisturbance, "try-error"))  browser()
-browser()
+
     pixels <- values(sim$masterRaster)
     yearEvents <- values(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
@@ -703,12 +703,13 @@ browser()
          "single data.table with 2 columns, pixels and year")
     ##TODO: need to add an option to read disturbances from rasters directly
   }
-
+browser()
   pixelCount <- spatialDT[, .N, by = pixelGroup]
 ###CELINE NOTES: all ok up to here.
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
+###CELINE NOTES: this might have to change b/c libcbm resets ages to 0 internally
 
   # mySpuDmids was created in CBM_dataPrep_XX
   mySpuDmids <- copy(sim$mySpuDmids)
@@ -753,7 +754,7 @@ browser()
     columns = setdiff(colnames(distPixelCpools),
                                c("pixelGroup", "pixelIndex"))
   )
-  #TODO: Celine check
+  #TODO: Celine check if this is needed - YES, a bunch of extra columns are being created.
   #remove unnecessary cols from generatePixelGroups
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
@@ -762,18 +763,19 @@ browser()
   cols <- c("pixelGroup", "newGroup")
   browser()
   distPixelCpools[, (cols) := list((newGroup), NULL)]
-
+###CELINE NOTES: all looks good, pool names are the new ones (no HW SW)
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
   # disturbed pixels)
 
-  updateSpatialDT <- rbind(spatialDT[!distPixelCpools, on = "pixelIndex"],
+  updateSpatialDT <- rbind(spatialDT[!(pixelIndex %in% distPixelCpools$pixelIndex),],
                            distPixelCpools[, .SD, .SDcols = colnames(spatialDT)])
   setkeyv(updateSpatialDT, "pixelIndex")
   pixelCount <- updateSpatialDT[, .N, by = pixelGroup]
   # adding the new pixelGroup to the pixelKeep. pixelKeep is 1st created in the
   # postspinup event and update in each annual event (in this script).
-  sim$pixelKeep[, newPix := updateSpatialDT$pixelGroup]
-  setnames(sim$pixelKeep, "newPix", paste0("pixelGroup", time(sim)[1]))
+  setkeyv(sim$pixelKeep, "pixelIndex")
+  sim$pixelKeep <- merge.data.table(updateSpatialDT[,.(pixelIndex, pixelGroup)],sim$pixelKeep)
+  setnames(sim$pixelKeep, "pixelGroup", paste0("pixelGroup", time(sim)[1]))
 
   # 7. Update the meta data for the pixelGroups. The first meta data is the
   # $level3DT created in the spadesCBMinputs module. When new pixels groups are
