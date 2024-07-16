@@ -480,7 +480,7 @@ spinup <- function(sim) {
                                   other_inc = sw_other_inc + hw_other_inc)]
   ### the above "growth_increments will come from CBM_vol2biomass
   #drop growth increments age 0
-  growth_increments <- growth_increments[age > 0,]
+  sim$growth_increments <- growth_increments[age > 0,]
 ##TODO this next object is the important one that we need to create for the
 ##spinup event.  Columns "pixelGroup", "age", "area"  will come from the
 ##inventory information (user provided in CBM_dataPrepXX). From that we can get
@@ -490,24 +490,26 @@ spinup <- function(sim) {
 ##or SQLite (see codeForDefaultsModule.R)
 
 
+
   spinup_input <- list(
     parameters = spinup_parameters_dedup,
-    increments = growth_increments
+    increments = sim$growth_increments
   )
+  sim$spinup_input <- spinup_input
   ##This takes a long time...and it will have to be loaded in
   ##CBM_defaults...unless we go straight to the SQLite
-  libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
+  mod$libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
   spinup_op_seq <- libcbmr::cbm_exn_get_spinup_op_sequence()
 
   spinup_ops <- libcbmr::cbm_exn_spinup_ops(
-    spinup_input, libcbm_default_model_config
+    spinup_input, mod$libcbm_default_model_config
   )
 ##TODO need to try to cache this
   cbm_vars <- libcbmr::cbm_exn_spinup(
     spinup_input,
     spinup_ops,
     spinup_op_seq,
-    libcbm_default_model_config
+    mod$libcbm_default_model_config
   )
 
 ##TODO this needs to be called $spinupResults because we will hopefully have - or do we?
@@ -703,7 +705,7 @@ annual <- function(sim) {
          "single data.table with 2 columns, pixels and year")
     ##TODO: need to add an option to read disturbances from rasters directly
   }
-browser()
+
   pixelCount <- spatialDT[, .N, by = pixelGroup]
 ###CELINE NOTES: all ok up to here.
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
@@ -748,7 +750,7 @@ browser()
   cPoolsOnly <- pixelGroupC[, .SD, .SDcols = c("pixelGroup", cPoolNames)]
 
   distPixelCpools <- cPoolsOnly[distPixels, on = c("pixelGroup")]
-  browser()
+
   distPixelCpools$newGroup <- LandR::generatePixelGroups(
     distPixelCpools, maxPixelGroup,
     columns = setdiff(colnames(distPixelCpools),
@@ -761,7 +763,7 @@ browser()
     "growth_curve_component_id", "growth_curve_id", "ecozones", cPoolNames)
   ]
   cols <- c("pixelGroup", "newGroup")
-  browser()
+
   distPixelCpools[, (cols) := list((newGroup), NULL)]
 ###CELINE NOTES: all looks good, pool names are the new ones (no HW SW)
   # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
@@ -818,6 +820,21 @@ browser()
   #-----------------------------------------------------------------------
   # RUN ALL PROCESSES FOR ALL NEW PIXEL GROUPS#############################
   #########################################################################
+browser()
+  ###CELINE NOTES: this will be passed in via the module environment (mod$) from
+  ###the spinup event
+  #libcbm_default_model_config <- libcbm_default_model_config
+
+  ##TODO
+  ## all tables in cbm_vars have to have the new pixelGroups
+  ## make sure they are all order by pixelGroup
+  ##
+
+###### Working on getting cbm_vars$parameters (which are the increments + dist
+###### type + meanTemp)
+  ### the above "growth_increments will come from CBM_vol2biomass
+  #drop growth increments age 0
+  sim$growth_increments <- growth_increments[age > 0,]
 
   # 1. Changing the vectors and matrices that need to be changed to process this year's growth
   sim$pools <- as.matrix(pixelGroupForAnnual[, Input:Products])
@@ -867,52 +884,9 @@ browser()
          "unique values for growth 1, growth 2 and overmature. Please correct.")
   }
 
-  #update sim$state which has the following columns
-  # c("area", "spatial_unit_id", "land_class_id", "age", "species"
-  #   "sw_hw", "time_since_last_disturbance", "time_since_land_use_change",
-  #   "last_disturbance_type", "enabled")
 
-  # annual event from libcbmr:
-  # I think we remake cbm_vars up with sim$pools, flux, parameters, state etc,
-  #now that pixelGroups are updated to reflect the newly disturbed pixels.
-  # calculate the increments from sim$growth_increments , then calculate the "cbm_exn_step_ops"
-  # and then the step
 
-  #This is merging growth_increments (incremental changes in AG C) by pixelGroup
-  #with the spinup result.
-  # cbm_increments <- merge(
-  #   cbm_simulation_records[c("cbm_record_id", "spinup_record_idx")],
-  #   growth_increments,
-  #   by.x = "spinup_record_idx",
-  #   by.y = "row_idx"
-  # )
-  # annual_increments <- merge(
-  #   cbm_increments,
-  #   cbm_vars$state,
-  #   by.x = c("cbm_record_id", "age"),
-  #   by.y = c("record_idx", "age")
-  # )
-  # annual_increments <- annual_increments[
-  #   order(annual_increments$cbm_record_id),
-  # ]
-  #
-  # cbm_vars$parameters$mean_annual_temperature <- 1.0
-  # cbm_vars$parameters$disturbance_type <- unlist(
-  #   unname(
-  #     cbm_simulation_records[as.character(year)]
-  #   )
-  # )
-  # step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, libcbm_default_model_config)
-  #
-  # cbm_vars <- libcbmr::cbm_exn_step(
-  #   cbm_vars,
-  #   step_ops,
-  #   libcbmr::cbm_exn_get_step_disturbance_ops_sequence(),
-  #   libcbmr::cbm_exn_get_step_ops_sequence(),
-  #   libcbm_default_model_config
-  # )
 
-  browser()
 
 
 
