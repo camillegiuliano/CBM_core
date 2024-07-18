@@ -820,7 +820,7 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------
   # RUN ALL PROCESSES FOR ALL NEW PIXEL GROUPS#############################
   #########################################################################
-browser()
+
   ###CELINE NOTES: this will be passed in via the module environment (mod$) from
   ###the spinup event
   #mod$libcbm_default_model_config <- libcbm_default_model_config
@@ -876,8 +876,8 @@ browser()
   ##for now inherit the growth curve from its previous pixelGroup (which was
   ##pixelGroup 6 as we can see in distPixels). gcid for pixelGroup 6 (in
   ##distPixel and sim$level3DT) is gcid 50
-  unique(distPixels$pixelGroup)
-  unique(distPixels$growth_curve_id)
+  unique(distPixels$pixelGroup) # 6
+  unique(distPixels$growth_curve_id) # 50
   ## our current growth curves go from 0 - 250
   growth_inc42 <- data.table(
     row_idx = rep(42, 250),
@@ -887,6 +887,8 @@ browser()
     other_inc =  sim$growth_increments[row_idx == 6, other_inc]
   )
   growth_increments <- rbind(sim$growth_increments, growth_inc42)
+  ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
+  ## in the Python functions so we are keeping it.
   cbm_vars$parameters$row_idx <- 1:42
   ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
   ##sites, who's age was set to 0, were not being assigned the right growth. I
@@ -937,18 +939,24 @@ browser()
 
   ###################### Working on cbm_vars$pools
   ######################################################
-  # the order of cbm_vars$pools was already
+  # the order of cbm_vars$pools was already by pixelGroup
   setkeyv(pixelGroupForAnnual, "pixelGroup")
   # adding lines for the new pixelGroups (just one here)
   cbm_vars$pools[nrow(cbm_vars$pools)+1,] <- NA
 
-  cbm_vars$pools <- cbind(Input = cbm_vars$pools[, "Input"], pixelGroupForAnnual[, Merch: Products])
+  # this line below do not change the - attr(*,
+  # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
+  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
+  cbm_vars$pools[, 2:length(cbm_vars$pools)] <- pixelGroupForAnnual[, Merch: Products]
+
 
   ###################### Working on cbm_vars$flux
   ######################################################
   # we are ASSUMING that these are sorted by pixelGroup like all other tables in
   # cbm_vars
   # just need to add a row
+  # this line below does not change the - attr(*,
+  # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[ 6,])
 
   ###################### Working on cbm_vars$state
@@ -956,6 +964,8 @@ browser()
   # we are ASSUMING that these are sorted by pixelGroup like all other tables in
   # cbm_vars
   # just need to add a row
+  # this line below does not change the - attr(*,
+  # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[ 6,])
 
   ## setting up the operations order in Python
@@ -977,7 +987,7 @@ browser()
     libcbmr::cbm_exn_get_step_ops_sequence(),
     mod$libcbm_default_model_config
   )
-
+###########################################################################################
 
   # 1. Changing the vectors and matrices that need to be changed to process this year's growth
   sim$pools <- as.matrix(pixelGroupForAnnual[, Input:Products])
