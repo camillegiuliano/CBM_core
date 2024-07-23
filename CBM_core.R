@@ -1038,11 +1038,6 @@ annual <- function(sim) {
 
   ############## Running Python functions for annual
   #####################################################################
-
-  ## This function sets up the sequence of operations in the step function,
-  ## libcbmr::cbm_exn_step below. Operations include disturbance,
-  ## snag_turnover,biomass_turnover, dom_decay, slow_decay, slow_mixing, growth,
-  ## and overmature_decline.
   step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, mod$libcbm_default_model_config)
 
   cbm_vars <- libcbmr::cbm_exn_step(
@@ -1257,9 +1252,6 @@ annual <- function(sim) {
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
   pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
-  ##TODO this would be a good check between the pools "seen" by the Python
-  ##functions and the SQLight. So compare this to the sim$pooldef created in the
-  ##CBM_defaults.
   updatePools <- data.table(
     simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
     pixelCount = pixelCount[["N"]],
@@ -1293,13 +1285,13 @@ annual <- function(sim) {
   # qsave(db, file.path(getwd(), "modules", "CBM_core", "data", "cbmData.qs"))
 
   # These could be supplied in the CBM_defaults module
-  # if (!suppliedElsewhere("processes", sim)) {
-  #   stop("CBM_core requires an object called *processes* that should likely ",
-  #        "come from the CBM_defaults module; please add that to the modules being used: ",
-  #        "PredictiveEcology/CBM_defaults")
-  #
-  #   sim$cbmData <- qread(file.path(dataPath(sim), "cbmData.qs"))
-  #
+  if (!suppliedElsewhere("processes", sim)) {
+    stop("CBM_core requires an object called *processes* that should likely ",
+         "come from the CBM_defaults module; please add that to the modules being used: ",
+         "PredictiveEcology/CBM_defaults")
+
+    sim$cbmData <- qread(file.path(dataPath(sim), "cbmData.qs"))
+
   # sim$processes <- list(
   #   domDecayMatrices = matrixHash(computeDomDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
   #   slowDecayMatrices = matrixHash(computeSlowDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
