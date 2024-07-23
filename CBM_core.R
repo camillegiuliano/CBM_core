@@ -322,19 +322,19 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 ### template initialization
 
 spinup <- function(sim) {
-  io <- inputObjects(sim, currentModule(sim))
-  objectNamesExpected <- io$objectName
-  available <- objectNamesExpected %in% ls(sim)
-  if (any(!available)) {
-    stop(
-      "The inputObjects for CBM_core are not all available:",
-      "These are missing:", paste(objectNamesExpected[!available], collapse = ", "),
-      ". \n\nHave you run ",
-      paste0("spadesCBM", c("defaults", "dataPrep", "vol2biomass"), collapse = ", "),
-      "?"
-    )
-  }
-
+  # io <- inputObjects(sim, currentModule(sim))
+  # objectNamesExpected <- io$objectName
+  # available <- objectNamesExpected %in% ls(sim)
+  # if (any(!available)) {
+  #   stop(
+  #     "The inputObjects for CBM_core are not all available:",
+  #     "These are missing:", paste(objectNamesExpected[!available], collapse = ", "),
+  #     ". \n\nHave you run ",
+  #     paste0("spadesCBM", c("defaults", "dataPrep", "vol2biomass"), collapse = ", "),
+  #     "?"
+  #   )
+  # }
+  #
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
@@ -1038,6 +1038,11 @@ annual <- function(sim) {
 
   ############## Running Python functions for annual
   #####################################################################
+
+  ## This function sets up the sequence of operations in the step function,
+  ## libcbmr::cbm_exn_step below. Operations include disturbance,
+  ## snag_turnover,biomass_turnover, dom_decay, slow_decay, slow_mixing, growth,
+  ## and overmature_decline.
   step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, mod$libcbm_default_model_config)
 
   cbm_vars <- libcbmr::cbm_exn_step(
@@ -1252,6 +1257,9 @@ annual <- function(sim) {
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
   pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
+  ##TODO this would be a good check between the pools "seen" by the Python
+  ##functions and the SQLight. So compare this to the sim$pooldef created in the
+  ##CBM_defaults.
   updatePools <- data.table(
     simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
     pixelCount = pixelCount[["N"]],
@@ -1285,13 +1293,13 @@ annual <- function(sim) {
   # qsave(db, file.path(getwd(), "modules", "CBM_core", "data", "cbmData.qs"))
 
   # These could be supplied in the CBM_defaults module
-  if (!suppliedElsewhere("processes", sim)) {
-    stop("CBM_core requires an object called *processes* that should likely ",
-         "come from the CBM_defaults module; please add that to the modules being used: ",
-         "PredictiveEcology/CBM_defaults")
-
-    sim$cbmData <- qread(file.path(dataPath(sim), "cbmData.qs"))
-
+  # if (!suppliedElsewhere("processes", sim)) {
+  #   stop("CBM_core requires an object called *processes* that should likely ",
+  #        "come from the CBM_defaults module; please add that to the modules being used: ",
+  #        "PredictiveEcology/CBM_defaults")
+  #
+  #   sim$cbmData <- qread(file.path(dataPath(sim), "cbmData.qs"))
+  #
   # sim$processes <- list(
   #   domDecayMatrices = matrixHash(computeDomDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
   #   slowDecayMatrices = matrixHash(computeSlowDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
@@ -1300,18 +1308,18 @@ annual <- function(sim) {
   #   bioTurnover = matrixHash(computeBioTurnoverMatrices(sim$cbmData@turnoverRates, sim$PoolCount)),
   #   disturbanceMatrices = matrixHash(loadDisturbanceMatrixIds(sim$cbmData@disturbanceMatrixValues, sim$cbmData@pools))
   # )
-
-    sim$pooldef <- c("Input", "SoftwoodMerch", "SoftwoodFoliage", "SoftwoodOther",
-                   "SoftwoodCoarseRoots", "SoftwoodFineRoots", "HardwoodMerch",
-                   "HardwoodFoliage", "HardwoodOther", "HardwoodCoarseRoots",
-                   "HardwoodFineRoots", "AboveGroundVeryFastSoil",
-                   "BelowGroundVeryFastSoil", "AboveGroundFastSoil",
-                   "BelowGroundFastSoil", "MediumSoil", "AboveGroundSlowSoil",
-                   "BelowGroundSlowSoil", "SoftwoodStemSnag",
-                   "SoftwoodBranchSnag", "HardwoodStemSnag", "HardwoodBranchSnag",
-                   "CO2", "CH4", "CO", "Products")
-  }
-
+#
+#     sim$pooldef <- c("Input", "SoftwoodMerch", "SoftwoodFoliage", "SoftwoodOther",
+#                    "SoftwoodCoarseRoots", "SoftwoodFineRoots", "HardwoodMerch",
+#                    "HardwoodFoliage", "HardwoodOther", "HardwoodCoarseRoots",
+#                    "HardwoodFineRoots", "AboveGroundVeryFastSoil",
+#                    "BelowGroundVeryFastSoil", "AboveGroundFastSoil",
+#                    "BelowGroundFastSoil", "MediumSoil", "AboveGroundSlowSoil",
+#                    "BelowGroundSlowSoil", "SoftwoodStemSnag",
+#                    "SoftwoodBranchSnag", "HardwoodStemSnag", "HardwoodBranchSnag",
+#                    "CO2", "CH4", "CO", "Products")
+#   }
+#
   # These could be supplied in the CBM_dataPrep_XXX modules
   # The below examples come from CBM_dataPrep_SK
   if (!suppliedElsewhere("ages", sim))  {
