@@ -21,9 +21,6 @@ defineModule(sim, list(
     "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
   parameters = rbind(
-    defineParameter("spinupDebug", "logical", FALSE, NA, NA,
-                    "If TRUE spinupResult will be outputed to a text file (spinup.csv). FALSE means no output of the spinupResult"),
-    # defineParameter("noAnnualDisturbances", "logical", FALSE, NA, NA, "If TRUE the sim$allProcesses and sim$opMatrix are created in the postSpinup event, just once. By default, these are recreated everyyear in the annual event"),
     defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
                     "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
     defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
@@ -67,11 +64,11 @@ defineModule(sim, list(
       objectName = "gcids", objectClass = "numeric",
       desc = "The identification of which growth curves to use on the specific stands provided by...", sourceURL = NA
     ),
-    expectsInput("gcHash", objectClass = "environment",
-                  desc = paste("Environment pointing to each gcID, that is itself an environment,",
-                               "pointing to each year of growth for all AG pools.Hashed matrix of the 1/2 growth increment.",
-                               "This is used in the c++ functions to increment AG pools two times in an annual event (in the CBM_core module.")
-    ),
+    # expectsInput("gcHash", objectClass = "environment",
+    #               desc = paste("Environment pointing to each gcID, that is itself an environment,",
+    #                            "pointing to each year of growth for all AG pools.Hashed matrix of the 1/2 growth increment.",
+    #                            "This is used in the c++ functions to increment AG pools two times in an annual event (in the CBM_core module.")
+    # ),
     expectsInput(
       objectName = "historicDMIDs", objectClass = "numeric",
       desc = "Vector, one for each stand, indicating historical disturbance type, linked to the S4 table called cbmData. Only Spinup.", sourceURL = NA
@@ -190,9 +187,6 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
       # do stuff for this event
       sim <- spinup(sim) ## this is the spinup
-      if (P(sim)$spinupDebug) {
-        sim <- scheduleEvent(sim, start(sim), "CBM_core", "saveSpinup")
-      }
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "postSpinup")
@@ -1275,7 +1269,7 @@ annual <- function(sim) {
 
 
 .inputObjects<- function(sim) {
-  P(sim)$spinupDebug <- FALSE
+
   P(sim)$emissionsProductsCols <- c("CO2", "CH4", "CO", "Products")
   P(sim)$poolsToPlot <- "totalCarbon"
   P(sim)$.plotInitialTime <- 1990
@@ -1284,15 +1278,15 @@ annual <- function(sim) {
   # library(qs)
   # qsave(db, file.path(getwd(), "modules", "CBM_core", "data", "cbmData.qs"))
 
-  # These could be supplied in the CBM_defaults module
-  if (!suppliedElsewhere("processes", sim)) {
-    stop("CBM_core requires an object called *processes* that should likely ",
-         "come from the CBM_defaults module; please add that to the modules being used: ",
-         "PredictiveEcology/CBM_defaults")
-
-    sim$cbmData <- qread(file.path(dataPath(sim), "cbmData.qs"))
-
-  # sim$processes <- list(
+  # # These could be supplied in the CBM_defaults module
+  # if (!suppliedElsewhere("processes", sim)) {
+  #   stop("CBM_core requires an object called *processes* that should likely ",
+  #        "come from the CBM_defaults module; please add that to the modules being used: ",
+  #        "PredictiveEcology/CBM_defaults")
+  #
+  #   sim$cbmData <- qread(file.path(dataPath(sim), "cbmData.qs"))
+  #
+  #   sim$processes <- list(
   #   domDecayMatrices = matrixHash(computeDomDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
   #   slowDecayMatrices = matrixHash(computeSlowDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
   #   slowMixingMatrix = matrixHash(computeSlowMixingMatrix(sim$cbmData@slowAGtoBGTransferRate, sim$PoolCount)),
