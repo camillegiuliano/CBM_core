@@ -15,7 +15,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "Rcpp", "RSQLite",
+    "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "RSQLite",
     "CBMutils", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)"
@@ -39,14 +39,10 @@ defineModule(sim, list(
       objectName = "masterRaster", objectClass = "raster",
       desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"
     ),
-    expectsInput(objectName = "processes", objectClass = "dataset", desc = NA, sourceURL = NA),
+
     expectsInput(
       objectName = "pooldef", objectClass = "character",
       desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "PoolCount", objectClass = "numeric",
-      desc = "Length of pooldef", sourceURL = NA
     ),
     expectsInput(
       objectName = "pools", objectClass = "matrix",
@@ -64,11 +60,6 @@ defineModule(sim, list(
       objectName = "gcids", objectClass = "numeric",
       desc = "The identification of which growth curves to use on the specific stands provided by...", sourceURL = NA
     ),
-    # expectsInput("gcHash", objectClass = "environment",
-    #               desc = paste("Environment pointing to each gcID, that is itself an environment,",
-    #                            "pointing to each year of growth for all AG pools.Hashed matrix of the 1/2 growth increment.",
-    #                            "This is used in the c++ functions to increment AG pools two times in an annual event (in the CBM_core module.")
-    # ),
     expectsInput(
       objectName = "historicDMIDs", objectClass = "numeric",
       desc = "Vector, one for each stand, indicating historical disturbance type, linked to the S4 table called cbmData. Only Spinup.", sourceURL = NA
@@ -163,8 +154,6 @@ defineModule(sim, list(
                   desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
     createsOutput(objectName = "spatialDT", objectClass = "data.table",
                   desc = "this is modified to associate the right pixel group to the pixel id after disturbances"),
-    createsOutput(objectName = "nStands", objectClass = "integer",
-                  desc = "number of `pixelGroup` in this annual run"),
     createsOutput(objectName = "gcids", objectClass = "vector",
                   desc = "growth component id associated with each `pixelGroup`"),
     createsOutput(objectName = "spatialUnits", objectClass = "vector",
@@ -200,22 +189,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       #sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 12 )
       # sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last())
     },
-    saveSpinup = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
-      colnames(sim$spinupResult) <- c(c("pixelGroup", "age"), sim$pooldef)
-      write.csv(file = file.path(outputPath(sim), "spinup.csv"), sim$spinupResult)
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + increment, "CBM_core", "templateEvent")
-
-      # ! ----- STOP EDITING ----- ! #
-    },
-    annual = {
+     annual = {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
       sim <- annual(sim)
@@ -226,10 +200,11 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
       sim <- postSpinup(sim)
-      sim$turnoverRates <- calcTurnoverRates(
-        turnoverRates = sim$cbmData@turnoverRates,
-        spatialUnitIds = sim$cbmData@spatialUnitIds, spatialUnits = sim$spatialUnits
-      )
+      ## These turnover rates are now in
+      # sim$turnoverRates <- calcTurnoverRates(
+      #   turnoverRates = sim$cbmData@turnoverRates,
+      #   spatialUnitIds = sim$cbmData@spatialUnitIds, spatialUnits = sim$spatialUnits
+      #)
       # ! ----- STOP EDITING ----- ! #
     },
     accumulateResults = {
@@ -284,11 +259,6 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       colnames(sim$cbmPools) <- c(c("simYear", "pixelCount", "pixelGroup", "ages"), sim$pooldef)
       write.csv(file = file.path(outputPath(sim), "cPoolsPixelYear.csv"), sim$cbmPools)
 
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      colnames(sim$cbmPools) <- c(c("simYear", "pixelCount", "pixelGroup", "ages"), sim$pooldef)
-      write.csv(file = file.path(outputPath(sim), "cPoolsPixelYear.csv"), sim$cbmPools)
 
       # e.g., call your custom functions/methods here
       # you can define your own methods below this `doEvent` function
@@ -329,94 +299,54 @@ spinup <- function(sim) {
   #   )
   # }
   #
+
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
   gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
-
-  # merge the growth curve sw/hw df onto the pixelGroup-level spatial inventory
-  ##NOTE: It is important to keep the growth curve ids as factors (and do we
-  ##really need three??) because we create the #factors (unique identifiers for
-  ##the growth curves) from a set a columns #provided by the user (these factors
-  ##are create with CBMutils::gcidsCreate(), line 299 CBM_dataPrep_SK.
-
   gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcid, levels(sim$level3DT$gcids))
+  ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
+  ## CBM_vol2biomass
+  level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
 
-  spatial_inv_gc_merge <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
+  ##This will come from CBM_defaults, with URL for SQLight
+  library(RSQLite)
+  library(CBMutils)
+  archiveIndex <- dbConnect(dbDriver("SQLite"), sim$dbPath)
+  spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
+  spinupSQL <- as.data.table(spinupSQL)
+  ## note that spinupSQL$id is the spatial_unit_id
 
-  ##WHY 41? Because there are 41 pixelGroups in the spinup, so 41 pixelGroups at
-  #time 0 of the simulation. This can be checked here simCoreAlone$level3DT.
+  spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
 
-  ###CELINE NOTE: spatial_inv_gc_merge currently matches simCoreAlone$level3DT
-  ###with the additional column that identifies `is_sw`
-
-  ##NEW SECRET KNOWLEDGE: disturbance_type_ref_en_CA.csv. Scott will eventually
-  ##put this table somewhere where we can access it via URL.
+  level3DT <- merge(level3DT, spinupParamsSPU, by.x = "spatial_unit_id", by.y = "id")
 
 
-  ## given SPU and search for the term "wildfire" in the name (CBMutils::spuDist
-  ## is a function that gets all the dist in a specific spu - it would need to
-  ## be modified to work with the new SQLite). That will be the DMID we are
-  ## looking for for the historicDMIDs for this pixelGroup. This is currently
-  ## done on lines 406-427 in CBM_dataPrep_SK.R.
-  ###CELINE: because we don't need the rasterID until the annual event, I am
-  ###skipping this. Restating: rasterID is specific to this study area, we
-  ###expect disturbances to each have their own rasters or polygons.
-
-  ###historicalDMIDs <- data.table(dmid = sim$historicDMIDs)
-  ###historicalDMIDs <- unique(sim$mySpuDmids[historicalDMIDs, on = c("disturbance_matrix_id" = "dmid")])
-  ###spatial_inv_gc_merge <- spatial_inv_gc_merge[historicalDMIDs[, .(spatial_unit_id, rasterID)],
-  ###                                             on = c("spatial_unit_id")]
-  ###setnames(spatial_inv_gc_merge, "rasterID", "historicalDMIDs")
-
-  ##lastPassDMIDs will be either user provided or from a raster (NTEMS for
-  ##example). This is the last known disturbance for each pixelGroup.
-  ###lastPassDMIDs <- data.table(dmid = sim$lastPassDMIDS)
-  ###lastPassDMIDs <- unique(sim$mySpuDmids[lastPassDMIDs, on = c("disturbance_matrix_id" = "dmid")])
-  ###spatial_inv_gc_merge <- spatial_inv_gc_merge[lastPassDMIDs[, .(spatial_unit_id, rasterID)],
-  ###                                             on = c("spatial_unit_id")]
-  ###TODO I am unsure why we would need the rasterID, which identifies the
-  ###user-provided disturbances for the annual events, for the spinup
-  ###setnames(spatial_inv_gc_merge, "rasterID", "lastPassDMIDS")
-
-  #join spatial_inv_gc_m
-
-  ##TODO NOTES FROM IAN: lastPassDMIDs need to be joined by spatial_unit_id and
-  ##whatever other column to produce vectors of length 6763, so that the 41
-  #values aren't recycled...ANSWER FROM CELINE: it is the opposite,
-  #spinup_parameters should have 41 lines, we are just spining-up the
-  #pixelGroups
   spinup_parameters <- data.table(
-    pixelGroup = spatial_inv_gc_merge$pixelGroup,
-    age = spatial_inv_gc_merge$ages,
-    area = 1.0, ##TODO ask Scott if this is supposed to be the pixel size? and why is it set to 1?
+    pixelGroup = level3DT$pixelGroup,
+    age = level3DT$ages,
+    ##Notes: The area column will have no effect on the C dynamics of this
+    ##script, since the internal working values are tonnesC/ha.  It may be
+    ##useful to keep the column anyways for results processing since multiplying
+    ##the tonnesC/ha, tonnesC/yr/ha values by the area is the CBM3 method for
+    ##extracting the mass, mass/year values.
+    area = 1.0,
     delay = sim$delays, ##user defined so CBM_dataPrep_SK
-    ##TODO The fire return intervals were in sim$cbmData (so SQLite) in
-    ##spadesCBM, but are not in spinup_input$parameters. Ask Scott to add or go
-    ##get them from the SQLite (but that repeats the Python work). These are
-    ##spatial unit/ecozone specific. IMPORTANT: these to not match the current
-    ##literature values for ecozones.
-    return_interval = sim$returnIntervals$return_interval,
-    #both simCoreAlone and this sim have 75 FRI but the spinupSQL says SPU 28 is
-    #83...(sigh). Make sure we get this from the SQLite/or
-    #libcbmr::cbm_exn_get_default_parameters()
-    min_rotations = sim$minRotations, ##same as return Intervals
-    max_rotations = sim$maxRotations, ##same as return Intervals
-    spatial_unit_id = spatial_inv_gc_merge$spatial_unit_id,
-    sw_hw = as.integer(spatial_inv_gc_merge$is_sw),
-    ##this is new and added above, it will be in the CBM_vol2biomass
+    return_interval = level3DT$return_interval,
+    min_rotations = level3DT$min_rotations,
+    max_rotations = level3DT$max_rotations,
+    spatial_unit_id = level3DT$spatial_unit_id,
+    sw_hw = as.integer(level3DT$is_sw),
+
     ###TODO species attribution is hard coded, need to sort this out! Species
     ###matches are in the CBM_dataPrep_SK
-    species = ifelse(spatial_inv_gc_merge$is_sw, 1, 62),
+    species = ifelse(level3DT$is_sw, 1, 62),
     ## this is assigning the species number, so species comes form user or
     ## inventory and will be in CBM_dataPrep_SK, but the species number will
     ## come from libcbmr::cbm_exn_get_default_parameters() species (see
     ## trackCBM_core) or directly from the SQLite -
     ##TODO how are these used if increments (based on species for Boudewyn
     ##translation) are already provided.
-    mean_annual_temperature = -0.02307,
-    ##TODO Ask Scott: this is usually associated with ecozone/spu but this doesn't
-    ##match SPU 28 (if the id columns are spus, which I think they are since
-    ##there are 48 of them). Why?
+    mean_annual_temperature = level3DT$historic_mean_temperature,
     historical_disturbance_type = 1L,
     last_pass_disturbance_type =  1L
     ##IMPORTANT: this value comes from a table provided by Scott Morking
@@ -433,65 +363,35 @@ spinup <- function(sim) {
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
   ##be easier.
+  ## Need to get rid of HW SW distinction
+  df1 <- sim$gc_df
+  df1 <- df1[, .(gcids = factor(df1$gcid, levels(sim$level3DT$gcids)),
+          age,
+          merch_inc =  sw_merch_inc + hw_merch_inc,
+          foliage_inc = sw_foliage_inc + hw_foliage_inc,
+          other_inc = sw_other_inc + hw_other_inc)]
+  ##Need to add pixelGroup to df1
+  df2 <- merge(df1, level3DT[,.(pixelGroup, gcids)],
+               by = "gcids",
+               allow.cartesian = TRUE)
+  setkeyv(df2, c("pixelGroup", "age"))
 
-  #drop duplicated rows - per libcmr - duplicated from pixelIndex
-  ### There are no more duplicates
-  spinup_parameters_dedup <- unique(spinup_parameters)
 
-  spinup_parameters_dedup[, spinup_record_idx := as.integer(rownames(spinup_parameters_dedup))]
-  #spinup_parameters_dedup <-   spinup_parameters_dedup[, area := NULL]
-
-  growth_increment_pre_merge <- spatial_inv_gc_merge[, .(gcid = unique(growth_curve_id),
-                                                         sw_hw = as.integer(unique(is_sw))),
-                                                     .(pixelGroup)]
-  #note sw_hw exists in both tables
-  #sw_hw.x is used repeatedly throughout so presumably this distinction is necessary...
-
-  #anyway - below will add gcid and sw_hw.y and sw_hw.y
-  growth_increments_merge_1 <- merge(
-    growth_increment_pre_merge,
-    spinup_parameters_dedup,
-    by = c("pixelGroup")
-  )
-###This won't be needed once we get the correct class out of CBM_vol2biomass and
-###CBM_dataPrep_SK
-
- sim$gc_df$gcid <- factor(sim$gc_df$gcid, levels(sim$level3DT$gcids))
- setkey(sim$gc_df, "gcid")
- setkey(growth_increments_merge_1, "gcid")
-  growth_increments_merge_2 <- merge.data.table(
-    growth_increments_merge_1[, .(spinup_record_idx, gcid, sw_hw.x)],
-    sim$gc_df,
-    allow.cartesian = TRUE #multiple gcid per pixelGroup/spinup_record_idx in
-    #growth_increments_merge_1 and multiple ages per gcid in gc_df
-  )
-
-  growth_increments <-
-    growth_increments_merge_2[, .(row_idx = spinup_record_idx,
-                                  age,
-                                  merch_inc =  sw_merch_inc + hw_merch_inc,
-                                  foliage_inc = sw_foliage_inc + hw_foliage_inc,
-                                  other_inc = sw_other_inc + hw_other_inc)]
-  ### the above "growth_increments will come from CBM_vol2biomass
   #drop growth increments age 0
-  sim$growth_increments <- growth_increments[age > 0,]
-##TODO this next object is the important one that we need to create for the
-##spinup event.  Columns "pixelGroup", "age", "area"  will come from the
-##inventory information (user provided in CBM_dataPrepXX). From that we can get
-##the "spatial_unit_id". "delay" is user defined (usually set to 0 by default,
-##this means no delay in regeneration in the spinup). "return_interval" is
-##associatewith ecozones (so from the libcbmr::cbm_exn_get_default_parameters()
-##or SQLite (see codeForDefaultsModule.R)
-
-
+  growth_increments <- df2[age > 0,.(row_idx = pixelGroup,
+                                     age,
+                                     merch_inc,
+                                     foliage_inc,
+                                     other_inc,
+                                     gcids)]
 
   spinup_input <- list(
-    parameters = spinup_parameters_dedup,
-    increments = sim$growth_increments
+    parameters = spinup_parameters,
+    increments = growth_increments
   )
   sim$spinup_input <- spinup_input
-  ##This takes a long time...and it will have to be loaded in
-  ##CBM_defaults...unless we go straight to the SQLite
+
+  ##First call to a Python function
   mod$libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
   spinup_op_seq <- libcbmr::cbm_exn_get_spinup_op_sequence()
 
@@ -506,81 +406,9 @@ spinup <- function(sim) {
     mod$libcbm_default_model_config
   )
 
-##TODO this needs to be called $spinupResults because we will hopefully have - or do we?
-##real data to replace this soon.
-  ###PROBLEM: none of these have the pixelGroup. I did a check with the ages to
-  ###get an idea if they were in the same order:
-  # Browse[1]> cbm_vars$state$age == spinup_input$parameters$age
-  # [1] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
-  # [18] TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE TRUE
-  # [35] TRUE TRUE TRUE TRUE TRUE TRUE TRUE
-  ###PROBLEM: these are orders of magnitude higher then our original spinup:
-  # Browse[1]> head(simCoreAlone$spinupResult)
-  # Input SoftwoodMerch SoftwoodFoliage SoftwoodOther SoftwoodCoarseRoots SoftwoodFineRoots
-  # [1,]     1      9.018817     0.026589240    0.44986358           1.3604480         0.3778418
-  # [2,]     1      6.492249     0.011452733    0.41525916           0.9618249         0.2910026
-  # [3,]     1     14.213983     0.008096681    0.04342577           2.1427526         0.5129604
-  # [4,]     1     16.132112     0.032905672    0.65111998           2.5888743         0.5743172
-  # [5,]     1      9.001756     0.025486262    0.43391934           1.3549403         0.3767364
-  # [6,]     1      6.477340     0.010794409    0.39994341           0.9570796         0.2898767
-  # HardwoodMerch HardwoodFoliage HardwoodOther HardwoodCoarseRoots HardwoodFineRoots
-  # [1,]             0               0             0                   0                 0
-  # [2,]             0               0             0                   0                 0
-  # [3,]             0               0             0                   0                 0
-  # [4,]             0               0             0                   0                 0
-  # [5,]             0               0             0                   0                 0
-  # [6,]             0               0             0                   0                 0
-  # AboveGroundVeryFastSoil BelowGroundVeryFastSoil AboveGroundFastSoil BelowGroundFastSoil
-  # [1,]               1.2029515               0.5411285           0.6007360           0.1864821
-  # [2,]               0.9266990               0.4182496           0.5272865           0.1340970
-  # [3,]               1.5918933               0.7313747           0.3657926           0.2855185
-  # [4,]               1.8072332               0.8199837           0.8803080           0.3499173
-  # [5,]               1.1987080               0.5396007           0.5871197           0.1858550
-  # [6,]               0.9225308               0.4166529           0.5139579           0.1334881
-  # MediumSoil AboveGroundSlowSoil BelowGroundSlowSoil SoftwoodStemSnag SoftwoodBranchSnag
-  # [1,]   3.532445          0.05514748          0.03326871        1.1700422        0.044462072
-  # [2,]   2.548617          0.04272481          0.02558344        0.8452926        0.041609003
-  # [3,]   5.644753          0.07067682          0.04537946        1.8614506        0.005347947
-  # [4,]   6.371460          0.08647611          0.05131075        2.1028507        0.061129517
-  # [5,]   3.503236          0.05474311          0.03317196        1.1667707        0.042930180
-  # [6,]   2.527578          0.04235391          0.02548325        0.8428067        0.040117022
-  # HardwoodStemSnag HardwoodBranchSnag CO2 CH4 CO Products
-  # [1,]                0                  0   0   0  0        0
-  # [2,]                0                  0   0   0  0        0
-  # [3,]                0                  0   0   0  0        0
-  # [4,]                0                  0   0   0  0        0
-  # [5,]                0                  0   0   0  0        0
-  # [6,]                0                  0   0   0  0        0
-  # Browse[1]> head(cbm_vars$pools)
-  # Input     Merch  Foliage    Other CoarseRoots FineRoots AboveGroundVeryFastSoil
-  # 1     1 12.329532 3.283875 8.784035    6.907029  1.700458               17.614549
-  # 2     1 12.357636 3.285513 8.786127    6.913469  1.700924               17.625114
-  # 3     1 12.384898 3.287083 8.788109    6.919701  1.701373               17.635247
-  # 4     1 12.554141 3.296402 8.799353    6.958033  1.704122               17.695516
-  # 5     1  1.940386 1.553422 4.126114    3.007458  1.200383                6.065366
-  # 6     1  2.171359 1.636021 4.378734    3.164162  1.233304                6.601400
-  # BelowGroundVeryFastSoil AboveGroundFastSoil BelowGroundFastSoil MediumSoil
-  # 1               1.2806751            4.161752           0.7256811   3.231070
-  # 2               1.2810644            4.164942           0.7267328   3.203080
-  # 3               1.2814404            4.167994           0.7277523   3.175735
-  # 4               1.2837382            4.185946           0.7340617   3.001483
-  # 5               0.8352238            4.097583           1.6410350   6.591535
-  # 6               0.8596967            3.985672           1.5287425   6.664677
-  # AboveGroundSlowSoil BelowGroundSlowSoil StemSnag BranchSnag      CO2      CH4       CO NO2
-  # 1            43.98619            86.92752 1.409978  0.6053798 4796.849 5.936824 53.42948   0
-  # 2            44.15711            87.01102 1.410659  0.6056065 4801.368 5.936824 53.42948   0
-  # 3            44.32609            87.09531 1.411448  0.6058212 4805.891 5.936824 53.42948   0
-  # 4            45.45593            87.70611 1.419315  0.6070399 4837.631 5.936824 53.42948   0
-  # 5            26.29761            84.51220 7.039405  1.0287375 4445.779 5.936824 53.42948   0
-  # 6            26.30789            84.47830 6.748279  0.9269304 4448.323 5.936824 53.42948   0
-  # Products
-  # 1        0
-  # 2        0
-  # 3        0
-  # 4        0
-  # 5        0
-  # 6        0
-
+##TODO Comparison of spinup results with other CBM runs needs to be completed.
+##Scott has it on his list
+  sim$spinupResults <- cbm_vars$pools
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
 }
@@ -608,6 +436,7 @@ postSpinup <- function(sim) {
   # in the end (cPoolsPixelYear.csv), this should be the same length at this vector
   ## got place for a vector length check!!
   setorderv(sim$spatialDT, "pixelGroup")
+
   sim$pixelKeep <- sim$spatialDT[, .(pixelIndex, pixelGroup)]
   setnames(sim$pixelKeep, c("pixelIndex", "pixelGroup0"))
 
@@ -635,6 +464,7 @@ annual <- function(sim) {
 
   # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
   # example. First add a column for disturbed pixels to the spatialDT
+
   spatialDT <- sim$spatialDT
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
@@ -674,8 +504,7 @@ annual <- function(sim) {
   # 3. get the disturbed pixels only
     distPixels <- spatialDT[events > 0, .(
       pixelIndex, pixelGroup, ages, spatial_unit_id,
-      growth_curve_component_id, growth_curve_id,
-      ecozones, events
+      gcids, ecozones, events
     )]
   } else if (is(sim$disturbanceRasters, "data.table")) { # RIA project had a data.table
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
@@ -756,7 +585,7 @@ annual <- function(sim) {
   ##function changes the value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
-    "growth_curve_component_id", "growth_curve_id", "ecozones", cPoolNames)
+    "gcids", "ecozones", cPoolNames)
   ]
 
   cols <- c("pixelGroup", "newGroup")
@@ -790,8 +619,7 @@ annual <- function(sim) {
   distGroupCpools <- unique(distPixelCpools[, -("pixelIndex")])
   setkey(distGroupCpools, pixelGroup)
   cols <- c(
-    "pixelGroup", "ages", "spatial_unit_id", "growth_curve_component_id",
-    "growth_curve_id", "ecozones", "events"
+    "pixelGroup", "ages", "spatial_unit_id", "gcids", "ecozones", "events"
   )
 
   ## year 2000 has no disturbance
@@ -886,8 +714,8 @@ annual <- function(sim) {
   ##pixelGroup 6 as we can see in distPixels). gcid for pixelGroup 6 (in
   ##distPixel and sim$level3DT) is gcid 50
   if (dim(distPixels)[1] > 0) {
-    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'growth_curve_id')])
-    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'growth_curve_id')])
+    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
+    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids')])
     ## these two above should have the same dim
     ##TODO make this a check
     dim(oldGCpixelGroup) == dim(newGCpixelGroup)
@@ -897,11 +725,12 @@ annual <- function(sim) {
     growth_incForDist <- data.table(
       row_idx = sort(rep(newGCpixelGroup$pixelGroup, 250)),
       age = rep(1:250, dim(newGCpixelGroup)[1]),
-      merch_inc = sim$growth_increments[row_idx %in% oldGCpixelGroup$pixelGroup, merch_inc],
-      foliage_inc = sim$growth_increments[row_idx %in% oldGCpixelGroup$pixelGroup, foliage_inc],
-      other_inc =  sim$growth_increments[row_idx %in% oldGCpixelGroup$pixelGroup, other_inc]
+      merch_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, merch_inc],
+      foliage_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, foliage_inc],
+      other_inc =  sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, other_inc],
+      gcids = factor(oldGCpixelGroup$gcids, levels(sim$level3DT$gcids))
     )
-    growth_increments <- rbind(sim$growth_increments, growth_incForDist)
+    growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
     ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
     ## in the Python functions so we are keeping it.
     cbm_vars$parameters$row_idx <- 1:dim(cbm_vars$parameters)[1]
@@ -922,6 +751,7 @@ annual <- function(sim) {
       growth_increments,
       by = c("row_idx", "age")
     )
+
     annual_increments <- as.data.table(annual_increments)
     names(annual_increments)
     ##TODO this seems precarious...but it will be fixed once the growth info comes
@@ -956,7 +786,7 @@ annual <- function(sim) {
     #make annual_increments
     annual_increments <- merge(
       cbm_vars$parameters,
-      sim$growth_increments,
+      sim$spinup_input$increments,
       by = c("row_idx", "age")
     )
     annual_increments <- as.data.table(annual_increments)
@@ -980,7 +810,7 @@ annual <- function(sim) {
 
   # need to keep the growth increments that we added for the next annual event
   if (dim(distPixels)[1] > 0) {
-      sim$growth_increments <- growth_increments
+      sim$spinup_input$increments <- growth_increments
       }
 
   ###################### END cbm_vars$parameters
@@ -1043,6 +873,8 @@ annual <- function(sim) {
   )
 
   sim$cbm_vars <- cbm_vars
+
+  ## need to update pixelGroupC for next annual event.
 ###########################################################################################
 
   # # 1. Changing the vectors and matrices that need to be changed to process this year's growth
@@ -1152,7 +984,39 @@ annual <- function(sim) {
   # sim$pools[which(is.na(sim$pools))] <- 0
   # ########################## END PROCESSES#########################################
   #-------------------------------------------------------------------------------
+  #### UPDATING ALL THE FINAL VECTORS FOR NEXT SIM YEAR ###################################
+  #-----------------------------------
+  # 1. Update long form (pixelIndex) and short form (pixelGroup) tables.
+  if (!identical(sim$spatialDT$pixelIndex, updateSpatialDT$pixelIndex))
+    stop("Some pixelIndices were lost; sim$spatialDT and updateSpatialDT should be the same NROW; they are not")
+  sim$spatialDT <- updateSpatialDT
+  ##TODO this will have to change once we stream line the creation of
+  ##pixelGroupForAnnual earlier in this event.
+  sim$pixelGroupC <- data.table(pixelGroupForAnnual[, !(Input:Products)], cbm_vars$pools)
 
+  ##CELINE NOTES Ages are update in cbm_vars$state internally in the
+  ##libcbmr::cbm_exn_step function
+  # # 2. increment ages
+  # sim$pixelGroupC[, ages := ages + 1]
+  # sim$spatialDT[, ages := ages + 1]
+
+  # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
+  # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
+  pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
+  ##TODO check is pooldef from CBM_defaults (comes from SQLight) matches the
+  ##names in the Python-built cbm_vars.
+  updatePools <- data.table(
+    simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
+    pixelCount = pixelCount[["N"]],
+    pixelGroup = sim$pixelGroupC$pixelGroup,
+    ages = sim$pixelGroupC$ages,
+    sim$pixelGroupC[, ..pooldef]
+  )
+
+  sim$cbmPools <- updatePools #rbind(sim$cbmPools, updatePools)
+
+  ######## END OF UPDATING VECTORS FOR NEXT SIM YEAR #######################################
+  #-----------------------------------
   #-----------------------------------------------------------------------------------
   ############ NPP ####################################################################
   # ############## NPP used in building sim$NPP and for plotting ####################################
@@ -1227,37 +1091,7 @@ annual <- function(sim) {
   ############# End of update emissions and products ------------------------------------
 
 
-  #### UPDATING ALL THE FINAL VECTORS FOR NEXT SIM YEAR ###################################
-  #-----------------------------------
-  # 1. Update long form (pixelIndex) and short form (pixelGroup) tables.
-  if (!identical(sim$spatialDT$pixelIndex, updateSpatialDT$pixelIndex))
-    stop("Some pixelIndices were lost; sim$spatialDT and updateSpatialDT should be the same NROW; they are not")
-  sim$spatialDT <- updateSpatialDT
-  ##TODO this will have to change once we stream line the creation of
-  ##pixelGroupForAnnual earlier in this event.
-  sim$pixelGroupC <- data.table(pixelGroupForAnnual[, !(Input:Products)], cbm_vars$pools)
 
-  ##CELINE NOTES Ages are update in cbm_vars$state internally in the
-  ##libcbmr::cbm_exn_step function
-  # # 2. increment ages
-  # sim$pixelGroupC[, ages := ages + 1]
-  # sim$spatialDT[, ages := ages + 1]
-
-  # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
-  # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
-  pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
-  updatePools <- data.table(
-    simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
-    pixelCount = pixelCount[["N"]],
-    pixelGroup = sim$pixelGroupC$pixelGroup,
-    ages = sim$pixelGroupC$ages,
-    sim$pixelGroupC[, ..pooldef]
-  )
-
-  sim$cbmPools <- updatePools #rbind(sim$cbmPools, updatePools)
-
-  ######## END OF UPDATING VECTORS FOR NEXT SIM YEAR #######################################
-  #-----------------------------------
 
   return(invisible(sim))
 }
@@ -1274,296 +1108,273 @@ annual <- function(sim) {
   P(sim)$poolsToPlot <- "totalCarbon"
   P(sim)$.plotInitialTime <- 1990
   P(sim)$.plotInterval <- 1
+
   ##TODO add qs to required packages
   # library(qs)
   # qsave(db, file.path(getwd(), "modules", "CBM_core", "data", "cbmData.qs"))
 
   # # These could be supplied in the CBM_defaults module
-  # if (!suppliedElsewhere("processes", sim)) {
-  #   stop("CBM_core requires an object called *processes* that should likely ",
-  #        "come from the CBM_defaults module; please add that to the modules being used: ",
-  #        "PredictiveEcology/CBM_defaults")
-  #
-  #   sim$cbmData <- qread(file.path(dataPath(sim), "cbmData.qs"))
-  #
-  #   sim$processes <- list(
-  #   domDecayMatrices = matrixHash(computeDomDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
-  #   slowDecayMatrices = matrixHash(computeSlowDecayMatrices(sim$decayRates, sim$cbmData@decayParameters, sim$PoolCount)),
-  #   slowMixingMatrix = matrixHash(computeSlowMixingMatrix(sim$cbmData@slowAGtoBGTransferRate, sim$PoolCount)),
-  #   domTurnover = matrixHash(computeDomTurnoverMatrices(sim$cbmData@turnoverRates, sim$PoolCount)),
-  #   bioTurnover = matrixHash(computeBioTurnoverMatrices(sim$cbmData@turnoverRates, sim$PoolCount)),
-  #   disturbanceMatrices = matrixHash(loadDisturbanceMatrixIds(sim$cbmData@disturbanceMatrixValues, sim$cbmData@pools))
-  # )
-#
-#     sim$pooldef <- c("Input", "SoftwoodMerch", "SoftwoodFoliage", "SoftwoodOther",
-#                    "SoftwoodCoarseRoots", "SoftwoodFineRoots", "HardwoodMerch",
-#                    "HardwoodFoliage", "HardwoodOther", "HardwoodCoarseRoots",
-#                    "HardwoodFineRoots", "AboveGroundVeryFastSoil",
-#                    "BelowGroundVeryFastSoil", "AboveGroundFastSoil",
-#                    "BelowGroundFastSoil", "MediumSoil", "AboveGroundSlowSoil",
-#                    "BelowGroundSlowSoil", "SoftwoodStemSnag",
-#                    "SoftwoodBranchSnag", "HardwoodStemSnag", "HardwoodBranchSnag",
-#                    "CO2", "CH4", "CO", "Products")
-#   }
-#
+  # if we want this module to run alone (I don't think we do), we need $poodef
+
   # These could be supplied in the CBM_dataPrep_XXX modules
-  # The below examples come from CBM_dataPrep_SK
-  if (!suppliedElsewhere("ages", sim))  {
-    sim$PoolCount <- length(sim$pooldef)
-    sim$pools <- matrix(ncol = sim$PoolCount, nrow = 739, data = 0)
-    sim$ages <- c(3,3,3,10,100,100,100,100,100,100,100,100,100,100,100,100,101,101,101
-                  ,101,101,101,101,101,101,101,101,101,101,102,102,102,102,102,102,102,102,102
-                  ,102,102,102,102,103,103,103,103,103,103,103,103,103,103,103,104,104,104,104
-                  ,104,107,108,108,108,108,108,108,108,108,108,109,109,109,109,109,109,109,109
-                  ,109,11,11,11,110,110,110,110,110,110,110,110,110,110,110,110,111,111,111
-                  ,111,111,111,111,111,111,111,111,112,112,112,112,112,112,112,112,112,112,113
-                  ,113,113,113,113,113,113,113,114,116,117,118,118,119,119,119,119,119,119,119
-                  ,119,119,12,12,12,12,12,120,120,120,120,120,120,120,120,120,120,120,121
-                  ,121,121,121,121,121,121,121,121,121,122,122,122,122,122,122,122,122,122,123
-                  ,123,123,123,126,127,127,127,127,128,128,128,128,128,128,128,128,128,128,129
-                  ,129,129,129,129,129,129,129,129,13,13,13,130,130,130,130,130,130,130,130
-                  ,130,130,131,131,131,131,131,131,131,131,131,132,132,132,132,132,135,135,136
-                  ,136,137,137,137,137,137,137,137,138,138,138,138,138,139,139,139,139,14,14
-                  ,14,14,140,142,143,143,144,144,144,144,144,145,145,145,145,146,146,146,146
-                  ,146,147,15,18,18,18,18,19,19,19,19,19,19,3,3,3,20,20,20
-                  ,20,20,20,20,21,21,21,21,21,21,21,21,22,22,22,23,23,28,28
-                  ,28,28,29,29,29,29,29,29,3,3,3,30,30,30,30,30,30,30,30
-                  ,31,31,31,31,31,31,31,31,32,32,32,32,32,32,32,33,33,33,33
-                  ,34,38,38,38,38,38,38,39,39,39,39,39,39,39,39,4,4,40,40
-                  ,40,40,40,40,40,40,40,41,41,41,41,41,41,41,41,41,41,42,42
-                  ,42,42,42,42,42,42,43,43,43,43,43,43,44,44,44,47,48,48,48
-                  ,48,48,48,48,48,48,49,49,49,49,49,49,49,49,49,49,5,5,50
-                  ,50,50,50,50,50,50,50,50,50,51,51,51,51,51,51,51,51,51,51
-                  ,52,52,52,52,52,52,52,52,52,52,53,53,53,53,53,53,53,53,54
-                  ,54,54,57,57,58,58,58,58,58,58,58,59,59,59,59,59,59,59,59
-                  ,59,59,6,6,60,60,60,60,60,60,60,60,60,60,61,61,61,61,61
-                  ,61,61,61,61,61,61,61,61,62,62,62,62,62,62,62,62,62,62,62
-                  ,63,63,63,63,63,63,63,64,67,68,68,68,68,68,68,69,69,69,69
-                  ,69,69,69,69,69,70,70,70,70,70,70,70,70,70,70,70,71,71,71
-                  ,71,71,71,71,71,71,71,72,72,72,72,72,72,72,72,72,73,73,73
-                  ,73,73,74,77,78,78,78,78,78,78,78,78,79,79,79,79,79,79,79
-                  ,79,79,79,79,80,80,80,80,80,80,80,80,80,80,80,80,81,81,81
-                  ,81,81,81,81,81,81,81,81,81,81,82,82,82,82,82,82,82,82,82
-                  ,82,82,82,83,83,83,83,83,83,83,83,83,83,84,84,87,87,87,88
-                  ,88,88,88,88,88,88,88,88,89,89,89,89,89,89,89,89,89,89,89
-                  ,9,90,90,90,90,90,90,90,90,90,90,90,91,91,91,91,91,91,91
-                  ,91,91,91,91,91,92,92,92,92,92,92,92,92,92,92,93,93,93,93
-                  ,93,93,93,93,94,94,94,94,97,97,97,97,97,98,98,98,98,98,98
-                  ,98,98,98,98,98,99,99,99,99,99,99,99,99,99,99,99,99)
-
-    sim$realAges <- c(
-      0,1,1,10,100,100,100,100,100,100,100,100,100,100,100,100,101,101,101,
-      101,101,101,101,101,101,101,101,101,101,102,102,102,102,102,102,102,102,102,
-      102,102,102,102,103,103,103,103,103,103,103,103,103,103,103,104,104,104,104,
-      104,107,108,108,108,108,108,108,108,108,108,109,109,109,109,109,109,109,109,
-      109,11,11,11,110,110,110,110,110,110,110,110,110,110,110,110,111,111,111,
-      111,111,111,111,111,111,111,111,112,112,112,112,112,112,112,112,112,112,113,
-      113,113,113,113,113,113,113,114,116,117,118,118,119,119,119,119,119,119,119,
-      119,119,12,12,12,12,12,120,120,120,120,120,120,120,120,120,120,120,121,
-      121,121,121,121,121,121,121,121,121,122,122,122,122,122,122,122,122,122,123,
-      123,123,123,126,127,127,127,127,128,128,128,128,128,128,128,128,128,128,129,
-      129,129,129,129,129,129,129,129,13,13,13,130,130,130,130,130,130,130,130,
-      130,130,131,131,131,131,131,131,131,131,131,132,132,132,132,132,135,135,136,
-      136,137,137,137,137,137,137,137,138,138,138,138,138,139,139,139,139,14,14,
-      14,14,140,142,143,143,144,144,144,144,144,145,145,145,145,146,146,146,146,
-      146,147,15,18,18,18,18,19,19,19,19,19,19,2,2,2,20,20,20,
-      20,20,20,20,21,21,21,21,21,21,21,21,22,22,22,23,23,28,28,
-      28,28,29,29,29,29,29,29,3,3,3,30,30,30,30,30,30,30,30,
-      31,31,31,31,31,31,31,31,32,32,32,32,32,32,32,33,33,33,33,
-      34,38,38,38,38,38,38,39,39,39,39,39,39,39,39,4,4,40,40,
-      40,40,40,40,40,40,40,41,41,41,41,41,41,41,41,41,41,42,42,
-      42,42,42,42,42,42,43,43,43,43,43,43,44,44,44,47,48,48,48,
-      48,48,48,48,48,48,49,49,49,49,49,49,49,49,49,49,5,5,50,
-      50,50,50,50,50,50,50,50,50,51,51,51,51,51,51,51,51,51,51,
-      52,52,52,52,52,52,52,52,52,52,53,53,53,53,53,53,53,53,54,
-      54,54,57,57,58,58,58,58,58,58,58,59,59,59,59,59,59,59,59,
-      59,59,6,6,60,60,60,60,60,60,60,60,60,60,61,61,61,61,61,
-      61,61,61,61,61,61,61,61,62,62,62,62,62,62,62,62,62,62,62,
-      63,63,63,63,63,63,63,64,67,68,68,68,68,68,68,69,69,69,69,
-      69,69,69,69,69,70,70,70,70,70,70,70,70,70,70,70,71,71,71,
-      71,71,71,71,71,71,71,72,72,72,72,72,72,72,72,72,73,73,73,
-      73,73,74,77,78,78,78,78,78,78,78,78,79,79,79,79,79,79,79,
-      79,79,79,79,80,80,80,80,80,80,80,80,80,80,80,80,81,81,81,
-      81,81,81,81,81,81,81,81,81,81,82,82,82,82,82,82,82,82,82,
-      82,82,82,83,83,83,83,83,83,83,83,83,83,84,84,87,87,87,88,
-      88,88,88,88,88,88,88,88,89,89,89,89,89,89,89,89,89,89,89,
-      9,90,90,90,90,90,90,90,90,90,90,90,91,91,91,91,91,91,91,
-      91,91,91,91,91,92,92,92,92,92,92,92,92,92,92,93,93,93,93,
-      93,93,93,93,94,94,94,94,97,97,97,97,97,98,98,98,98,98,98,
-      98,98,98,98,98,99,99,99,99,99,99,99,99,99,99,99,99
-    )
-
-    if (!suppliedElsewhere("gcids", sim)) {
-      ## this is where the pixelGroups and their spu eco etc.
-      message("No spatial information was provided for the growth curves.
-            The default values (SK simulations) will be used to limit the number of growth curves used.")
-      sim$gcids <- c(
-        52, 52, 58, 52, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58,
-        61, 28, 29, 31, 34, 35, 37, 40, 49, 50, 52, 55, 58, 61, 28, 29,
-        31, 34, 37, 40, 49, 50, 52, 55, 56, 58, 61, 28, 29, 31, 34, 40,
-        49, 50, 52, 55, 58, 61, 28, 34, 49, 52, 55, 40, 28, 31, 34, 40,
-        49, 50, 52, 55, 61, 28, 31, 34, 40, 49, 50, 52, 55, 61, 52, 55,
-        58, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 28, 31, 34,
-        37, 40, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49, 50, 52,
-        55, 61, 28, 31, 34, 40, 49, 52, 55, 61, 28, 61, 52, 61, 62, 28,
-        31, 34, 40, 49, 50, 52, 55, 61, 31, 34, 49, 52, 55, 28, 31, 34,
-        40, 49, 50, 52, 55, 58, 61, 62, 28, 29, 31, 34, 40, 49, 50, 52,
-        55, 61, 28, 34, 40, 49, 50, 52, 55, 61, 62, 28, 34, 40, 61, 49,
-        31, 40, 49, 61, 28, 29, 31, 34, 40, 49, 50, 52, 58, 61, 28, 31,
-        34, 40, 49, 50, 52, 55, 61, 49, 52, 55, 28, 31, 34, 40, 49, 50,
-        52, 55, 58, 61, 28, 31, 34, 40, 49, 50, 52, 55, 61, 40, 49, 50,
-        52, 61, 28, 31, 31, 61, 28, 31, 34, 49, 50, 55, 61, 28, 31, 34,
-        49, 61, 28, 34, 52, 61, 31, 49, 52, 55, 55, 40, 28, 49, 28, 31,
-        34, 49, 52, 28, 31, 58, 61, 28, 31, 34, 49, 50, 61, 52, 49, 52,
-        55, 58, 31, 34, 37, 49, 52, 55, 52, 55, 58, 31, 34, 49, 52, 55,
-        56, 58, 31, 34, 49, 52, 55, 56, 58, 61, 49, 52, 55, 52, 55, 28,
-        34, 49, 55, 28, 31, 34, 37, 52, 55, 49, 52, 55, 28, 31, 34, 37,
-        49, 52, 55, 58, 28, 31, 34, 37, 49, 52, 55, 58, 28, 31, 34, 37,
-        49, 52, 55, 34, 37, 50, 52, 52, 28, 31, 34, 37, 52, 55, 28, 31,
-        34, 37, 49, 52, 55, 58, 52, 55, 28, 31, 34, 37, 40, 49, 52, 55,
-        58, 28, 31, 34, 37, 40, 49, 52, 55, 58, 61, 28, 31, 34, 37, 49,
-        52, 55, 58, 28, 31, 34, 37, 52, 55, 31, 52, 55, 31, 28, 31, 34,
-        37, 40, 49, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55, 58,
-        52, 55, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37,
-        40, 49, 50, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55, 58,
-        28, 31, 34, 37, 49, 52, 55, 58, 34, 49, 55, 28, 31, 28, 31, 34,
-        49, 52, 55, 58, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 49, 52,
-        28, 31, 34, 37, 40, 49, 50, 52, 55, 58, 28, 29, 31, 34, 35, 37,
-        40, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49, 50, 52, 55,
-        58, 61, 28, 31, 34, 49, 52, 55, 58, 52, 28, 28, 34, 49, 55, 58,
-        61, 28, 34, 37, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49,
-        50, 52, 55, 58, 61, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 28,
-        31, 34, 49, 50, 52, 55, 58, 61, 28, 40, 49, 55, 58, 49, 34, 28,
-        31, 34, 49, 50, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55,
-        58, 61, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 28, 29,
-        31, 34, 37, 40, 49, 50, 52, 55, 56, 58, 61, 28, 29, 31, 34, 37,
-        40, 49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 40, 49, 50, 52, 55,
-        61, 31, 50, 49, 52, 61, 28, 31, 34, 49, 50, 52, 55, 58, 61, 28,
-        31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 52, 28, 31, 34, 37, 40,
-        49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55,
-        58, 61, 28, 31, 34, 40, 49, 50, 52, 55, 58, 61, 28, 34, 49, 50,
-        52, 55, 58, 61, 49, 50, 55, 61, 49, 52, 55, 58, 61, 28, 29, 31,
-        34, 40, 49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 37, 40, 49, 50,
-        52, 55, 58, 61
-      )
-    }
-
-    if (!suppliedElsewhere("ecozones", sim)) {
-      message("No spatial information was provided for the growth curves.
-            The default values (SK simulations) will be used to determine which ecozones these curves are in.")
-      sim$ecozones <- c(
-        9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6,
-        6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9,
-        9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6,
-        6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-        6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6,
-        6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 9, 9, 9,
-        9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6, 9, 9,
-        9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9,
-        9, 9, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9,
-        9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9,
-        9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 6, 6, 6, 9, 6,
-        6, 6, 9, 9, 9, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 9, 9, 9, 9, 6,
-        6, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9,
-        9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 6, 9, 9,
-        9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9,
-        9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6,
-        9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6, 9, 9, 6, 6, 6, 6, 9, 9, 9,
-        9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9,
-        9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 6, 9, 9, 6, 6, 6,
-        6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6,
-        6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6,
-        6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 9, 9, 6, 6, 6,
-        6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-        6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6,
-        6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6,
-        9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9,
-        9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9,
-        9, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6,
-        9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-        6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9,
-        9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 6, 6, 6, 9, 9,
-        9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6,
-        9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-        6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9,
-        9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 6, 9, 6, 6, 6, 9, 9, 9, 9, 6, 6,
-        9, 6, 6, 6, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 6, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-        9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9,
-        9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
-        6, 6, 6, 6, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9,
-        6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9,
-        9, 6, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-        9
-      )
-    }
-    if (!suppliedElsewhere("spatialUnits", sim)) {
-      message("No spatial information was provided for the growth curves.
-            The default values (SK simulations) will be used to determine which CBM-spatial units these curves are in.")
-      sim$spatialUnits <- c(
-        28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
-        28, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27,
-        27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
-        28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27, 27, 27,
-        28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28,
-        28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27,
-        27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
-        28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 27, 28, 28, 28, 28, 27,
-        27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27,
-        27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
-        28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 28, 28,
-        27, 27, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27,
-        27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28,
-        28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 28, 28,
-        28, 28, 27, 27, 27, 28, 27, 27, 27, 28, 28, 28, 28, 27, 27, 27,
-        28, 28, 27, 27, 28, 28, 27, 28, 28, 28, 28, 27, 27, 28, 27, 27,
-        27, 28, 28, 27, 27, 28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28,
-        28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28,
-        28, 28, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 27,
-        27, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27,
-        28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 27, 27, 27, 27,
-        28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27, 27, 28, 28, 27, 27,
-        27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
-        28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 28,
-        28, 28, 28, 27, 27, 27, 27, 28, 28, 27, 28, 28, 27, 27, 27, 27,
-        27, 27, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
-        28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27,
-        27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
-        27, 27, 27, 27, 28, 28, 28, 28, 27, 28, 28, 27, 27, 27, 27, 27,
-        28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28,
-        27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27,
-        27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-        28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 28, 28, 28,
-        28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28,
-        28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27,
-        27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 28, 27, 27,
-        27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-        28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27,
-        27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
-        27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-        28, 27, 28, 28, 28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27,
-        27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
-        28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-        28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28,
-        28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27,
-        27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28,
-        28, 28, 28, 28
-      )
-    }
-    sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
-    sim$lastPassDMIDS <- sim$historicDMIDs
-
-    sim$delays <- rep(0, 739)
-    sim$minRotations <- rep(10, 739)
-    sim$maxRotations <- rep(30, 739)
-
-    sim$returnIntervals <- read.csv(file.path(getwd(), "modules","CBM_core",
-                                              "data", "returnInt.csv"))
+  # The below examples come from CBM_dataPrep_SK for the whole managed forests
+  # (like in Boisvenue et al 2016 a and b)
+  # if (!suppliedElsewhere("ages", sim))  {
+  #   sim$PoolCount <- length(sim$pooldef)
+  #   sim$pools <- matrix(ncol = sim$PoolCount, nrow = 739, data = 0)
+  #   sim$ages <- c(3,3,3,10,100,100,100,100,100,100,100,100,100,100,100,100,101,101,101
+  #                 ,101,101,101,101,101,101,101,101,101,101,102,102,102,102,102,102,102,102,102
+  #                 ,102,102,102,102,103,103,103,103,103,103,103,103,103,103,103,104,104,104,104
+  #                 ,104,107,108,108,108,108,108,108,108,108,108,109,109,109,109,109,109,109,109
+  #                 ,109,11,11,11,110,110,110,110,110,110,110,110,110,110,110,110,111,111,111
+  #                 ,111,111,111,111,111,111,111,111,112,112,112,112,112,112,112,112,112,112,113
+  #                 ,113,113,113,113,113,113,113,114,116,117,118,118,119,119,119,119,119,119,119
+  #                 ,119,119,12,12,12,12,12,120,120,120,120,120,120,120,120,120,120,120,121
+  #                 ,121,121,121,121,121,121,121,121,121,122,122,122,122,122,122,122,122,122,123
+  #                 ,123,123,123,126,127,127,127,127,128,128,128,128,128,128,128,128,128,128,129
+  #                 ,129,129,129,129,129,129,129,129,13,13,13,130,130,130,130,130,130,130,130
+  #                 ,130,130,131,131,131,131,131,131,131,131,131,132,132,132,132,132,135,135,136
+  #                 ,136,137,137,137,137,137,137,137,138,138,138,138,138,139,139,139,139,14,14
+  #                 ,14,14,140,142,143,143,144,144,144,144,144,145,145,145,145,146,146,146,146
+  #                 ,146,147,15,18,18,18,18,19,19,19,19,19,19,3,3,3,20,20,20
+  #                 ,20,20,20,20,21,21,21,21,21,21,21,21,22,22,22,23,23,28,28
+  #                 ,28,28,29,29,29,29,29,29,3,3,3,30,30,30,30,30,30,30,30
+  #                 ,31,31,31,31,31,31,31,31,32,32,32,32,32,32,32,33,33,33,33
+  #                 ,34,38,38,38,38,38,38,39,39,39,39,39,39,39,39,4,4,40,40
+  #                 ,40,40,40,40,40,40,40,41,41,41,41,41,41,41,41,41,41,42,42
+  #                 ,42,42,42,42,42,42,43,43,43,43,43,43,44,44,44,47,48,48,48
+  #                 ,48,48,48,48,48,48,49,49,49,49,49,49,49,49,49,49,5,5,50
+  #                 ,50,50,50,50,50,50,50,50,50,51,51,51,51,51,51,51,51,51,51
+  #                 ,52,52,52,52,52,52,52,52,52,52,53,53,53,53,53,53,53,53,54
+  #                 ,54,54,57,57,58,58,58,58,58,58,58,59,59,59,59,59,59,59,59
+  #                 ,59,59,6,6,60,60,60,60,60,60,60,60,60,60,61,61,61,61,61
+  #                 ,61,61,61,61,61,61,61,61,62,62,62,62,62,62,62,62,62,62,62
+  #                 ,63,63,63,63,63,63,63,64,67,68,68,68,68,68,68,69,69,69,69
+  #                 ,69,69,69,69,69,70,70,70,70,70,70,70,70,70,70,70,71,71,71
+  #                 ,71,71,71,71,71,71,71,72,72,72,72,72,72,72,72,72,73,73,73
+  #                 ,73,73,74,77,78,78,78,78,78,78,78,78,79,79,79,79,79,79,79
+  #                 ,79,79,79,79,80,80,80,80,80,80,80,80,80,80,80,80,81,81,81
+  #                 ,81,81,81,81,81,81,81,81,81,81,82,82,82,82,82,82,82,82,82
+  #                 ,82,82,82,83,83,83,83,83,83,83,83,83,83,84,84,87,87,87,88
+  #                 ,88,88,88,88,88,88,88,88,89,89,89,89,89,89,89,89,89,89,89
+  #                 ,9,90,90,90,90,90,90,90,90,90,90,90,91,91,91,91,91,91,91
+  #                 ,91,91,91,91,91,92,92,92,92,92,92,92,92,92,92,93,93,93,93
+  #                 ,93,93,93,93,94,94,94,94,97,97,97,97,97,98,98,98,98,98,98
+  #                 ,98,98,98,98,98,99,99,99,99,99,99,99,99,99,99,99,99)
+  #
+  #   sim$realAges <- c(
+  #     0,1,1,10,100,100,100,100,100,100,100,100,100,100,100,100,101,101,101,
+  #     101,101,101,101,101,101,101,101,101,101,102,102,102,102,102,102,102,102,102,
+  #     102,102,102,102,103,103,103,103,103,103,103,103,103,103,103,104,104,104,104,
+  #     104,107,108,108,108,108,108,108,108,108,108,109,109,109,109,109,109,109,109,
+  #     109,11,11,11,110,110,110,110,110,110,110,110,110,110,110,110,111,111,111,
+  #     111,111,111,111,111,111,111,111,112,112,112,112,112,112,112,112,112,112,113,
+  #     113,113,113,113,113,113,113,114,116,117,118,118,119,119,119,119,119,119,119,
+  #     119,119,12,12,12,12,12,120,120,120,120,120,120,120,120,120,120,120,121,
+  #     121,121,121,121,121,121,121,121,121,122,122,122,122,122,122,122,122,122,123,
+  #     123,123,123,126,127,127,127,127,128,128,128,128,128,128,128,128,128,128,129,
+  #     129,129,129,129,129,129,129,129,13,13,13,130,130,130,130,130,130,130,130,
+  #     130,130,131,131,131,131,131,131,131,131,131,132,132,132,132,132,135,135,136,
+  #     136,137,137,137,137,137,137,137,138,138,138,138,138,139,139,139,139,14,14,
+  #     14,14,140,142,143,143,144,144,144,144,144,145,145,145,145,146,146,146,146,
+  #     146,147,15,18,18,18,18,19,19,19,19,19,19,2,2,2,20,20,20,
+  #     20,20,20,20,21,21,21,21,21,21,21,21,22,22,22,23,23,28,28,
+  #     28,28,29,29,29,29,29,29,3,3,3,30,30,30,30,30,30,30,30,
+  #     31,31,31,31,31,31,31,31,32,32,32,32,32,32,32,33,33,33,33,
+  #     34,38,38,38,38,38,38,39,39,39,39,39,39,39,39,4,4,40,40,
+  #     40,40,40,40,40,40,40,41,41,41,41,41,41,41,41,41,41,42,42,
+  #     42,42,42,42,42,42,43,43,43,43,43,43,44,44,44,47,48,48,48,
+  #     48,48,48,48,48,48,49,49,49,49,49,49,49,49,49,49,5,5,50,
+  #     50,50,50,50,50,50,50,50,50,51,51,51,51,51,51,51,51,51,51,
+  #     52,52,52,52,52,52,52,52,52,52,53,53,53,53,53,53,53,53,54,
+  #     54,54,57,57,58,58,58,58,58,58,58,59,59,59,59,59,59,59,59,
+  #     59,59,6,6,60,60,60,60,60,60,60,60,60,60,61,61,61,61,61,
+  #     61,61,61,61,61,61,61,61,62,62,62,62,62,62,62,62,62,62,62,
+  #     63,63,63,63,63,63,63,64,67,68,68,68,68,68,68,69,69,69,69,
+  #     69,69,69,69,69,70,70,70,70,70,70,70,70,70,70,70,71,71,71,
+  #     71,71,71,71,71,71,71,72,72,72,72,72,72,72,72,72,73,73,73,
+  #     73,73,74,77,78,78,78,78,78,78,78,78,79,79,79,79,79,79,79,
+  #     79,79,79,79,80,80,80,80,80,80,80,80,80,80,80,80,81,81,81,
+  #     81,81,81,81,81,81,81,81,81,81,82,82,82,82,82,82,82,82,82,
+  #     82,82,82,83,83,83,83,83,83,83,83,83,83,84,84,87,87,87,88,
+  #     88,88,88,88,88,88,88,88,89,89,89,89,89,89,89,89,89,89,89,
+  #     9,90,90,90,90,90,90,90,90,90,90,90,91,91,91,91,91,91,91,
+  #     91,91,91,91,91,92,92,92,92,92,92,92,92,92,92,93,93,93,93,
+  #     93,93,93,93,94,94,94,94,97,97,97,97,97,98,98,98,98,98,98,
+  #     98,98,98,98,98,99,99,99,99,99,99,99,99,99,99,99,99
+  #   )
+  #
+  #   if (!suppliedElsewhere("gcids", sim)) {
+  #     ## this is where the pixelGroups and their spu eco etc.
+  #     message("No spatial information was provided for the growth curves.
+  #           The default values (SK simulations) will be used to limit the number of growth curves used.")
+  #     sim$gcids <- c(
+  #       52, 52, 58, 52, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58,
+  #       61, 28, 29, 31, 34, 35, 37, 40, 49, 50, 52, 55, 58, 61, 28, 29,
+  #       31, 34, 37, 40, 49, 50, 52, 55, 56, 58, 61, 28, 29, 31, 34, 40,
+  #       49, 50, 52, 55, 58, 61, 28, 34, 49, 52, 55, 40, 28, 31, 34, 40,
+  #       49, 50, 52, 55, 61, 28, 31, 34, 40, 49, 50, 52, 55, 61, 52, 55,
+  #       58, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 28, 31, 34,
+  #       37, 40, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49, 50, 52,
+  #       55, 61, 28, 31, 34, 40, 49, 52, 55, 61, 28, 61, 52, 61, 62, 28,
+  #       31, 34, 40, 49, 50, 52, 55, 61, 31, 34, 49, 52, 55, 28, 31, 34,
+  #       40, 49, 50, 52, 55, 58, 61, 62, 28, 29, 31, 34, 40, 49, 50, 52,
+  #       55, 61, 28, 34, 40, 49, 50, 52, 55, 61, 62, 28, 34, 40, 61, 49,
+  #       31, 40, 49, 61, 28, 29, 31, 34, 40, 49, 50, 52, 58, 61, 28, 31,
+  #       34, 40, 49, 50, 52, 55, 61, 49, 52, 55, 28, 31, 34, 40, 49, 50,
+  #       52, 55, 58, 61, 28, 31, 34, 40, 49, 50, 52, 55, 61, 40, 49, 50,
+  #       52, 61, 28, 31, 31, 61, 28, 31, 34, 49, 50, 55, 61, 28, 31, 34,
+  #       49, 61, 28, 34, 52, 61, 31, 49, 52, 55, 55, 40, 28, 49, 28, 31,
+  #       34, 49, 52, 28, 31, 58, 61, 28, 31, 34, 49, 50, 61, 52, 49, 52,
+  #       55, 58, 31, 34, 37, 49, 52, 55, 52, 55, 58, 31, 34, 49, 52, 55,
+  #       56, 58, 31, 34, 49, 52, 55, 56, 58, 61, 49, 52, 55, 52, 55, 28,
+  #       34, 49, 55, 28, 31, 34, 37, 52, 55, 49, 52, 55, 28, 31, 34, 37,
+  #       49, 52, 55, 58, 28, 31, 34, 37, 49, 52, 55, 58, 28, 31, 34, 37,
+  #       49, 52, 55, 34, 37, 50, 52, 52, 28, 31, 34, 37, 52, 55, 28, 31,
+  #       34, 37, 49, 52, 55, 58, 52, 55, 28, 31, 34, 37, 40, 49, 52, 55,
+  #       58, 28, 31, 34, 37, 40, 49, 52, 55, 58, 61, 28, 31, 34, 37, 49,
+  #       52, 55, 58, 28, 31, 34, 37, 52, 55, 31, 52, 55, 31, 28, 31, 34,
+  #       37, 40, 49, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55, 58,
+  #       52, 55, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37,
+  #       40, 49, 50, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55, 58,
+  #       28, 31, 34, 37, 49, 52, 55, 58, 34, 49, 55, 28, 31, 28, 31, 34,
+  #       49, 52, 55, 58, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 49, 52,
+  #       28, 31, 34, 37, 40, 49, 50, 52, 55, 58, 28, 29, 31, 34, 35, 37,
+  #       40, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49, 50, 52, 55,
+  #       58, 61, 28, 31, 34, 49, 52, 55, 58, 52, 28, 28, 34, 49, 55, 58,
+  #       61, 28, 34, 37, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49,
+  #       50, 52, 55, 58, 61, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 28,
+  #       31, 34, 49, 50, 52, 55, 58, 61, 28, 40, 49, 55, 58, 49, 34, 28,
+  #       31, 34, 49, 50, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55,
+  #       58, 61, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 28, 29,
+  #       31, 34, 37, 40, 49, 50, 52, 55, 56, 58, 61, 28, 29, 31, 34, 37,
+  #       40, 49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 40, 49, 50, 52, 55,
+  #       61, 31, 50, 49, 52, 61, 28, 31, 34, 49, 50, 52, 55, 58, 61, 28,
+  #       31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 52, 28, 31, 34, 37, 40,
+  #       49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55,
+  #       58, 61, 28, 31, 34, 40, 49, 50, 52, 55, 58, 61, 28, 34, 49, 50,
+  #       52, 55, 58, 61, 49, 50, 55, 61, 49, 52, 55, 58, 61, 28, 29, 31,
+  #       34, 40, 49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 37, 40, 49, 50,
+  #       52, 55, 58, 61
+  #     )
+  #   }
+  #
+  #   if (!suppliedElsewhere("ecozones", sim)) {
+  #     message("No spatial information was provided for the growth curves.
+  #           The default values (SK simulations) will be used to determine which ecozones these curves are in.")
+  #     sim$ecozones <- c(
+  #       9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6,
+  #       6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9,
+  #       9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6,
+  #       6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6,
+  #       6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6,
+  #       6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 9, 9, 9,
+  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6, 9, 9,
+  #       9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9,
+  #       9, 9, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9,
+  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9,
+  #       9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 6, 6, 6, 9, 6,
+  #       6, 6, 9, 9, 9, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 9, 9, 9, 9, 6,
+  #       6, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 6, 9, 9,
+  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9,
+  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6,
+  #       9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6, 9, 9, 6, 6, 6, 6, 9, 9, 9,
+  #       9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9,
+  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 6, 9, 9, 6, 6, 6,
+  #       6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6,
+  #       6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6,
+  #       6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 9, 9, 6, 6, 6,
+  #       6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6,
+  #       6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6,
+  #       6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6,
+  #       9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9,
+  #       9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9,
+  #       9, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6,
+  #       9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6,
+  #       6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9,
+  #       9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 6, 6, 6, 9, 9,
+  #       9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6,
+  #       9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6,
+  #       6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9,
+  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 6, 9, 6, 6, 6, 9, 9, 9, 9, 6, 6,
+  #       9, 6, 6, 6, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 6, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9,
+  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       6, 6, 6, 6, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9,
+  #       6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9,
+  #       9, 6, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
+  #       9
+  #     )
+  #   }
+  #   if (!suppliedElsewhere("spatialUnits", sim)) {
+  #     message("No spatial information was provided for the growth curves.
+  #           The default values (SK simulations) will be used to determine which CBM-spatial units these curves are in.")
+  #     sim$spatialUnits <- c(
+  #       28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
+  #       28, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27,
+  #       27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
+  #       28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27, 27, 27,
+  #       28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28,
+  #       28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27,
+  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
+  #       28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 27, 28, 28, 28, 28, 27,
+  #       27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27,
+  #       27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
+  #       28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 28, 28,
+  #       27, 27, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27,
+  #       27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28,
+  #       28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 28, 28,
+  #       28, 28, 27, 27, 27, 28, 27, 27, 27, 28, 28, 28, 28, 27, 27, 27,
+  #       28, 28, 27, 27, 28, 28, 27, 28, 28, 28, 28, 27, 27, 28, 27, 27,
+  #       27, 28, 28, 27, 27, 28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28,
+  #       28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28,
+  #       28, 28, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 27,
+  #       27, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27,
+  #       28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 27, 27, 27, 27,
+  #       28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27, 27, 28, 28, 27, 27,
+  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
+  #       28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 28,
+  #       28, 28, 28, 27, 27, 27, 27, 28, 28, 27, 28, 28, 27, 27, 27, 27,
+  #       27, 27, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
+  #       28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27,
+  #       27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
+  #       27, 27, 27, 27, 28, 28, 28, 28, 27, 28, 28, 27, 27, 27, 27, 27,
+  #       28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28,
+  #       27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27,
+  #       27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
+  #       28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 28, 28, 28,
+  #       28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28,
+  #       28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27,
+  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 28, 27, 27,
+  #       27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
+  #       28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27,
+  #       27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
+  #       27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
+  #       28, 27, 28, 28, 28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27,
+  #       27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
+  #       28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28,
+  #       28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28,
+  #       28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27,
+  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28,
+  #       28, 28, 28, 28
+  #     )
+  #   }
+    # sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
+    # sim$lastPassDMIDS <- sim$historicDMIDs
+    #
+    # sim$delays <- rep(0, 739)
+    # sim$minRotations <- rep(10, 739)
+    # sim$maxRotations <- rep(30, 739)
+    #
+    # sim$returnIntervals <- read.csv(file.path(getwd(), "modules","CBM_core",
+    #                                           "data", "returnInt.csv"))
 
     dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
     sim$disturbanceRasters <- list.files(
@@ -1575,15 +1386,16 @@ annual <- function(sim) {
     sim$userDist <- read.csv(file.path(dataPath(sim), "userDist.csv"))
 
 
-    if (!suppliedElsewhere(sim$dbPath)) {
-      sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
-    }
+    # if (!suppliedElsewhere(sim$dbPath)) {
+    #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
+    # }
+    ##TODO these two will come from CBM_dataPrep_XX
     sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
 
     sim$spatialDT <- read.csv(file.path(dataPath(sim),
                                         "spatialDT.csv"))
 
-    sim$curveID <- "growth_curve_component_id"
+    #sim$curveID <- "gcids" # not needed in the Python
 
     sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
                                           "mySpuDmids.csv"))
@@ -1592,10 +1404,6 @@ annual <- function(sim) {
       sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
     }
 
-    if (!suppliedElsewhere("nStands", sim)) {
-      sim$nStands <- length(sim$ages)
-    }
-  }
 
   return(sim)
 }
