@@ -286,6 +286,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 ### template initialization
 
 spinup <- function(sim) {
+  ##TODO this will be reinstated once we call the other CBM modules
   # io <- inputObjects(sim, currentModule(sim))
   # objectNamesExpected <- io$objectName
   # available <- objectNamesExpected %in% ls(sim)
@@ -358,7 +359,9 @@ spinup <- function(sim) {
     ##Celine made a tracking sheet for disturbance tables in the SQLite database
     ##here
     ##https://docs.google.com/spreadsheets/d/1TFBQiRH4z54l8ROX1N02OOiCHXMe20GSaExiuUqsC0Q/edit?usp=sharing,
-    ##on the sheet "disturbanceMatrices"
+    ##on the sheet "disturbanceMatrices". And a script codeForDefaultsModule.R
+    ##(in project R folder). In CBM_defaults we will need matrices2, matrcies3
+    ##and the table above.
   )
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
