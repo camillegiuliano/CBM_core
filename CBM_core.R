@@ -422,26 +422,30 @@ spinup <- function(sim) {
 }
 
 postSpinup <- function(sim) {
-  ###CELINE NOTES: not sure if any of this is needed now...
-  ###Just in case we dont' need it, set all the atm gases and products to 0
-  sim$cbm_vars$pools[,c('CO2', 'CH4', 'CO', 'NO2', 'Products')] <- 0L
-  sim$pools <- sim$cbm_vars$pools
+  ##TODO need to track emissions and products. First check that cbm_vars$fluxes
+  ##are yearly (question for Scott or we found out by mapping the Python
+  ##functions ourselves)
+
   ##TODO: confirm if this is still the case where CBM_vol2biomass won't
   ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
   sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event (same order)
   setorderv(sim$level3DT, "pixelGroup")
-  #TODO: track this below! Do we need this seperate object now?
-  sim$pixelGroupC <- cbind(sim$level3DT, sim$pools)
 
-  ##TODO the Python scripts track this differently...need to check if correct.
-  ## creating these objects here...will be usefull for comparison?
+  #TODO: track this below! Do we need this seperate object now? This is a spot
+  #where we could simplify. But currently it is needed throught annual event.
+  sim$pixelGroupC <- cbind(sim$level3DT, sim$cbm_vars$pools)
+
+  ##TODO the Python scripts track this differently via cbm_vars. Again, we could
+  ##simplify, but it will take time and careful attention.
   sim$cbmPools <- NULL
   sim$NPP <- NULL
-  sim$emissionsProducts <- NULL
+
+  ##TODO this is currently not being produced. Need this in results.
+  #sim$emissionsProducts <- NULL
 
   # Keep the pixels from each simulation year (in the postSpinup event)
-  # in the end (cPoolsPixelYear.csv), this should be the same length at this vector
+  # at the end of each sim, this should be the same length at this vector
   ## got place for a vector length check!!
   setorderv(sim$spatialDT, "pixelGroup")
 
@@ -465,10 +469,10 @@ annual <- function(sim) {
   # event, permitting the rasters to come for each annual event from another
   # source.
 
-  ##TODO: disturbances for both SK and RIA were read-in for the whole simulation
-  ##horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
-  ##modules such as rasters, they need to be read in here. We need to build this
-  ##in.
+  #TODO: disturbances for both SK and RIA were read-in for the whole simulation
+  #horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
+  #modules (such as yearly rasters), they need to be read in here. We need to build this
+  #in.
 
   # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
   # example. First add a column for disturbed pixels to the spatialDT
@@ -539,14 +543,15 @@ annual <- function(sim) {
 
   pixelCount <- spatialDT[, .N, by = pixelGroup]
 
-  # 4. reset the ages for disturbed pixels in stand replacing disturbances
+  # 4. Reset the ages for disturbed pixels in stand replacing disturbances.
+  # libcbm resets ages to 0 internally but for transparency we are doing it here
+  # to (and it gives an opportunity for a check).
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
-###CELINE NOTES: this might have to change b/c libcbm resets ages to 0 internally
 
   # mySpuDmids was created in CBM_dataPrep_XX
   mySpuDmids <- copy(sim$mySpuDmids)
-  mySpuDmids[, "events" := rasterID][, rasterID := NULL] ## TODO:  object 'rasterID' not found
+  mySpuDmids[, "events" := rasterID][, rasterID := NULL]
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
   # read-in the mySpuDmids, make a vector of 0 and 1 or 2 the length of distPixels$events
@@ -588,9 +593,9 @@ annual <- function(sim) {
     columns = setdiff(colnames(distPixelCpools),
                                c("pixelGroup", "pixelIndex"))
   )
-  ##TODO: Celine check if this is needed - YES, a bunch of extra columns are
-  ##being created. remove unnecessary cols from generatePixelGroups. Also this
-  ##function changes the value of pixelGroup to the newGroup.
+  ##TODO: Check why a bunch of extra columns are being created. remove
+  ##unnecessary cols from generatePixelGroups. Also this function changes the
+  ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
     "gcids", "ecozones", cPoolNames)
@@ -644,6 +649,9 @@ annual <- function(sim) {
 
   # 9. From the events column, create a vector of the disturbance matrix
   # identification so it links back to the CBM default disturbance matrices.
+
+  ##TODO See lines 693 to 705 below, this will be cleaned up once we have
+  #information coming from CBM_defaults.
   DM <- merge(pixelGroupForAnnual, mySpuDmids,
               by = c("spatial_unit_id", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
@@ -663,7 +671,7 @@ annual <- function(sim) {
 
   cbm_vars <- sim$cbm_vars
 
-  ###### Working on getting cbm_vars$parameters (which are the increments + dist
+  ###### Working on getting cbm_vars$parameters (which are the increments + dist)
   ######################
   ## cbm_vars$parameters:
   ## Making cbm_vars$parameters the same length as the pixelGroupForAnnual (has
@@ -686,7 +694,7 @@ annual <- function(sim) {
                                                              historic_mean_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
-## The DMID for that is in the DMIDS vector (in this case 371). But we need
+##TODO The DMID for that is in the DMIDS vector (in this case 371). But we need
   ## disturbance_type_id. disturbance_type_id is matched to
   ## disturbance_matrix_id and spatial unit in matrices2(SQLight).
   ## Note: disturbance_matrix_id is unique and DMIDS is sorted by pixelGroup
@@ -702,21 +710,20 @@ annual <- function(sim) {
 
 
   ##growth_increments
-  ## Need to match the growth info by pixelGroups (but I would eventually need
-  #to do this my gcid) and age. The above "growth_increments will come from
-  #CBM_vol2biomass
-  # drop growth increments age 0 was done in the spinup event
-  #sim$growth_increments <- growth_increments[age > 0,] # this also lives in
-  #spinup_input$increments (but only in the spinup event)
+  ## Need to match the growth info by pixelGroups and gcids while tracking age.
+  ## The above "growth_increments will come from CBM_vol2biomass
+
   #age in is cbm_vars$state but there is no pixelGroup in that table nor is
-  #there in $flux or $pools.
-  ## checking that the tables are in the same pixelGroup order
+  #there in $flux or $pools. Checking that the tables are in the same pixelGroup
+  #order.
+  ##TODO Good place for some checks??
   which(cbm_vars$pools$Merch == pixelGroupForAnnual$Merch)
   # [1]  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
   # [40] 40 41
-  ## ASSUMPTION: the Merch matches so all tables are in the same sorting order,
+  ## ASSUMPTION: the Merch matches so all tables are in the same sorting order
   ## which is pixelGroup. cbm_vars$pools has one less record for the moment.
-  ##CELINE: not sure if this is how we will proceed once things are cleaned up,
+
+  ##TODO not sure if this is how we will proceed once things are cleaned up,
   ##but the new pixelGroup needs a growth curve. Our new pixelGroup (42) will
   ##for now inherit the growth curve from its previous pixelGroup (which was
   ##pixelGroup 6 as we can see in distPixels). gcid for pixelGroup 6 (in
@@ -767,22 +774,16 @@ annual <- function(sim) {
     annual_increments[,names(annual_increments)[5:7] := NULL]
     annual_increments[, age := NULL]
     setkeyv(annual_increments, "row_idx")
-  ###CELINE NOTES: don't change the data.frames to data.tables
-    ##There seems to be a problem for passing a data.table (as opposed to a
-    ##data.frame with - attr(*, "pandas.index")=RangeIndex(start=0, stop=41,
-    ##step=1) to the Python functions). In run_spatial_test.R, Scott remakes the
-    ##data frames, taking away the row names, and remaking the state$record_idx
-    ##(lines 274) before passing them back to cbm_vars. This needs to be confirmed.
+    ##NOTES: don't change the data.frames to data.tables. There seems to be a
+    ##problem for passing a data.table (as opposed to a data.frame with -
+    ##attr(*, "pandas.index")=RangeIndex(start=0, stop=41, step=1) to the Python
+    ##functions). In run_spatial_test.R, Scott remakes the data frames, taking
+    ##away the row names, and remaking the state$record_idx (lines 274) before
+    ##passing them back to cbm_vars. This needs to be confirmed.
 
-    # cbm_vars$parameters <- data.table(cbm_vars$parameters)
-    # setkeyv(cbm_vars$parameters, "row_idx")
-    # #cols2 <- c("age", "row_idx")
-    # cbm_vars$parameters[, age := NULL]
-    # cbm_vars$parameters[, row_idx := NULL]
 
     ##TODO ##cbm_vars$parameters is already sorted by row_idx (which are
-    ##pixelGroups...but we might have to check that if we have a lot of disturbed
-    ##pixels.
+    ##pixelGroups). Need a check for that if we have a lot of disturbed pixels.
 
     ## replace the NaN with the increments for that pixelGroup and age and add the
     ## new pixelGroup
@@ -882,122 +883,14 @@ annual <- function(sim) {
 
   sim$cbm_vars <- cbm_vars
 
-  ## need to update pixelGroupC for next annual event.
-###########################################################################################
 
-  # # 1. Changing the vectors and matrices that need to be changed to process this year's growth
-  # sim$pools <- as.matrix(pixelGroupForAnnual[, Input:Products])
-  # sim$ecozones <- pixelGroupForAnnual$ecozones
-  # sim$ages <- pixelGroupForAnnual[, ages]
-  # sim$nStands <- length(sim$ages)
-  #
-  #
-  # curveID <- sim$curveID
-  # gcids <- if (!is.null(sim$level3DT)) {
-  #   gcidsLevels <- levels(sim$level3DT$gcids)
-  #   factor(gcidsCreate(pixelGroupForAnnual[, ..curveID]), levels = gcidsLevels)
-  # } else {
-  #   NA
-  # }
-  # if (any(is.na(gcids))) {
-  #   stop("gcids need to have all levels available that are required in simulations")
-  # }
-  #
-  # sim$gcids <- gcids
-  #
-  # sim$spatialUnits <- pixelGroupForAnnual[, spatial_unit_id]
-  #
-  # # 2. Make a matrix out of the updated vectors
-  # # this is a matrix that gives the index of the matrix to be used for this
-  # # annual event in $allProcesses.
-  # sim$opMatrixCBM <- cbind(
-  #   DMIDS, # disturbance matrix identification vector
-  #   1:sim$nStands, # growth 1
-  #   sim$ecozones, # domturnover
-  #   sim$ecozones, # bioturnover
-  #   1:sim$nStands, # overmature
-  #   1:sim$nStands, # growth 2
-  #   sim$spatialUnits, # domDecay
-  #   sim$spatialUnits, # slow decay
-  #   rep(1, sim$nStands) # slow mixing
-  # )
-  #
-  # colnames(sim$opMatrixCBM) <- c(
-  #   "disturbance", "growth 1", "domturnover",
-  #   "bioturnover", "overmature", "growth 2",
-  #   "domDecay", "slow decay", "slow mixing"
-  # )
-  #
-  # assertion1 <- sapply(as.data.table(sim$opMatrixCBM), function(x) length(unique(x)))
-  # if (!all(NROW(sim$opMatrixCBM) == assertion1[c("growth 1", "growth 2", "overmature")])) {
-  #   stop("opMatrixCBM has ", NROW(sim$opMatrixCBM), " rows; it is expecting that many ",
-  #        "unique values for growth 1, growth 2 and overmature. Please correct.")
-  # }
-  #
-  #
-  #
-  #
-  #
-  #
-  #
-  #
-  # # 3. select the matrices that apply to this annual event and specific sim
-  # # allProcesses contains all the default matrices for disturbances in CBM, gets
-  # # the growth matrices for this annual event, and the specific matrices for the
-  # # other processes for this simulation. The order of the columns reflect the
-  # # order in which these processes are applied to the carbon pools.
-  # sim$allProcesses <- list(
-  #   Disturbance = sim$processes$disturbanceMatrices,
-  #   Growth1 = NULL,
-  #   DomTurnover = sim$processes$domTurnover,
-  #   BioTurnover = sim$processes$bioTurnover,
-  #   OvermatureDecline = NULL,
-  #   Growth2 = NULL,
-  #   DomDecay = sim$processes$domDecayMatrices,
-  #   SlowDecay = sim$processes$slowDecayMatrices,
-  #   SlowMixing = sim$processes$slowMixingMatrix
-  # )
-  #
-  # # 4. compute the growth increments that are specific to the number of
-  # # pixelGroups in this annual event, and feed in the vectors specific to this
-  # # annual event. Note: remember that the "id" column in sim$growth_increments
-  # # which is the non-hashed version of sim$gchash is the result of
-  # # as.numeric(increments[["gcids"]])
-  # growthAndDecline <- ComputeGrowthAndDeclineMatrices2(
-  #   growthIncrements = sim$gcHash,
-  #   ages = sim$ages,
-  #   gcids = sim$gcids,
-  #   pools = sim$pools,
-  #   rootParameters = as.data.frame(t(sim$cbmData@rootParameters[1, ])),
-  #   turnoverParams = as.data.frame(t(sim$cbmData@turnoverRates[1, ])),
-  #   biomassToCarbonRate = as.numeric(sim$cbmData@biomassToCarbonRate),
-  #   swMult = 0.5, hwMult = 0.5
-  # )
-  #
-  # sim$allProcesses$Growth1 <- growthAndDecline$Growth
-  # sim$allProcesses$Growth2 <- growthAndDecline$Growth
-  # sim$allProcesses$OvermatureDecline <- growthAndDecline$OvermatureDecline
-  #
-  # ### good check: dim(pools)[1]==dim(opMatrixCBM)[1]
-  #
-  # # 5. save the pre-carbon transaction values for emissions and Products
-  # emissionsProductsIn <- sim$pools[,P(sim)$emissionsProductsCols]
-  #
-  # # 6. All the work happens here: update all the pools.
-  # sim$pools <- StepPools(
-  #   pools = sim$pools,
-  #   opMatrix = sim$opMatrixCBM,
-  #   flowMatrices = sim$allProcesses
-  # )
-  # sim$pools[which(is.na(sim$pools))] <- 0
-  # ########################## END PROCESSES#########################################
   #-------------------------------------------------------------------------------
   #### UPDATING ALL THE FINAL VECTORS FOR NEXT SIM YEAR ###################################
   #-----------------------------------
   # 1.
   ##TODO this will have to change once we stream line the creation of
   ##pixelGroupForAnnual earlier in this event.
-  browser()
+
   sim$pixelGroupC <- data.table(pixelGroupForAnnual[, !(Input:Products)], cbm_vars$pools)
 
   ##CELINE NOTES Ages are update in cbm_vars$state internally in the
@@ -1033,20 +926,6 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
   ############ NPP ####################################################################
   # ############## NPP used in building sim$NPP and for plotting ####################################
-  # pgs <- rep(pixelGroupForAnnual$pixelGroup, lengths(sim$allProcesses$Growth1)/3)
-  # incsMat <- do.call(rbind, sim$allProcesses$Growth1)
-  # incDT <- as.data.table(incsMat)
-  # set(incDT, NULL, "pixelGroup", pgs)
-  #
-  # # incsListDT <- lapply(sim$allProcesses$Growth1, as.data.table)
-  # # setattr(incsListDT, 'names', pixelGroupForAnnual$pixelGroup)
-  # # incDT <- rbindlist(incsListDT, idcol = "pixelGroup")
-  # # set(incDT, NULL, "pixelGroup", as.numeric(incDT[["pixelGroup"]]))
-  # ## TODO could improve the NPP and seperate into AG and BG (AG = merch,
-  # ## foliage, other  - for sw cols = 2,3,4, for hw cols = 7,8,9; BG = fineRoots,
-  # ## coarseRoots - sw cols = 5, 6, for hw cols = 10,11)
-  # NPP <- incDT[value > 0 & value < 1, .(NPP = 2*sum(value)), by = "pixelGroup"]
-  # set(NPP, NULL, "simYear", time(sim)[1])
 
   NPP <- (
     cbm_vars$flux$DeltaBiomass_AG
@@ -1069,10 +948,12 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
 
   ############# Update emissions and products -------------------------------------------
-  # Emissions are re-zeroed every year as these pools should not define the
-  # pixelGroups and both these values are most commonly required on a yearly
-  # basis.
-
+  ##TODO need to be able to plot these, so need to save them. Could be part of
+  ##output? Maybe they come from the cbm_vars$flux tables? Check is fluxes are
+  ##per year Emissions should not define the pixelGroups, they should be
+  #re-zeros every year. Both these values are most commonly required on a yearly
+  #basis.
+  ##OLD
   # sim$emissionsProducts was first created in postspinup event as NULL and is update
   # here for each annual event. The sim$spinupResult emissions and Products was
   # re-zeroed at the end of the spinup event.
