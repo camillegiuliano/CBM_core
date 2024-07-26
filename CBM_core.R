@@ -182,8 +182,13 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual")
 
       # need this to be after the saving of outputs -- so very low priority
-      sim <- scheduleEvent(sim, min(end(sim), start(sim) + P(sim)$.plotInterval),
-                           "CBM_core", "accumulateResults", eventPriority = 11)
+      ##TODO this is not happening because P(sim)$.plotInterval is NULL
+      # sim <- scheduleEvent(sim, min(end(sim), start(sim) + P(sim)$.plotInterval),
+      #                      "CBM_core", "accumulateResults", eventPriority = 11)
+      ##So, I am making this one until we figure out how to do both more
+      ##generically
+      sim <- scheduleEvent(sim, end(sim), "CBM_core", "accumulateResults", eventPriority = 11)
+
 
       #sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
       #sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 12 )
@@ -457,12 +462,12 @@ annual <- function(sim) {
   # The example simulation (SK) has a raster stack covering 1984-2011 for an
   # area in SK. The raster stack like all inputs from user, is read in the
   # spadesCBM_dataPrep_SK module. However, one raster at a time is read in this annual
-  # event, permitting the raters to come for each annual event from another
+  # event, permitting the rasters to come for each annual event from another
   # source.
 
   ##TODO: disturbances for both SK and RIA were read-in for the whole simulation
   ##horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
-  ##modules such as rasters they need to be read in here. We need to build this
+  ##modules such as rasters, they need to be read in here. We need to build this
   ##in.
 
   # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
@@ -533,7 +538,7 @@ annual <- function(sim) {
   }
 
   pixelCount <- spatialDT[, .N, by = pixelGroup]
-###CELINE NOTES: all ok up to here.
+
   # 4. reset the ages for disturbed pixels in stand replacing disturbances
   ## In SK example: not all disturbances are stand replacing. Disturbance matrix
   ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
@@ -989,19 +994,24 @@ annual <- function(sim) {
   #-------------------------------------------------------------------------------
   #### UPDATING ALL THE FINAL VECTORS FOR NEXT SIM YEAR ###################################
   #-----------------------------------
-  # 1. Update long form (pixelIndex) and short form (pixelGroup) tables.
-  if (!identical(sim$spatialDT$pixelIndex, updateSpatialDT$pixelIndex))
-    stop("Some pixelIndices were lost; sim$spatialDT and updateSpatialDT should be the same NROW; they are not")
-  sim$spatialDT <- updateSpatialDT
+  # 1.
   ##TODO this will have to change once we stream line the creation of
   ##pixelGroupForAnnual earlier in this event.
+  browser()
   sim$pixelGroupC <- data.table(pixelGroupForAnnual[, !(Input:Products)], cbm_vars$pools)
 
   ##CELINE NOTES Ages are update in cbm_vars$state internally in the
   ##libcbmr::cbm_exn_step function
-  # # 2. increment ages
-  # sim$pixelGroupC[, ages := ages + 1]
-  # sim$spatialDT[, ages := ages + 1]
+  # 2. increment ages
+  sim$pixelGroupC$ages <- cbm_vars$state$age
+
+  # 2. Update long form (pixelIndex) and short form (pixelGroup) tables.
+  if (!identical(sim$spatialDT$pixelIndex, updateSpatialDT$pixelIndex))
+    stop("Some pixelIndices were lost; sim$spatialDT and updateSpatialDT should be the same NROW; they are not")
+  agesUp <- merge.data.table(updateSpatialDT, sim$pixelGroupC[,.(pixelGroup, ages)], by = "pixelGroup")
+  agesUp[, ages.x := NULL]
+  setnames(agesUp, old = "ages.y", new = "ages")
+  sim$spatialDT <- agesUp
 
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
