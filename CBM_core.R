@@ -668,7 +668,7 @@ annual <- function(sim) {
   ## We are currently only working in spu 28
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
-    dbPath <- "C:/Celine/github/spadesCBM/defaultDB/cbm_defaults_v1.2.8340.362.db"
+    dbPath <- "defaultDB/cbm_defaults_v1.2.8340.362.db"
     library(RSQLite)
     library(CBMutils)
     archiveIndex <- dbConnect(dbDriver("SQLite"), dbPath)
