@@ -8,14 +8,14 @@ defineModule(sim, list(
   keywords = c("carbon", "CBM-CFS"),
   authors = person("Celine", "Boisvenue", email = "celine.boisvenue@nrcan-rncan.gc.ca", role = c("aut", "cre")),
   childModules = character(0),
-  version = list(CBM_core = "0.0.1"),
-  spatialExtent = raster::extent(rep(NA_real_, 4)),
+  version = list(CBM_core = "0.0.2"),
+  spatialExtent = terra::ext(rep(0, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "ggplot2", "quickPlot", "magrittr", "raster", "RSQLite",
+    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
     "CBMutils", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)"
@@ -104,6 +104,10 @@ defineModule(sim, list(
     #   objectName = "mySpuDmids", objectClass = "data.frame",
     #   desc = "the table containing one line per pixel"
     # ),
+    expectsInput(
+      objectName = "pixelGroupC", objectClass = "data.table",
+      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
+    ),
     expectsInput( ## URL RIA CORRECT CHECKED
       objectName = "userDist", objectClass = "data.table",
       desc = "User provided file that identifies disturbances for simulation (distName),
@@ -412,7 +416,7 @@ spinup <- function(sim) {
     spinup_ops,
     spinup_op_seq,
     mod$libcbm_default_model_config
-  )
+  ) |> Cache()
 
 ##TODO Comparison of spinup results with other CBM runs needs to be completed.
 ##Scott has it on his list
@@ -1286,8 +1290,8 @@ annual <- function(sim) {
     ##TODO these two will come from CBM_dataPrep_XX
     sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
 
-    sim$spatialDT <- read.csv(file.path(dataPath(sim),
-                                        "spatialDT.csv"))
+    # sim$spatialDT <- read.csv(file.path(dataPath(sim),
+    #                                     "spatialDT.csv"))
 
     #sim$curveID <- "gcids" # not needed in the Python
 
