@@ -1274,34 +1274,34 @@ annual <- function(sim) {
     # sim$returnIntervals <- read.csv(file.path(getwd(), "modules","CBM_core",
     #                                           "data", "returnInt.csv"))
 
-    dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
-    sim$disturbanceRasters <- list.files(
-      file.path(dPath, "disturbance_testArea"),
-      pattern = "[.]grd$",
-      full.names = TRUE
-    )
-
-    sim$userDist <- read.csv(file.path(dataPath(sim), "userDist.csv"))
-
-
-    # if (!suppliedElsewhere(sim$dbPath)) {
-    #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
+    # dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+    # sim$disturbanceRasters <- list.files(
+    #   file.path(dPath, "disturbance_testArea"),
+    #   pattern = "[.]grd$",
+    #   full.names = TRUE
+    # )
+    #
+    # sim$userDist <- read.csv(file.path(dataPath(sim), "userDist.csv"))
+    #
+    #
+    # # if (!suppliedElsewhere(sim$dbPath)) {
+    # #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
+    # # }
+    # ##TODO these two will come from CBM_dataPrep_XX
+    # sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
+    #
+    # # sim$spatialDT <- read.csv(file.path(dataPath(sim),
+    # #                                     "spatialDT.csv"))
+    #
+    # #sim$curveID <- "gcids" # not needed in the Python
+    #
+    # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
+    #                                       "mySpuDmids.csv"))
+    #
+    # if (!suppliedElsewhere("masterRaster", sim)) {
+    #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
     # }
-    ##TODO these two will come from CBM_dataPrep_XX
-    sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
-
-    # sim$spatialDT <- read.csv(file.path(dataPath(sim),
-    #                                     "spatialDT.csv"))
-
-    #sim$curveID <- "gcids" # not needed in the Python
-
-    sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
-                                          "mySpuDmids.csv"))
-
-    if (!suppliedElsewhere("masterRaster", sim)) {
-      sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
-    }
-
+    #
 
   return(sim)
 }
