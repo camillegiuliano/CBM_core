@@ -113,7 +113,7 @@ defineModule(sim, list(
       desc = "User provided file that identifies disturbances for simulation (distName),
       raster Id if applicable, and wholeStand toggle (1 = whole stand disturbance, 0 = partial disturbance),
       if not there it will use userDistFile",
-      sourceURL = "https://drive.google.com/file/d/1Gr_oIfxR11G1ahynZ5LhjVekOIr2uH8X"
+      sourceURL = "https://docs.google.com/spreadsheets/d/1fOikb83aOuLlFYIn6pjmC7Jydjcy77TH/edit?usp=sharing&ouid=108246386320559871010&rtpof=true&sd=true"
     ),
     # expectsInput(objectName = "disturbanceEvents", objectClass = "matrix",
     #              desc = "3 column matrix, PixelGroupID, Year (that sim year), and DisturbanceMatrixId. Not used in Spinup.", sourceURL = NA),
@@ -1274,6 +1274,10 @@ annual <- function(sim) {
     # sim$returnIntervals <- read.csv(file.path(getwd(), "modules","CBM_core",
     #                                           "data", "returnInt.csv"))
 
+<<<<<<< Updated upstream
+=======
+  ##All these are provided in the out$ for now
+>>>>>>> Stashed changes
     # dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
     # sim$disturbanceRasters <- list.files(
     #   file.path(dPath, "disturbance_testArea"),
@@ -1284,6 +1288,7 @@ annual <- function(sim) {
     # sim$userDist <- read.csv(file.path(dataPath(sim), "userDist.csv"))
     #
     #
+<<<<<<< Updated upstream
     # # if (!suppliedElsewhere(sim$dbPath)) {
     # #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
     # # }
@@ -1302,6 +1307,26 @@ annual <- function(sim) {
     #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
     # }
     #
+=======
+    # if (!suppliedElsewhere(sim$dbPath)) {
+    #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
+    # }
+    ##TODO these two will come from CBM_dataPrep_XX
+    sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
+
+    # sim$spatialDT <- read.csv(file.path(dataPath(sim),
+    #                                     "spatialDT.csv"))
+
+    #sim$curveID <- "gcids" # not needed in the Python
+
+    # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
+    #                                       "mySpuDmids.csv"))
+    #
+    # if (!suppliedElsewhere("masterRaster", sim)) {
+    #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
+    # }
+
+>>>>>>> Stashed changes
 
   return(sim)
 }
