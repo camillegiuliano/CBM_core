@@ -312,8 +312,8 @@ spinup <- function(sim) {
 
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
-  gcid_is_sw_hw <- sim$gc_df[, .(is_sw = any(sw_merch_inc > 0)), .(gcid)]
-  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcid, levels(sim$level3DT$gcids))
+  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)]
+  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
   ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
   ## CBM_vol2biomass
   level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
@@ -376,14 +376,10 @@ spinup <- function(sim) {
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
   ##be easier.
   ## Need to get rid of HW SW distinction
-  df1 <- sim$gc_df
-  df1 <- df1[, .(gcids = factor(df1$gcid, levels(sim$level3DT$gcids)),
-          age,
-          merch_inc =  sw_merch_inc + hw_merch_inc,
-          foliage_inc = sw_foliage_inc + hw_foliage_inc,
-          other_inc = sw_other_inc + hw_other_inc)]
-  ##Need to add pixelGroup to df1
-  df2 <- merge(df1, level3DT[,.(pixelGroup, gcids)],
+
+
+  ##Need to add pixelGroup to sim$growth_increments
+  df2 <- merge(sim$growth_increments, level3DT[,.(pixelGroup, gcids)],
                by = "gcids",
                allow.cartesian = TRUE)
   setkeyv(df2, c("pixelGroup", "age"))
@@ -410,7 +406,7 @@ spinup <- function(sim) {
   spinup_ops <- libcbmr::cbm_exn_spinup_ops(
     spinup_input, mod$libcbm_default_model_config
   )
-##TODO need to try to cache this
+
   cbm_vars <- libcbmr::cbm_exn_spinup(
     spinup_input,
     spinup_ops,
@@ -730,8 +726,8 @@ annual <- function(sim) {
   ##TODO not sure if this is how we will proceed once things are cleaned up,
   ##but the new pixelGroup needs a growth curve. Our new pixelGroup (42) will
   ##for now inherit the growth curve from its previous pixelGroup (which was
-  ##pixelGroup 6 as we can see in distPixels). gcid for pixelGroup 6 (in
-  ##distPixel and sim$level3DT) is gcid 50
+  ##pixelGroup 6 as we can see in distPixels). gcids for pixelGroup 6 (in
+  ##distPixel and sim$level3DT) is gcids 50
   if (dim(distPixels)[1] > 0) {
     oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
     newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids')])
@@ -749,6 +745,7 @@ annual <- function(sim) {
       other_inc =  sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, other_inc],
       gcids = factor(oldGCpixelGroup$gcids, levels(sim$level3DT$gcids))
     )
+
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
     ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
     ## in the Python functions so we are keeping it.
