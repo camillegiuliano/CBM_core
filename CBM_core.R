@@ -319,13 +319,14 @@ spinup <- function(sim) {
   level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
 
   ##This will come from CBM_defaults, with URL for SQLight
-  library(RSQLite)
-  library(CBMutils)
-  archiveIndex <- dbConnect(dbDriver("SQLite"), sim$dbPath)
-  spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
-  spinupSQL <- as.data.table(spinupSQL)
+  # library(RSQLite)
+  # library(CBMutils)
+  # archiveIndex <- dbConnect(dbDriver("SQLite"), sim$dbPath)
+  # spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
+  # spinupSQL <- as.data.table(spinupSQL)
   ## note that spinupSQL$id is the spatial_unit_id
-
+  #in CBM_defaults@TransitionTesting
+  spinupSQL <- sim$spinupSQL
   spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
 
   level3DT <- merge(level3DT, spinupParamsSPU, by.x = "spatial_unit_id", by.y = "id")
@@ -681,16 +682,17 @@ annual <- function(sim) {
   ## We are currently only working in spu 28
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
-    dbPath <- "defaultDB/cbm_defaults_v1.2.8340.362.db"
-    library(RSQLite)
-    library(CBMutils)
-    archiveIndex <- dbConnect(dbDriver("SQLite"), dbPath)
-    matrices2 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_matrix_association")
-    matrices5 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_type")
-    spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
-    spinupSQL <- as.data.table(spinupSQL)
+    disturbanceMatrix <- sim$disturbanceMatrix
+    # dbPath <- "defaultDB/cbm_defaults_v1.2.8340.362.db"
+    # library(RSQLite)
+    # library(CBMutils)
+    # archiveIndex <- dbConnect(dbDriver("SQLite"), dbPath)
+    # matrices2 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_matrix_association")
+    # matrices5 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_type")
+    # spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
+    # spinupSQL <- as.data.table(spinupSQL)
 
-    cbm_vars$parameters$mean_annual_temperature <- spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
+    cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
                                                              historic_mean_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
@@ -699,7 +701,7 @@ annual <- function(sim) {
   ## disturbance_matrix_id and spatial unit in matrices2(SQLight).
   ## Note: disturbance_matrix_id is unique and DMIDS is sorted by pixelGroup
   if (dim(distPixels)[1] > 0) {
-    distMatass <- as.data.table(matrices2)
+    distMatass <- as.data.table(disturbanceMatrix)
     DMIDS[DMIDS > 0] <- distMatass[disturbance_matrix_id %in% DMIDS[DMIDS > 0],][spatial_unit_id %in% part2$spatial_unit_id, disturbance_type_id]
     cbm_vars$parameters$disturbance_type <- DMIDS
   } else {
