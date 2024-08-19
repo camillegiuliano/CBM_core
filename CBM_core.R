@@ -954,7 +954,7 @@ annual <- function(sim) {
 browser()
   pools <- as.data.table(cbm_vars$pools)
   products <- pools[, c("Products")]
-  products <- as.data.table(c(simYear = time(sim), products)) ##TODO figure out what each 43 entry represents (pixelGroup?)
+  products <- as.data.table(c(simYear = time(sim), products)) ##TODO figure out what each 42 entry represents (pixelGroup?)
 
   flux <- as.data.table(cbm_vars$flux)
   emissions <- flux[, c("DisturbanceBioCO2Emission",
@@ -969,9 +969,9 @@ browser()
                                  DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
                                  DisturbanceDOMCOEmission))]
   emissions <- emissions[, c("Emissions")]
-  emissions <- as.data.table(c(simYear = time(sim), emissions)) ##TODO figure out what each 43 entry represents (pixelGroup?)
+  emissions <- as.data.table(c(emissions)) ##TODO figure out what each 42 entry represents (pixelGroup?)
 
-  sim$emissionsProducts <- products[emissions, on = .(simYear=simYear)]
+  sim$emissionsProducts <- cbind(products, emissions)
 
   ##TODO need to be able to plot these, so need to save them. Could be part of
   ##output? Maybe they come from the cbm_vars$flux tables? Check is fluxes are
