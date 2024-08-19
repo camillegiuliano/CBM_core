@@ -951,6 +951,38 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
 
   ############# Update emissions and products -------------------------------------------
+browser()
+  pools <- as.data.table(cbm_vars$pools)
+  products <- pools[, c("Products")]
+  products <- as.data.table(c(simYear = time(sim), products))
+
+  flux <- as.data.table(cbm_vars$flux)
+  emissions <- flux[, c("DisturbanceBioCO2Emission",
+                        "DisturbanceBioCH4Emission",
+                        "DisturbanceBioCOEmission",
+                        "DecayDOMCO2Emission",
+                        "DisturbanceDOMCO2Emission",
+                        "DisturbanceDOMCH4Emission",
+                        "DisturbanceDOMCOEmission")]
+  emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
+                                 DisturbanceBioCOEmission + DecayDOMCO2Emission +
+                                 DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
+                                 DisturbanceDOMCOEmission))]
+  cols <- c("DisturbanceBioCO2Emission",
+            "DisturbanceBioCH4Emission",
+            "DisturbanceBioCOEmission",
+            "DecayDOMCO2Emission",
+            "DisturbanceDOMCO2Emission",
+            "DisturbanceDOMCH4Emission",
+            "DisturbanceDOMCOEmission")
+  emissions[, `:=`((cols), NULL)]
+  emissions <- as.data.table(c(simYear = time(sim), emissions))
+
+  sim$productsEmissions <- products[emissions, on = .(simYear=simYear)]
+
+
+
+
   ##TODO need to be able to plot these, so need to save them. Could be part of
   ##output? Maybe they come from the cbm_vars$flux tables? Check is fluxes are
   ##per year Emissions should not define the pixelGroups, they should be
