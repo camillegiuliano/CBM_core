@@ -18,7 +18,7 @@ defineModule(sim, list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
     "CBMutils", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
-    "PredictiveEcology/LandR@development (>= 1.1.1)"
+    "PredictiveEcology/LandR@development (>= 1.1.1)", "box"
   ),
   parameters = rbind(
     defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
@@ -972,7 +972,7 @@ annual <- function(sim) {
   emissions <- as.data.table(c(emissions)) ##TODO figure out what each 42 entry represents (pixelGroup?)
 
   emissionsProducts <- cbind(products, emissions)
-  emissionsProducts <- colSums(emissionsProducts1 * prod(res(sim$masterRaster)) / 10000 *
+  emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
           pixelCount[["N"]])
 
   sim$emissionsProducts <-  c(
