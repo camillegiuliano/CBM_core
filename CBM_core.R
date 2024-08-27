@@ -312,11 +312,11 @@ spinup <- function(sim) {
 
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
-  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)]
-  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
+  # gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
+  # gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
   ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
   ## CBM_vol2biomass
-  level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
+  level3DT <- sim$level3DT[sim$gcid_is_sw_hw, on = c("gcids" = "gcid")]
 
   ##This will come from CBM_defaults, with URL for SQLight
   # library(RSQLite)
@@ -372,6 +372,8 @@ spinup <- function(sim) {
     ##on the sheet "disturbanceMatrices". And a script codeForDefaultsModule.R
     ##(in project R folder). In CBM_defaults we will need matrices2, matrcies3
     ##and the table above.
+    ##TODO: spatial_unit_id, disturbance_type_id is in sim$disturbanceMatrix
+    #       an equivalent of sw_hw is in sim$sim$forestTypeId
   )
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
@@ -683,15 +685,6 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
     disturbanceMatrix <- sim$disturbanceMatrix
-    # dbPath <- "defaultDB/cbm_defaults_v1.2.8340.362.db"
-    # library(RSQLite)
-    # library(CBMutils)
-    # archiveIndex <- dbConnect(dbDriver("SQLite"), dbPath)
-    # matrices2 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_matrix_association")
-    # matrices5 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_type")
-    # spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
-    # spinupSQL <- as.data.table(spinupSQL)
-
     cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
                                                              historic_mean_temperature]
   }
