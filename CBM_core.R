@@ -312,11 +312,11 @@ spinup <- function(sim) {
 
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
-  # gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
-  # gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
+  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
+  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
   ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
   ## CBM_vol2biomass
-  level3DT <- sim$level3DT[sim$gcid_is_sw_hw, on = c("gcids" = "gcid")]
+  level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
 
   ##This will come from CBM_defaults, with URL for SQLight
   # library(RSQLite)
@@ -445,7 +445,7 @@ postSpinup <- function(sim) {
   sim$NPP <- NULL
 
   ##TODO this is currently not being produced. Need this in results.
-  #sim$emissionsProducts <- NULL
+  sim$emissionsProducts <- NULL
 
   # Keep the pixels from each simulation year (in the postSpinup event)
   # at the end of each sim, this should be the same length at this vector
@@ -947,7 +947,7 @@ annual <- function(sim) {
 # browser()
   pools <- as.data.table(cbm_vars$pools)
   products <- pools[, c("Products")]
-  products <- as.data.table(c(products)) ##TODO figure out what each 42 entry represents (pixelGroup?)
+  products <- as.data.table(c(products)) ##TODO figure out what each 42 entry represents (pixelGroup?) update: is actually 43, so yes pixelgroup
 
   flux <- as.data.table(cbm_vars$flux)
   emissions <- flux[, c("DisturbanceBioCO2Emission",
@@ -960,18 +960,17 @@ annual <- function(sim) {
   emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
                                  DisturbanceBioCOEmission + DecayDOMCO2Emission +
                                  DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
-                                 DisturbanceDOMCOEmission))]
-  emissions <- emissions[, c("Emissions")]
-  emissions <- as.data.table(c(emissions)) ##TODO figure out what each 42 entry represents (pixelGroup?)
+                                 DisturbanceDOMCOEmission))] ##TODO: this combined emissions column might not be needed.
+  emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
+  emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
+  emissions[, `:=`(CO, (DisturbanceBioCOEmission + DisturbanceDOMCOEmission))]
+  emissions <- emissions[, c("CO2", "CH4", "CO","Emissions")] ##NOTE: CH4 and CO are always 0.
+  emissions <- as.data.table(c(emissions))
 
-  emissionsProducts <- cbind(products, emissions)
+  emissionsProducts <- cbind(emissions, products)
   emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
           pixelCount[["N"]])
-
-  sim$emissionsProducts <-  c(
-      simYear = time(sim)[1],
-      emissionsProducts
-    )
+  sim$emissionsProducts <-  c(simYear = time(sim), emissionsProducts)
 
   # sim$emissionsProducts <- cbind(products, emissions)
 
