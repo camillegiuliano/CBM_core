@@ -317,15 +317,6 @@ spinup <- function(sim) {
   ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
   ## CBM_vol2biomass
   level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
-
-  ##This will come from CBM_defaults, with URL for SQLight
-  # library(RSQLite)
-  # library(CBMutils)
-  # archiveIndex <- dbConnect(dbDriver("SQLite"), sim$dbPath)
-  # spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
-  # spinupSQL <- as.data.table(spinupSQL)
-  ## note that spinupSQL$id is the spatial_unit_id
-  #in CBM_defaults@TransitionTesting
   spinupSQL <- sim$spinupSQL
   spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
 
@@ -599,6 +590,7 @@ annual <- function(sim) {
   ##TODO: Check why a bunch of extra columns are being created. remove
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
+  browser()
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
     "gcids", "ecozones", cPoolNames)
@@ -904,9 +896,10 @@ annual <- function(sim) {
 
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
-  pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
+  # pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
   ##TODO check is pooldef from CBM_defaults (comes from SQLight) matches the
   ##names in the Python-built cbm_vars.
+  pooldef <- sim$pooldef
   updatePools <- data.table(
     simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
     pixelCount = pixelCount[["N"]],
@@ -970,7 +963,7 @@ annual <- function(sim) {
   emissionsProducts <- cbind(emissions, products)
   emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
           pixelCount[["N"]])
-  sim$emissionsProducts <-  c(simYear = time(sim), emissionsProducts)
+  sim$emissionsProducts <-  c(simYear = rep(time(sim)[1]), emissionsProducts) ##TODO: why does it only create data for 2000 (last year in simulation)
 
   # sim$emissionsProducts <- cbind(products, emissions)
 
