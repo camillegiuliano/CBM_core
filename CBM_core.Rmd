@@ -7,19 +7,53 @@ editor_options:
   chunk_output_type: console
 ---
 
-# Overview
+# CBM_core
 
-NPP: Net primary productivity is for both above and below ground productivity.
-Provide an overview of what the module does / how to use the module.
+## Overview
 
-Module documentation should be written so that others can use your module.
-This is a template for module documentation, and should be changed to reflect your module.
+This is the core modules of Spades CBM.
+
+## List of input objects
+
+| Name              | Class | Description | Source          |
+|-------------------|-------|-------------|-----------------|
+| growth_increments |       |             | CBM_vol2biomass |
+| forestTypeID      |       |             | CM_defaults     |
+| level3DT          |       |             | CBM_dataPrep_x  |
+| spatialDT         |       |             |                 |
+| masterRaster      |       |             | CBM_dataPrep_x  |
+| pooldel           |       |             | CBM_defaults    |
+| spinupSQL         |       |             | CBM_defaults    |
+| disturbanceMatrix |       |             | CBM_defaults    |
+
+## List of output objects
+
+| Name              | Class | Description |
+|-------------------|-------|-------------|
+| spinup_input      |       |             |
+| cbm_vars          |       |             |
+| spinupResults     |       |             |
+| pixelGroupC       |       |             |
+| pixelKeep         |       |             |
+| cbmPools          |       |             |
+| NPP               |       |             |
+| emissionsProducts |       |             |
+
+## Module flow (rename this section later)
+
+## OLD
+
+## Overview
+
+NPP: Net primary productivity is for both above and below ground productivity. Provide an overview of what the module does / how to use the module.
+
+Module documentation should be written so that others can use your module. This is a template for module documentation, and should be changed to reflect your module.
 
 ## R Markdown
 
 R Markdown syntax allows R code, outputs, and figures to be rendered in the documentation.
 
-For help writing in R Markdown, see http://rmarkdown.rstudio.com/.
+For help writing in R Markdown, see <http://rmarkdown.rstudio.com/>.
 
 # Usage
 
@@ -70,8 +104,7 @@ Write what is saved.
 
 ## Input data
 
-How to obtain input data, and a description of the data required by the module.
-If `sourceURL` is specified, `downloadData("CBM_core", "path/to/modules/dir")` may be sufficient.
+How to obtain input data, and a description of the data required by the module. If `sourceURL` is specified, `downloadData("CBM_core", "path/to/modules/dir")` may be sufficient.
 
 ## Output data
 
@@ -80,4 +113,3 @@ Description of the module outputs.
 # Links to other modules
 
 Describe any anticipated linkages to other modules.
-
