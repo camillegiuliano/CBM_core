@@ -364,8 +364,7 @@ spinup <- function(sim) {
     ##on the sheet "disturbanceMatrices". And a script codeForDefaultsModule.R
     ##(in project R folder). In CBM_defaults we will need matrices2, matrcies3
     ##and the table above.
-    ##TODO: spatial_unit_id, disturbance_type_id is in sim$disturbanceMatrix
-    #       an equivalent of sw_hw is in sim$sim$forestTypeId
+    ##TODO: these are now created in defaults. However, historical_disturbance_type and last_pass_disturbance_type aren't used anywhere in this module.
   )
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
@@ -420,6 +419,7 @@ postSpinup <- function(sim) {
   ##TODO need to track emissions and products. First check that cbm_vars$fluxes
   ##are yearly (question for Scott or we found out by mapping the Python
   ##functions ourselves)
+  # Camille thinks they might be yearly. At the very least they are not cumulative as CH4 and CO emissions are >0 in 1998 and 0 in 2000.
 
   ##TODO: confirm if this is still the case where CBM_vol2biomass won't
   ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
@@ -899,6 +899,7 @@ annual <- function(sim) {
   # pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
   ##TODO check is pooldef from CBM_defaults (comes from SQLight) matches the
   ##names in the Python-built cbm_vars.
+  ##TODO: it doesn't currently, it has the old pooldef. the correct pools are currently hard coded in until this is fixed in the database and can be re-added to defaults.
   pooldef <- sim$pooldef
   updatePools <- data.table(
     simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
@@ -937,10 +938,9 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
 
   ############# Update emissions and products -------------------------------------------
-# browser()
   pools <- as.data.table(cbm_vars$pools)
   products <- pools[, c("Products")]
-  products <- as.data.table(c(products)) ##TODO figure out what each 42 entry represents (pixelGroup?) update: is actually 43, so yes pixelgroup
+  products <- as.data.table(c(products))
 
   flux <- as.data.table(cbm_vars$flux)
   emissions <- flux[, c("DisturbanceBioCO2Emission",
@@ -957,15 +957,14 @@ annual <- function(sim) {
   emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
   emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
   emissions[, `:=`(CO, (DisturbanceBioCOEmission + DisturbanceDOMCOEmission))]
-  emissions <- emissions[, c("CO2", "CH4", "CO","Emissions")] ##NOTE: CH4 and CO are always 0.
+  emissions <- emissions[, c("CO2", "CH4", "CO","Emissions")] ##NOTE: CH4 and CO are 0 in 1999 and 2000
   emissions <- as.data.table(c(emissions))
 
   emissionsProducts <- cbind(emissions, products)
   emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
           pixelCount[["N"]])
-  sim$emissionsProducts <-  c(simYear = rep(time(sim)[1]), emissionsProducts) ##TODO: why does it only create data for 2000 (last year in simulation)
-
-  # sim$emissionsProducts <- cbind(products, emissions)
+  emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
+  sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
 
   ##TODO need to be able to plot these, so need to save them. Could be part of
   ##output? Maybe they come from the cbm_vars$flux tables? Check is fluxes are
