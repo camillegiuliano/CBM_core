@@ -312,10 +312,11 @@ spinup <- function(sim) {
 
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
-  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
-  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
+  # gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
+  # gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
   ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
   ## CBM_vol2biomass
+  gcid_is_sw_hw <- sim$gcid_is_sw_hw
   level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
   spinupSQL <- sim$spinupSQL
   spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
@@ -590,7 +591,6 @@ annual <- function(sim) {
   ##TODO: Check why a bunch of extra columns are being created. remove
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
-  browser()
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
     "gcids", "ecozones", cPoolNames)
