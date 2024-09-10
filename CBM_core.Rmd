@@ -15,33 +15,41 @@ This is the core modules of Spades CBM.
 
 ## List of input objects
 
-| Name              | Class | Description | Source          |
-|-------------------|-------|-------------|-----------------|
-| growth_increments |       |             | CBM_vol2biomass |
-| forestTypeID      |       |             | CM_defaults     |
-| level3DT          |       |             | CBM_dataPrep_x  |
-| spatialDT         |       |             |                 |
-| masterRaster      |       |             | CBM_dataPrep_x  |
-| pooldel           |       |             | CBM_defaults    |
-| spinupSQL         |       |             | CBM_defaults    |
-| disturbanceMatrix |       |             | CBM_defaults    |
+| Name              | Class      | Description                                                  | Source          |
+|-----------------|-----------------|-----------------------|-----------------|
+| growth_increments | Data table |                                                              | CBM_vol2biomass |
+| forestTypeID      | Data table | Defines forest types and their respective IDs                | CM_defaults     |
+| level3DT          | Data table | pixelGroup level table with all collapsed raster information |                 |
+| spatialDT         | Data table | Pixel level table with all collapsed raster information      | CBM_dataPrep_x  |
+| masterRaster      | SpatRaster |                                                              | CBM_dataPrep_x  |
+| pooldel           | Character  | Vector of pools                                              | CBM_defaults    |
+| spinupSQL         | Data table | Parameters for CBM_core spinup event                         | CBM_defaults    |
+| disturbanceMatrix | Data table | Default disturbance data                                     | CBM_defaults    |
 
 ## List of output objects
 
-| Name              | Class | Description |
-|-------------------|-------|-------------|
-| spinup_input      |       |             |
-| cbm_vars          |       |             |
-| spinupResults     |       |             |
-| pixelGroupC       |       |             |
-| pixelKeep         |       |             |
-| cbmPools          |       |             |
-| NPP               |       |             |
-| emissionsProducts |       |             |
+| Name              | Class      | Description                                                     |
+|------------------|------------------|-------------------------------------|
+| spinup_input      | List       |                                                                 |
+| cbm_vars          | List       |                                                                 |
+| spinupResults     | Data frame | Pools post spinup in order of pixelGroup                        |
+| pixelGroupC       | Data table | All vectors (pixelGroup columns) and pools for simulation year. |
+| pixelKeep         | Data table | Tracking all pixels' pixel group through simulations            |
+| cbmPools          | Data table | All pools and pixelGroups after each simulation                 |
+| NPP               | Data table | Net primary production per pixel group                          |
+| emissionsProducts | matrix     | Total emissions and products for study area per simulation year |
 
 ## Module flow (rename this section later)
 
-## OLD
+1.  
+
+2.  
+
+3.  
+
+4.  
+
+## OLD VERSION
 
 ## Overview
 
