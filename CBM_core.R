@@ -15,10 +15,10 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
+    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite", "box",
     "CBMutils", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
-    "PredictiveEcology/LandR@development (>= 1.1.1)", "box"
+    "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
   parameters = rbind(
     defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
@@ -312,11 +312,12 @@ spinup <- function(sim) {
 
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
-  # gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
-  # gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
+  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
+  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
   ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
   ## CBM_vol2biomass
-  gcid_is_sw_hw <- sim$gcid_is_sw_hw
+  # gcid_is_sw_hw <- sim$gcid_is_sw_hw
+  sim$gcid_is_sw_hw <- gcid_is_sw_hw
   level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
   spinupSQL <- sim$spinupSQL
   spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
@@ -419,7 +420,6 @@ postSpinup <- function(sim) {
   ##TODO need to track emissions and products. First check that cbm_vars$fluxes
   ##are yearly (question for Scott or we found out by mapping the Python
   ##functions ourselves)
-  # Camille thinks they might be yearly. At the very least they are not cumulative as CH4 and CO emissions are >0 in 1998 and 0 in 2000.
 
   ##TODO: confirm if this is still the case where CBM_vol2biomass won't
   ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
