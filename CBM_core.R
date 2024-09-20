@@ -922,6 +922,11 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
 
   ############# Update emissions and products -------------------------------------------
+  #Note: details of which source and sink pools goes into each of the columns in
+  #cbm_vars$flux can be found here:
+  #https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html
+  ##TODO double-check with Scott Morken that the cbm_vars$flux are in metric
+  ##tonnes of carbon per ha like the rest of the values produced.
   pools <- as.data.table(cbm_vars$pools)
   products <- pools[, c("Products")]
   products <- as.data.table(c(products))
@@ -937,7 +942,9 @@ annual <- function(sim) {
   emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
                                  DisturbanceBioCOEmission + DecayDOMCO2Emission +
                                  DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
-                                 DisturbanceDOMCOEmission))] ##TODO: this combined emissions column might not be needed.
+                                 DisturbanceDOMCOEmission))]
+  ##TODO: this combined emissions column might not be needed.
+
   emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
   emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
   emissions[, `:=`(CO, (DisturbanceBioCOEmission + DisturbanceDOMCOEmission))]
@@ -950,9 +957,9 @@ annual <- function(sim) {
   emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
 
-  ##TODO Check is fluxes are per year Emissions should not define the pixelGroups, they should be
-  #re-zeros every year. Both these values are most commonly required on a yearly
-  #basis.
+  ##TODO Check if fluxes are per year Emissions should not define the
+  #pixelGroups, they should be re-zeros every year. Both these values are most
+  #commonly required on a yearly basis.
 
   ############# End of update emissions and products ------------------------------------
 
