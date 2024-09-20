@@ -15,7 +15,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
+    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite", "box",
     "CBMutils", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)"
@@ -312,20 +312,14 @@ spinup <- function(sim) {
 
   ##TODO object below should be in identified in CBM_vol2biomass, when the
   ##gcMeta (from user) is read in
-  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)]
+  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
   gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
   ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
   ## CBM_vol2biomass
+  # gcid_is_sw_hw <- sim$gcid_is_sw_hw
+  sim$gcid_is_sw_hw <- gcid_is_sw_hw
   level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
-
-  ##This will come from CBM_defaults, with URL for SQLight
-  library(RSQLite)
-  library(CBMutils)
-  archiveIndex <- dbConnect(dbDriver("SQLite"), sim$dbPath)
-  spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
-  spinupSQL <- as.data.table(spinupSQL)
-  ## note that spinupSQL$id is the spatial_unit_id
-
+  spinupSQL <- sim$spinupSQL
   spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
 
   level3DT <- merge(level3DT, spinupParamsSPU, by.x = "spatial_unit_id", by.y = "id")
@@ -371,12 +365,12 @@ spinup <- function(sim) {
     ##on the sheet "disturbanceMatrices". And a script codeForDefaultsModule.R
     ##(in project R folder). In CBM_defaults we will need matrices2, matrcies3
     ##and the table above.
+    ##TODO: these are now created in defaults. However, historical_disturbance_type and last_pass_disturbance_type aren't used anywhere in this module.
   )
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
   ##be easier.
   ## Need to get rid of HW SW distinction
-
 
   ##Need to add pixelGroup to sim$growth_increments
   df2 <- merge(sim$growth_increments, level3DT[,.(pixelGroup, gcids)],
@@ -440,9 +434,7 @@ postSpinup <- function(sim) {
   ##simplify, but it will take time and careful attention.
   sim$cbmPools <- NULL
   sim$NPP <- NULL
-
-  ##TODO this is currently not being produced. Need this in results.
-  #sim$emissionsProducts <- NULL
+  sim$emissionsProducts <- NULL
 
   # Keep the pixels from each simulation year (in the postSpinup event)
   # at the end of each sim, this should be the same length at this vector
@@ -649,9 +641,6 @@ annual <- function(sim) {
 
   # 9. From the events column, create a vector of the disturbance matrix
   # identification so it links back to the CBM default disturbance matrices.
-
-  ##TODO See lines 693 to 705 below, this will be cleaned up once we have
-  #information coming from CBM_defaults.
   DM <- merge(pixelGroupForAnnual, mySpuDmids,
               by = c("spatial_unit_id", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
@@ -681,33 +670,19 @@ annual <- function(sim) {
   ## We are currently only working in spu 28
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
-    dbPath <- "defaultDB/cbm_defaults_v1.2.8340.362.db"
-    library(RSQLite)
-    library(CBMutils)
-    archiveIndex <- dbConnect(dbDriver("SQLite"), dbPath)
-    matrices2 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_matrix_association")
-    matrices5 <- dbGetQuery(archiveIndex, "SELECT * FROM disturbance_type")
-    spinupSQL <- dbGetQuery(archiveIndex, "SELECT * FROM spinup_parameter")
-    spinupSQL <- as.data.table(spinupSQL)
-
-    cbm_vars$parameters$mean_annual_temperature <- spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
+    disturbanceMatrix <- sim$disturbanceMatrix
+    cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
                                                              historic_mean_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
-##TODO The DMID for that is in the DMIDS vector (in this case 371). But we need
-  ## disturbance_type_id. disturbance_type_id is matched to
-  ## disturbance_matrix_id and spatial unit in matrices2(SQLight).
-  ## Note: disturbance_matrix_id is unique and DMIDS is sorted by pixelGroup
   if (dim(distPixels)[1] > 0) {
-    distMatass <- as.data.table(matrices2)
+    distMatass <- as.data.table(disturbanceMatrix)
     DMIDS[DMIDS > 0] <- distMatass[disturbance_matrix_id %in% DMIDS[DMIDS > 0],][spatial_unit_id %in% part2$spatial_unit_id, disturbance_type_id]
     cbm_vars$parameters$disturbance_type <- DMIDS
   } else {
     ##there might be a disturbance_type left over from the previous annual event
     cbm_vars$parameters$disturbance_type <- rep(0, length(cbm_vars$parameters$disturbance_type))
   }
-
-
 
   ##growth_increments
   ## Need to match the growth info by pixelGroups and gcids while tracking age.
@@ -851,7 +826,6 @@ annual <- function(sim) {
       cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[oldGCpixelGroup$pixelGroup,])
   }
 
-
   ###################### Working on cbm_vars$state
   ######################################################
   # we are ASSUMING that these are sorted by pixelGroup like all other tables in
@@ -909,9 +883,8 @@ annual <- function(sim) {
 
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
-  pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
-  ##TODO check is pooldef from CBM_defaults (comes from SQLight) matches the
-  ##names in the Python-built cbm_vars.
+  # pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
+  pooldef <- sim$pooldef
   updatePools <- data.table(
     simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
     pixelCount = pixelCount[["N"]],
@@ -949,43 +922,46 @@ annual <- function(sim) {
   #-----------------------------------------------------------------------------------
 
   ############# Update emissions and products -------------------------------------------
-  ##TODO need to be able to plot these, so need to save them. Could be part of
-  ##output? Maybe they come from the cbm_vars$flux tables? Check is fluxes are
-  ##per year Emissions should not define the pixelGroups, they should be
-  #re-zeros every year. Both these values are most commonly required on a yearly
-  #basis.
-  ##OLD
-  # sim$emissionsProducts was first created in postspinup event as NULL and is update
-  # here for each annual event. The sim$spinupResult emissions and Products was
-  # re-zeroed at the end of the spinup event.
+  #Note: details of which source and sink pools goes into each of the columns in
+  #cbm_vars$flux can be found here:
+  #https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html
+  ##TODO double-check with Scott Morken that the cbm_vars$flux are in metric
+  ##tonnes of carbon per ha like the rest of the values produced.
+  pools <- as.data.table(cbm_vars$pools)
+  products <- pools[, c("Products")]
+  products <- as.data.table(c(products))
 
-  # # 1. Add the emissions and Products for this year
-  # emissionsProductsOut <- sim$pools[,P(sim)$emissionsProductsCols]
-  #
-  # ## assertion
-  # if (time(sim) == start(sim)) {
-  #   if (!identical((emissionsProductsOut - emissionsProductsIn), emissionsProductsOut))
-  #     stop(
-  #       "The difference between emissionsProductsOut and emissionsProductsIn,",
-  #       "should be equal to emissionsProductsOut in the first year of simulation.",
-  #       "That is not the case. The simulation cannot proceed."
-  #     )
-  # }
-  #
-  # emissionsProducts1 <- (emissionsProductsOut - emissionsProductsIn)
-  # emissionsProducts2 <- colSums(emissionsProducts1 * prod(res(sim$masterRaster)) / 10000 *
-  #                                 pixelCount[["N"]])
-  # emissionsProducts <-  c(
-  #   simYear = time(sim)[1],
-  #   emissionsProducts2
-  # )
-  ###TODO use the cbm_vars$flux to calculate emissions (need to search column
-  ###names) and products will come from cbm_vars$pools
-  #sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
+  flux <- as.data.table(cbm_vars$flux)
+  emissions <- flux[, c("DisturbanceBioCO2Emission",
+                        "DisturbanceBioCH4Emission",
+                        "DisturbanceBioCOEmission",
+                        "DecayDOMCO2Emission",
+                        "DisturbanceDOMCO2Emission",
+                        "DisturbanceDOMCH4Emission",
+                        "DisturbanceDOMCOEmission")]
+  emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
+                                 DisturbanceBioCOEmission + DecayDOMCO2Emission +
+                                 DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
+                                 DisturbanceDOMCOEmission))]
+  ##TODO: this combined emissions column might not be needed.
+
+  emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
+  emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
+  emissions[, `:=`(CO, (DisturbanceBioCOEmission + DisturbanceDOMCOEmission))]
+  emissions <- emissions[, c("CO2", "CH4", "CO","Emissions")] ##NOTE: CH4 and CO are 0 in 1999 and 2000
+  emissions <- as.data.table(c(emissions))
+
+  emissionsProducts <- cbind(emissions, products)
+  emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
+          pixelCount[["N"]])
+  emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
+  sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
+
+  ##TODO Check if fluxes are per year Emissions should not define the
+  #pixelGroups, they should be re-zeros every year. Both these values are most
+  #commonly required on a yearly basis.
 
   ############# End of update emissions and products ------------------------------------
-
-
 
 
   return(invisible(sim))
