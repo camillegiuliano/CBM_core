@@ -16,7 +16,7 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite", "box",
-    "PredictiveEcology/CBMutils@development (HEAD)", "PredictiveEcology/reproducible",
+    "PredictiveEcology/CBMutils@celineTest (HEAD)", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
@@ -61,11 +61,11 @@ defineModule(sim, list(
       desc = "The identification of which growth curves to use on the specific stands provided by...", sourceURL = NA
     ),
     expectsInput(
-      objectName = "historicDMIDs", objectClass = "numeric",
+      objectName = "historicDMtype", objectClass = "numeric",
       desc = "Vector, one for each stand, indicating historical disturbance type, linked to the S4 table called cbmData. Only Spinup.", sourceURL = NA
     ),
     expectsInput(
-      objectName = "lastPassDMIDS", objectClass = "numeric",
+      objectName = "lastPassDMtype", objectClass = "numeric",
       desc = "Vector, one for each stand, indicating final disturbance type, linked to the S4 table called cbmData. Only Spinup.", sourceURL = NA
     ),
     expectsInput(
@@ -83,14 +83,6 @@ defineModule(sim, list(
     expectsInput(
       objectName = "returnIntervals", objectClass = "numeric",
       desc = "Vector, one for each stand, indicating the fixed fire return interval. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "spatialUnits", objectClass = "numeric",
-      desc = "The id given to the intersection of province and ecozones across Canada, linked to the S4 table called cbmData", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "ecozones", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating the numeric represenation of the Canadian ecozones, as used in CBM-CFS3", sourceURL = NA
     ),
     expectsInput(
       objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table",
@@ -324,7 +316,7 @@ spinup <- function(sim) {
 
   level3DT <- merge(level3DT, spinupParamsSPU, by.x = "spatial_unit_id", by.y = "id")
 
-
+browser()
   spinup_parameters <- data.table(
     pixelGroup = level3DT$pixelGroup,
     age = level3DT$ages,
@@ -351,8 +343,8 @@ spinup <- function(sim) {
     ##TODO how are these used if increments (based on species for Boudewyn
     ##translation) are already provided.
     mean_annual_temperature = level3DT$historic_mean_temperature,
-    historical_disturbance_type = 1L,
-    last_pass_disturbance_type =  1L
+    historical_disturbance_type = sim$historicDMtype,
+    last_pass_disturbance_type =  sim$lastPassDMtype
     ##IMPORTANT: this value comes from a table provided by Scott Morking
     ##(disturbance_type_ref_en_CA.csv). A value of 1 represents "Wildfire".
     ##Three columns are used to determine the disturbance matrix ID internally
