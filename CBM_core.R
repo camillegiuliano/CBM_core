@@ -92,10 +92,10 @@ defineModule(sim, list(
       "by 4 digit year, e.g., 1998, 1999. If a data.table, it must have a column named 'year', with ",
       "entries for each year of the simulation, e.g., 1998, 1999")
     ),
-    # expectsInput(
-    #   objectName = "mySpuDmids", objectClass = "data.frame",
-    #   desc = "the table containing one line per pixel"
-    # ),
+    expectsInput(
+      objectName = "mySpuDmids", objectClass = "data.frame",
+      desc = "Table matching user defined disturbance with disturbance type and matrix ids."
+    ),
     expectsInput(
       objectName = "pixelGroupC", objectClass = "data.table",
       desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
@@ -116,7 +116,6 @@ defineModule(sim, list(
       desc = "the table containing one line per pixel"
     ),
     expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(objectName = "mySpuDmids", objectClass = "", desc = NA, sourceURL = NA) ## TODO
   ),
   outputObjects = bindrows(
     createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
@@ -310,13 +309,13 @@ spinup <- function(sim) {
   ## CBM_vol2biomass
   # gcid_is_sw_hw <- sim$gcid_is_sw_hw
   sim$gcid_is_sw_hw <- gcid_is_sw_hw
-  level3DT <- sim$level3DT[gcid_is_sw_hw, on = c("gcids" = "gcid")]
+  level3DT <- sim$level3DT[gcid_is_sw_hw[,1:2], on = "gcids"]
   spinupSQL <- sim$spinupSQL
   spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
 
-  level3DT <- merge(level3DT, spinupParamsSPU, by.x = "spatial_unit_id", by.y = "id")
+  level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
 
-browser()
+
   spinup_parameters <- data.table(
     pixelGroup = level3DT$pixelGroup,
     age = level3DT$ages,
@@ -335,8 +334,8 @@ browser()
 
     ###TODO species attribution is hard coded, need to sort this out! Species
     ###matches are in the CBM_dataPrep_SK
-    species = ifelse(level3DT$is_sw, 1, 62),
-    ## this is assigning the species number, so species comes form user or
+    species = ifelse(level3DT$is_sw, 1, 62), ##TODO does this mess-up the selection of our growth curves? to check
+    ## this is assigning the species number, so species comes frm user or
     ## inventory and will be in CBM_dataPrep_SK, but the species number will
     ## come from libcbmr::cbm_exn_get_default_parameters() species (see
     ## trackCBM_core) or directly from the SQLite -
@@ -538,6 +537,7 @@ annual <- function(sim) {
   mySpuDmids[, "events" := rasterID][, rasterID := NULL]
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
+  ##TODO check if this works the way it is supposed to
   # read-in the mySpuDmids, make a vector of 0 and 1 or 2 the length of distPixels$events
   setkey(wholeStandDist,pixelIndex)
   setkey(distPixels,pixelIndex)
