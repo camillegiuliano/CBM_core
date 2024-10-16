@@ -301,13 +301,9 @@ spinup <- function(sim) {
   # }
   #
 
-  ##TODO object below should be in identified in CBM_vol2biomass, when the
-  ##gcMeta (from user) is read in
-  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)] ##TODO: is_sw already exists in sim$forestTypeId created in defaults
+  # sim$growth_increments is built in CBM_vol2biomass
+  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)]
   gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
-  ## adding the sw_hw which will come from either the CBM_dataPrep_XX or
-  ## CBM_vol2biomass
-  # gcid_is_sw_hw <- sim$gcid_is_sw_hw
   sim$gcid_is_sw_hw <- gcid_is_sw_hw
   level3DT <- sim$level3DT[gcid_is_sw_hw[,1:2], on = "gcids"]
   spinupSQL <- sim$spinupSQL
