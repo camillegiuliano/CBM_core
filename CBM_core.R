@@ -16,7 +16,7 @@ defineModule(sim, list(
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite", "box",
-    "PredictiveEcology/CBMutils@celineTest (HEAD)", "PredictiveEcology/reproducible",
+    "PredictiveEcology/CBMutils@development", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
