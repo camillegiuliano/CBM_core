@@ -13,6 +13,10 @@ editor_options:
 
 This is the core modules of Spades CBM.
 
+
+### Notes on forest type
+The SQligth (used in CBM_defaults) has has a column named `forest_type_id` that identifies a softwood forest (sw) as 1, a mixed forest as 2, and a hardwood forest (hw) as 3. This distinction is important because it determines how the root biomass will be calculated (sw differently than hw). The definition of `fotrest_type_id` is constant and is the same that is used in `canfi_species.csv` (species level identification of codes that is needed in the volumne to biomass translation in CBM_vol2biomass), in `gcMeta.csv` (SK specific growth curve metadata), and in `sim$growth_increments` because it built from `gcMeta` and `canfi_species`. The `sim$growth_increment$forest_type_id` is the one used to create the sw flag needed for input in the spinup event. After that, the sw_hw flag (1=sw, 0=hw) is stored in the `sim$cbm_vars$state$sw_hw` column.
+
 ## List of input objects
 
 | Name              | Class      | Description                                                  | Source          |
