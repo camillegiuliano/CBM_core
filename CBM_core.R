@@ -62,11 +62,11 @@ defineModule(sim, list(
     ),
     expectsInput(
       objectName = "historicDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating historical disturbance type, linked to the S4 table called cbmData. Only Spinup.", sourceURL = NA
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
     ),
     expectsInput(
       objectName = "lastPassDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating final disturbance type, linked to the S4 table called cbmData. Only Spinup.", sourceURL = NA
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
     ),
     expectsInput(
       objectName = "delays", objectClass = "numeric",
