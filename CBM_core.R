@@ -340,19 +340,6 @@ spinup <- function(sim) {
     mean_annual_temperature = level3DT$historic_mean_temperature,
     historical_disturbance_type = sim$historicDMtype,
     last_pass_disturbance_type =  sim$lastPassDMtype
-    ##IMPORTANT: this value comes from a table provided by Scott Morking
-    ##(disturbance_type_ref_en_CA.csv). A value of 1 represents "Wildfire".
-    ##Three columns are used to determine the disturbance matrix ID internally
-    ##in the `libcbm::` function calls: spatial_unit_id, disturbance_type_id,
-    ##and sw_hw. With those three you can find the disturbance matrix id in
-    ##reticulate::py_to_r(libcbm_default_model_config$disturbance_matrix_association)[0:5,].
-    ##Celine made a tracking sheet for disturbance tables in the SQLite database
-    ##here
-    ##https://docs.google.com/spreadsheets/d/1TFBQiRH4z54l8ROX1N02OOiCHXMe20GSaExiuUqsC0Q/edit?usp=sharing,
-    ##on the sheet "disturbanceMatrices". And a script codeForDefaultsModule.R
-    ##(in project R folder). In CBM_defaults we will need matrices2, matrcies3
-    ##and the table above.
-    ##TODO: these are now created in defaults. However, historical_disturbance_type and last_pass_disturbance_type aren't used anywhere in this module.
   )
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
