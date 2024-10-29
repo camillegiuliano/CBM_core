@@ -310,6 +310,7 @@ spinup <- function(sim) {
   spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
 
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
+  level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
 
 
   spinup_parameters <- data.table(
@@ -327,16 +328,7 @@ spinup <- function(sim) {
     max_rotations = level3DT$max_rotations,
     spatial_unit_id = level3DT$spatial_unit_id,
     sw_hw = as.integer(level3DT$is_sw),
-
-    ###TODO species attribution is hard coded, need to sort this out! Species
-    ###matches are in the CBM_dataPrep_SK
-    species = ifelse(level3DT$is_sw, 1, 62), ##TODO does this mess-up the selection of our growth curves? to check
-    ## this is assigning the species number, so species comes frm user or
-    ## inventory and will be in CBM_dataPrep_SK, but the species number will
-    ## come from libcbmr::cbm_exn_get_default_parameters() species (see
-    ## trackCBM_core) or directly from the SQLite -
-    ##TODO how are these used if increments (based on species for Boudewyn
-    ##translation) are already provided.
+    species = level3DT$species_id,
     mean_annual_temperature = level3DT$historic_mean_temperature,
     historical_disturbance_type = sim$historicDMtype,
     last_pass_disturbance_type =  sim$lastPassDMtype
