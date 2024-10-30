@@ -1,6 +1,10 @@
+# Everything in this file gets sourced during simInit, and all functions and objects
+# are put into the simList. To use objects, use sim$xxx, and are thus globally available
+# to all modules. Functions can be used without sim$ as they are namespaced, like functions
+# in R packages. If exact location is required, functions will be: sim$<moduleName>$FunctionName
 defineModule(sim, list(
   name = "CBM_core",
-  description = "Modules that simulated the annual events as described in the CBM-CFS model",
+  description = "Modules that simulated the annual events as described in the CBM-CFS model", # "insert module description here",
   keywords = c("carbon", "CBM-CFS"),
   authors = person("Celine", "Boisvenue", email = "celine.boisvenue@nrcan-rncan.gc.ca", role = c("aut", "cre")),
   childModules = character(0),
@@ -105,13 +109,13 @@ defineModule(sim, list(
     ),
     # expectsInput(objectName = "disturbanceEvents", objectClass = "matrix",
     #              desc = "3 column matrix, PixelGroupID, Year (that sim year), and DisturbanceMatrixId. Not used in Spinup.", sourceURL = NA),
-    expectsInput(objectName = "dbPath", objectClass = "character", desc = NA, sourceURL = NA),
-    expectsInput(objectName = "level3DT", objectClass = "data.table", desc = NA, sourceURL = NA),
+    expectsInput(objectName = "dbPath", objectClass = "character", desc = NA, sourceURL = NA), ## TODO
+    expectsInput(objectName = "level3DT", objectClass = "data.table", desc = NA, sourceURL = NA), ## TODO
     expectsInput(
       objectName = "spatialDT", objectClass = "data.table",
       desc = "the table containing one line per pixel"
     ),
-    expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA),
+    expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
   ),
   outputObjects = bindrows(
     createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
@@ -173,6 +177,11 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual")
 
       # need this to be after the saving of outputs -- so very low priority
+      ##TODO this is not happening because P(sim)$.plotInterval is NULL
+      # sim <- scheduleEvent(sim, min(end(sim), start(sim) + P(sim)$.plotInterval),
+      #                      "CBM_core", "accumulateResults", eventPriority = 11)
+      ##So, I am making this one until we figure out how to do both more
+      ##generically
       sim <- scheduleEvent(sim, end(sim), "CBM_core", "accumulateResults", eventPriority = 11)
 
 
@@ -191,7 +200,11 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
       sim <- postSpinup(sim)
-
+      ## These turnover rates are now in
+      # sim$turnoverRates <- calcTurnoverRates(
+      #   turnoverRates = sim$cbmData@turnoverRates,
+      #   spatialUnitIds = sim$cbmData@spatialUnitIds, spatialUnits = sim$spatialUnits
+      #)
       # ! ----- STOP EDITING ----- ! #
     },
     accumulateResults = {
@@ -207,17 +220,19 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       }
     },
     plot = {
+      ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
       if (time(sim) != start(sim)) {
+        ## TODO: for some reason the plot fails the first time, but not subsequently
         retry(quote({
           carbonOutPlot(
             emissionsProducts = sim$emissionsProducts,
-            masterRaster = sim$masterRaster
+            masterRaster = sim$masterRaster ## TODO: not used in this function
           )
         }), retries = 2)
 
         barPlot(
           cbmPools = sim$cbmPools,
-          masterRaster = sim$masterRaster
+          masterRaster = sim$masterRaster ## TODO: not used in this function
         )
 
         NPPplot(
@@ -263,17 +278,36 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
   return(invisible(sim))
 }
 
+## event functions
+#   - follow the naming convention `modulenameEventtype()`;
+#   - `modulenameInit()` function is required for initiliazation;
+#   - keep event functions short and clean, modularize by calling subroutines from section below.
 
 ### template initialization
 
 spinup <- function(sim) {
+  ##TODO this will be reinstated once we call the other CBM modules
+  # io <- inputObjects(sim, currentModule(sim))
+  # objectNamesExpected <- io$objectName
+  # available <- objectNamesExpected %in% ls(sim)
+  # if (any(!available)) {
+  #   stop(
+  #     "The inputObjects for CBM_core are not all available:",
+  #     "These are missing:", paste(objectNamesExpected[!available], collapse = ", "),
+  #     ". \n\nHave you run ",
+  #     paste0("spadesCBM", c("defaults", "dataPrep", "vol2biomass"), collapse = ", "),
+  #     "?"
+  #   )
+  # }
+  #
+
   # sim$growth_increments is built in CBM_vol2biomass
   gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)]
   gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
   sim$gcid_is_sw_hw <- gcid_is_sw_hw
   level3DT <- sim$level3DT[gcid_is_sw_hw[,1:2], on = "gcids"]
   spinupSQL <- sim$spinupSQL
-  spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as this example only has 1 new pixelGroup in 1998 an din 1999.
+  spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
 
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
   level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
@@ -288,7 +322,7 @@ spinup <- function(sim) {
     ##the tonnesC/ha, tonnesC/yr/ha values by the area is the CBM3 method for
     ##extracting the mass, mass/year values.
     area = 1.0,
-    delay = sim$delays,
+    delay = sim$delays, ##user defined so CBM_dataPrep_SK
     return_interval = level3DT$return_interval,
     min_rotations = level3DT$min_rotations,
     max_rotations = level3DT$max_rotations,
@@ -299,6 +333,10 @@ spinup <- function(sim) {
     historical_disturbance_type = sim$historicDMtype,
     last_pass_disturbance_type =  sim$lastPassDMtype
   )
+  ### the next section is an artifact of not perfect understanding of the data
+  ##provided. Once growth_increments will come from CBM_vol2biomass, this will
+  ##be easier.
+  ## Need to get rid of HW SW distinction
 
   ##Need to add pixelGroup to sim$growth_increments
   df2 <- merge(sim$growth_increments, level3DT[,.(pixelGroup, gcids)],
@@ -336,23 +374,37 @@ spinup <- function(sim) {
     mod$libcbm_default_model_config
   ) |> Cache()
 
+##TODO Comparison of spinup results with other CBM runs needs to be completed.
+##Scott has it on his list
   sim$spinupResults <- cbm_vars$pools
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
 }
 
 postSpinup <- function(sim) {
+  ##TODO need to track emissions and products. First check that cbm_vars$fluxes
+  ##are yearly (question for Scott or we found out by mapping the Python
+  ##functions ourselves)
+
+  ##TODO: confirm if this is still the case where CBM_vol2biomass won't
+  ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
   sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event (same order)
   setorderv(sim$level3DT, "pixelGroup")
 
+  #TODO: track this below! Do we need this seperate object now? This is a spot
+  #where we could simplify. But currently it is needed throught annual event.
   sim$pixelGroupC <- cbind(sim$level3DT, sim$cbm_vars$pools)
+
+  ##TODO the Python scripts track this differently via cbm_vars. Again, we could
+  ##simplify, but it will take time and careful attention.
   sim$cbmPools <- NULL
   sim$NPP <- NULL
   sim$emissionsProducts <- NULL
 
   # Keep the pixels from each simulation year (in the postSpinup event)
   # at the end of each sim, this should be the same length at this vector
+  ## got place for a vector length check!!
   setorderv(sim$spatialDT, "pixelGroup")
 
   sim$pixelKeep <- sim$spatialDT[, .(pixelIndex, pixelGroup)]
@@ -374,6 +426,11 @@ annual <- function(sim) {
   # spadesCBM_dataPrep_SK module. However, one raster at a time is read in this annual
   # event, permitting the rasters to come for each annual event from another
   # source.
+
+  #TODO: disturbances for both SK and RIA were read-in for the whole simulation
+  #horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
+  #modules (such as yearly rasters), they need to be read in here. We need to build this
+  #in.
 
   # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
   # example. First add a column for disturbed pixels to the spatialDT
@@ -406,8 +463,12 @@ annual <- function(sim) {
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
 
   # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
+
+    ##TODO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
+    ### do I have to make it sim$ here?
     newEvents <- yearEvents > 0
     spatialDT <- spatialDT[newEvents == TRUE, events := yearEvents[newEvents]]
+    # this could be big so remove it
     rm(yearEvents)
 
   # 3. get the disturbed pixels only
@@ -420,6 +481,9 @@ annual <- function(sim) {
     setnames(annualDisturbance, names(annualDisturbance)[1], "pixelIndex", skip_absent = TRUE)
     set(annualDisturbance, NULL, "year", NULL)
     distPixels <- spatialDT[annualDisturbance, on = "pixelIndex", nomatch = NULL]
+    # had to change this for the presentDay runs (and harvest scenarios b/c
+    # there are two types of dists)
+    # set(distPixels, NULL, "events", 1L) # These are fires i.e., event type 1
     distPixels[, "events" := NULL]
     setnames(distPixels, "i.events", "events")
     # make sure there are no double disturbance
@@ -432,6 +496,7 @@ annual <- function(sim) {
   } else {
     stop("sim$disturbancRasters must be a list of filenames of Rasters (in .grd) or a ",
          "single data.table with 2 columns, pixels and year")
+    ##TODO: need to add an option to read disturbances from rasters directly
   }
 
   pixelCount <- spatialDT[, .N, by = pixelGroup]
@@ -447,6 +512,7 @@ annual <- function(sim) {
   mySpuDmids[, "events" := rasterID][, rasterID := NULL]
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
+  ##TODO check if this works the way it is supposed to
   # read-in the mySpuDmids, make a vector of 0 and 1 or 2 the length of distPixels$events
   setkey(wholeStandDist,pixelIndex)
   setkey(distPixels,pixelIndex)
@@ -466,7 +532,8 @@ annual <- function(sim) {
 
   # Get the carbon info from the pools in from previous year. The
   # sim$pixelGroupC is created in the postspinup event, and then updated at
-  # the end of each annual event (in this script)
+  # the end of each annual event (in this script).
+  ###CELINE NOTE: currently, pixelGroupC comes from postSpinup
   pixelGroupC <- sim$pixelGroupC
   setkey(pixelGroupC, pixelGroup)
 
@@ -485,7 +552,9 @@ annual <- function(sim) {
     columns = setdiff(colnames(distPixelCpools),
                                c("pixelGroup", "pixelIndex"))
   )
-
+  ##TODO: Check why a bunch of extra columns are being created. remove
+  ##unnecessary cols from generatePixelGroups. Also this function changes the
+  ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
     "gcids", "ecozones", cPoolNames)
@@ -563,6 +632,8 @@ annual <- function(sim) {
   ## cbm_vars$parameters:
   ## Making cbm_vars$parameters the same length as the pixelGroupForAnnual (has
   ## new pixelGroups)
+  ## for now mean_annual_temperature is taken from the
+  ## spinupSQL table, and I am assuming that the id column is the spatial unit.
   ## We are currently only working in spu 28
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
@@ -584,12 +655,18 @@ annual <- function(sim) {
   ## Need to match the growth info by pixelGroups and gcids while tracking age.
   ## The above "growth_increments will come from CBM_vol2biomass
 
-  # Checking that the tables are in the same pixelGroup
+  #age in is cbm_vars$state but there is no pixelGroup in that table nor is
+  #there in $flux or $pools. Checking that the tables are in the same pixelGroup
   #order.
+  ##TODO Good place for some checks??
   which(cbm_vars$pools$Merch == pixelGroupForAnnual$Merch)
   # [1]  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
   # [40] 40 41
-  ## Our new pixelGroup (42) will
+  ## ASSUMPTION: the Merch matches so all tables are in the same sorting order
+  ## which is pixelGroup. cbm_vars$pools has one less record for the moment.
+
+  ##TODO not sure if this is how we will proceed once things are cleaned up,
+  ##but the new pixelGroup needs a growth curve. Our new pixelGroup (42) will
   ##for now inherit the growth curve from its previous pixelGroup (which was
   ##pixelGroup 6 as we can see in distPixels). gcids for pixelGroup 6 (in
   ##distPixel and sim$level3DT) is gcids 50
@@ -597,8 +674,10 @@ annual <- function(sim) {
     oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
     newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids')])
     ## these two above should have the same dim
+    ##TODO make this a check
     dim(oldGCpixelGroup) == dim(newGCpixelGroup)
     ## our current growth curves go from 0 - 250
+    ##TODO this will need to be more flexible. replace 250 by length of GC
 
     growth_incForDist <- data.table(
       row_idx = sort(rep(newGCpixelGroup$pixelGroup, 250)),
@@ -614,6 +693,16 @@ annual <- function(sim) {
     ## in the Python functions so we are keeping it.
     cbm_vars$parameters$row_idx <- 1:dim(cbm_vars$parameters)[1]
 
+    ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
+    ##sites, who's age was set to 0, were not being assigned the right growth. I
+    ##am setting it to age = 1, but this needs to be solved.
+    ##TODO Scott confirmed that resetting the ages happens internally in the Python
+    ##functions. First, check at the end of this annual (post Step function) if
+    ##this is correct for pixelGroup 42 (disturbed by fire dmid 371) - CORRECT.
+    ##Second, need to make sure we take that into account. This really means that
+    ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
+    ##we need it here is to make the match to the annual growth needed for the
+    ##libcbmr::cbm_exn_step function below.
     cbm_vars$parameters$age <- c(cbm_vars$state$age, 1)
     annual_increments <- merge(
       cbm_vars$parameters,
@@ -623,11 +712,28 @@ annual <- function(sim) {
 
     annual_increments <- as.data.table(annual_increments)
     names(annual_increments)
+    ##TODO this seems precarious...but it will be fixed once the growth info comes
+    ##from another module (either CBM_vol2biomass, or LandCBM).
     annual_increments[,names(annual_increments)[5:7] := NULL]
     annual_increments[, age := NULL]
     setkeyv(annual_increments, "row_idx")
+    ##NOTES: don't change the data.frames to data.tables. There seems to be a
+    ##problem for passing a data.table (as opposed to a data.frame with -
+    ##attr(*, "pandas.index")=RangeIndex(start=0, stop=41, step=1) to the Python
+    ##functions). In run_spatial_test.R, Scott remakes the data frames, taking
+    ##away the row names, and remaking the state$record_idx (lines 274) before
+    ##passing them back to cbm_vars. This needs to be confirmed.
+
+
+    ##TODO ##cbm_vars$parameters is already sorted by row_idx (which are
+    ##pixelGroups). Need a check for that if we have a lot of disturbed pixels.
+
+    ## replace the NaN with the increments for that pixelGroup and age and add the
+    ## new pixelGroup
   } else {
-    # ages needs to be updated with the ages in cbm_vars$state$age
+    # row_dix doesn't have to be added it is still there from the last annual
+    # event
+    #add age: ages needs to be update with the ages in cbm_vars$state$age
     cbm_vars$parameters$age <- cbm_vars$state$age
     #make annual_increments
     annual_increments <- merge(
@@ -637,6 +743,8 @@ annual <- function(sim) {
     )
     annual_increments <- as.data.table(annual_increments)
     names(annual_increments)
+    ##TODO this seems precarious...but it will be fixed once the growth info comes
+    ##from another module (either CBM_vol2biomass, or LandCBM).
     annual_increments[,names(annual_increments)[5:7] := NULL]
     annual_increments[, age := NULL]
     setkeyv(annual_increments, "row_idx")
@@ -668,7 +776,8 @@ annual <- function(sim) {
     # one here)
     cbm_vars$pools[nrow(cbm_vars$pools)+dim(newGCpixelGroup)[1],] <- NA
   }
-
+  # this line below do not change the - attr(*,
+  # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
   cbm_vars$pools[, 2:length(cbm_vars$pools)] <- pixelGroupForAnnual[, Merch: Products]
 
@@ -721,8 +830,13 @@ annual <- function(sim) {
   #### UPDATING ALL THE FINAL VECTORS FOR NEXT SIM YEAR ###################################
   #-----------------------------------
   # 1.
+  ##TODO this will have to change once we stream line the creation of
+  ##pixelGroupForAnnual earlier in this event.
+
   sim$pixelGroupC <- data.table(pixelGroupForAnnual[, !(Input:Products)], cbm_vars$pools)
 
+  ##CELINE NOTES Ages are update in cbm_vars$state internally in the
+  ##libcbmr::cbm_exn_step function
   # 2. increment ages
   sim$pixelGroupC$ages <- cbm_vars$state$age
 
@@ -735,6 +849,8 @@ annual <- function(sim) {
   sim$spatialDT <- agesUp
 
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
+  # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
+  # pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
   pooldef <- sim$pooldef
   updatePools <- data.table(
     simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
@@ -744,7 +860,7 @@ annual <- function(sim) {
     sim$pixelGroupC[, ..pooldef]
   )
 
-  sim$cbmPools <- updatePools
+  sim$cbmPools <- updatePools #rbind(sim$cbmPools, updatePools)
 
   ######## END OF UPDATING VECTORS FOR NEXT SIM YEAR #######################################
   #-----------------------------------
@@ -776,6 +892,8 @@ annual <- function(sim) {
   #Note: details of which source and sink pools goes into each of the columns in
   #cbm_vars$flux can be found here:
   #https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html
+  ##TODO double-check with Scott Morken that the cbm_vars$flux are in metric
+  ##tonnes of carbon per ha like the rest of the values produced.
   pools <- as.data.table(cbm_vars$pools)
   products <- pools[, c("Products")]
   products <- as.data.table(c(products))
@@ -791,12 +909,13 @@ annual <- function(sim) {
   emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
                                  DisturbanceBioCOEmission + DecayDOMCO2Emission +
                                  DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
-                                 DisturbanceDOMCOEmission))].
+                                 DisturbanceDOMCOEmission))]
+  ##TODO: this combined emissions column might not be needed.
 
   emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
   emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
   emissions[, `:=`(CO, (DisturbanceBioCOEmission + DisturbanceDOMCOEmission))]
-  emissions <- emissions[, c("CO2", "CH4", "CO","Emissions")]
+  emissions <- emissions[, c("CO2", "CH4", "CO","Emissions")] ##NOTE: CH4 and CO are 0 in 1999 and 2000
   emissions <- as.data.table(c(emissions))
 
   emissionsProducts <- cbind(emissions, products)
@@ -804,6 +923,10 @@ annual <- function(sim) {
           pixelCount[["N"]])
   emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
+
+  ##TODO Check if fluxes are per year Emissions should not define the
+  #pixelGroups, they should be re-zeros every year. Both these values are most
+  #commonly required on a yearly basis.
 
   ############# End of update emissions and products ------------------------------------
 
@@ -813,12 +936,23 @@ annual <- function(sim) {
 
 # creating a .inputObject for CBM_core so it can run independently
 
+##TODO add cache calls
+## give the data folder to Scott
+
+
 .inputObjects<- function(sim) {
 
   P(sim)$emissionsProductsCols <- c("CO2", "CH4", "CO", "Products")
   P(sim)$poolsToPlot <- "totalCarbon"
   P(sim)$.plotInitialTime <- 1990
   P(sim)$.plotInterval <- 1
+
+  ##TODO add qs to required packages
+  # library(qs)
+  # qsave(db, file.path(getwd(), "modules", "CBM_core", "data", "cbmData.qs"))
+
+  # # These could be supplied in the CBM_defaults module
+  # if we want this module to run alone (I don't think we do), we need $poodef
 
   # These could be supplied in the CBM_dataPrep_XXX modules
   # The below examples come from CBM_dataPrep_SK for the whole managed forests
@@ -1116,6 +1250,7 @@ annual <- function(sim) {
     # if (!suppliedElsewhere(sim$dbPath)) {
     #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
     # }
+    ##TODO these two will come from CBM_dataPrep_XX
     #sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
 
     # sim$spatialDT <- read.csv(file.path(dataPath(sim),
