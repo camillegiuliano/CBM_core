@@ -1,7 +1,3 @@
-# Everything in this file gets sourced during simInit, and all functions and objects
-# are put into the simList. To use objects, use sim$xxx, and are thus globally available
-# to all modules. Functions can be used without sim$ as they are namespaced, like functions
-# in R packages. If exact location is required, functions will be: sim$<moduleName>$FunctionName
 defineModule(sim, list(
   name = "CBM_core",
   description = "Modules that simulated the annual events as described in the CBM-CFS model", # "insert module description here",
@@ -307,7 +303,7 @@ spinup <- function(sim) {
   sim$gcid_is_sw_hw <- gcid_is_sw_hw
   level3DT <- sim$level3DT[gcid_is_sw_hw[,1:2], on = "gcids"]
   spinupSQL <- sim$spinupSQL
-  spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
+  spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as this example raster only has 1 new pixelGroup in 1998 an din 1999.
 
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
   level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
@@ -336,7 +332,6 @@ spinup <- function(sim) {
   ### the next section is an artifact of not perfect understanding of the data
   ##provided. Once growth_increments will come from CBM_vol2biomass, this will
   ##be easier.
-  ## Need to get rid of HW SW distinction
 
   ##Need to add pixelGroup to sim$growth_increments
   df2 <- merge(sim$growth_increments, level3DT[,.(pixelGroup, gcids)],
@@ -421,16 +416,11 @@ annual <- function(sim) {
   ###################################
   #
   # 1. Read-in the disturbances
-  # The example simulation (SK) has a raster stack covering 1984-2011 for an
+  # The example simulation has a raster stack covering 1984-2011 for an
   # area in SK. The raster stack like all inputs from user, is read in the
   # spadesCBM_dataPrep_SK module. However, one raster at a time is read in this annual
   # event, permitting the rasters to come for each annual event from another
   # source.
-
-  #TODO: disturbances for both SK and RIA were read-in for the whole simulation
-  #horizon in spadesCBMinputs. To permit "on-the-fly" disturbances, from other
-  #modules (such as yearly rasters), they need to be read in here. We need to build this
-  #in.
 
   # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
   # example. First add a column for disturbed pixels to the spatialDT
@@ -438,7 +428,6 @@ annual <- function(sim) {
   spatialDT <- sim$spatialDT
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
-## SK example has a character
   if (is(sim$disturbanceRasters, "character") ||
       is(sim$disturbanceRasters, "SpatRaster") ||
       is(sim$disturbanceRasters, "RasterStack")) {
@@ -476,7 +465,7 @@ annual <- function(sim) {
       pixelIndex, pixelGroup, ages, spatial_unit_id,
       gcids, ecozones, events
     )]
-  } else if (is(sim$disturbanceRasters, "data.table")) { # RIA project had a data.table
+  } else if (is(sim$disturbanceRasters, "data.table")) {
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
     setnames(annualDisturbance, names(annualDisturbance)[1], "pixelIndex", skip_absent = TRUE)
     set(annualDisturbance, NULL, "year", NULL)
@@ -503,9 +492,7 @@ annual <- function(sim) {
 
   # 4. Reset the ages for disturbed pixels in stand replacing disturbances.
   # libcbm resets ages to 0 internally but for transparency we are doing it here
-  # to (and it gives an opportunity for a check).
-  ## In SK example: not all disturbances are stand replacing. Disturbance matrix
-  ## 91 (events 3 and 5) are 20% mortality and does not need ages set to 0.
+  # to (and it gives an opportunity for a check)
 
   # mySpuDmids was created in CBM_dataPrep_XX
   mySpuDmids <- copy(sim$mySpuDmids)
@@ -523,11 +510,6 @@ annual <- function(sim) {
   # make a column of new pixelGroup that includes events and carbon from
   # previous pixel group since that changes the amount and destination of the
   # carbon being moved.
-  # NOTE: disturbances in the SK example are not all stand replacing, "events", which
-  # means type of disturbances, is not part of the factors in determining pixel
-  # groups. If we start representing partial disturbances or have different
-  # transitions resulting from specific disturbances, this will have to change.
-
   maxPixelGroup <- max(spatialDT$pixelGroup)
 
   # Get the carbon info from the pools in from previous year. The
@@ -638,7 +620,7 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
     disturbanceMatrix <- sim$disturbanceMatrix
-    cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as standAloneCore only has 1 new pixelGroup in 1998 an din 1999.
+    cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as this example only has 1 new pixelGroup in 1998 an din 1999.
                                                              historic_mean_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
@@ -655,7 +637,7 @@ annual <- function(sim) {
   ## Need to match the growth info by pixelGroups and gcids while tracking age.
   ## The above "growth_increments will come from CBM_vol2biomass
 
-  #age in is cbm_vars$state but there is no pixelGroup in that table nor is
+  #age is in cbm_vars$state but there is no pixelGroup in that table nor is
   #there in $flux or $pools. Checking that the tables are in the same pixelGroup
   #order.
   ##TODO Good place for some checks??
