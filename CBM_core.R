@@ -111,6 +111,10 @@ defineModule(sim, list(
       objectName = "spatialDT", objectClass = "data.table",
       desc = "the table containing one line per pixel"
     ),
+    expectsInput(
+      objectName = "speciesPixelGroup", objectClass = "data.table",
+      desc = "This table connects species codes to PixelGroups"
+    ),
     expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
   ),
   outputObjects = bindrows(
