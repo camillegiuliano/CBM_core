@@ -15,7 +15,7 @@ ReticulateFindPython <- function(version, versionInstall = version,
                                  pyenvRoot = tools::R_user_dir("r-CBM_core"), prompt = interactive()){
 
   # Get path to Python interpreter
-  pyExe <- .reticulate_python_exe_path(version, pyenvRoot = pyenvRoot)
+  pyExe <- reticulate_python_exe_path(version, pyenvRoot = pyenvRoot)
 
   # If found: return
   if (!is.null(pyExe)) return(pyExe)
@@ -23,7 +23,7 @@ ReticulateFindPython <- function(version, versionInstall = version,
   # If not found: install Python
   if (identical(tolower(Sys.info()[["sysname"]]), "windows")){
 
-    .reticulate_install_python_windows(versionInstall, pyenvRoot = pyenvRoot, prompt = prompt)
+    reticulate_install_python_windows(versionInstall, pyenvRoot = pyenvRoot, prompt = prompt)
 
   }else{
 
@@ -31,7 +31,7 @@ ReticulateFindPython <- function(version, versionInstall = version,
   }
 
   # Return path to interpreter
-  .reticulate_python_exe_path(version, pyenvRoot = pyenvRoot)
+  reticulate_python_exe_path(version, pyenvRoot = pyenvRoot)
 }
 
 # Get path to Python interpreter, including installs at a given pyenv-win location
@@ -41,7 +41,7 @@ ReticulateFindPython <- function(version, versionInstall = version,
 # @param pyenvRoot character. Path to directory containing pyenv-win tool
 #
 # @return character or NULL. IF found, a path to Python executable (.exe) file
-.reticulate_python_exe_path <- function(version = NULL, pyenvRoot = tools::R_user_dir("r-CBM_core")){
+reticulate_python_exe_path <- function(version = NULL, pyenvRoot = tools::R_user_dir("r-CBM_core")){
 
   # Get paths to Python interpreters in known locations
   pyPaths <- reticulate::virtualenv_starter(version = version, all = TRUE)
@@ -83,7 +83,7 @@ ReticulateFindPython <- function(version, versionInstall = version,
 # Download the pyenv-win Python version management tool from Github if necessary
 # See: https://github.com/pyenv-win/pyenv-win
 # @param version character. Python version string.
-.reticulate_install_python_windows <- function(version = NULL, prompt = interactive(),
+reticulate_install_python_windows <- function(version = NULL, prompt = interactive(),
                                                pyenvRoot = tools::R_user_dir("r-CBM_core")){
 
   # Check if Git is available on system
