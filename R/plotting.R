@@ -8,7 +8,7 @@ NPPplot <- function(spatialDT, NPP, masterRaster) {
   t <- spatialDT[, .(pixelIndex, pixelGroup)]
   setkey(t, pixelGroup)
   setkey(avgNPP, pixelGroup)
-  temp <- merge(t, avgNPP, on = "pixelGroup", allow.cartesian=TRUE)
+  temp <- merge(t, avgNPP, allow.cartesian=TRUE)
   setkey(temp, pixelIndex)
   plotMaster <- terra::rast(masterRaster)
   plotMaster[] <- 0
@@ -100,7 +100,7 @@ spatialPlot <- function(cbmPools, years, masterRaster, spatialDT) {
   t <- spatialDT[, .(pixelIndex, pixelGroup)]
   setkey(t, pixelGroup)
   setkey(totalCarbon, pixelGroup)
-  temp <- merge(t, totalCarbon, on = "pixelGroup", allow.cartesian=TRUE)
+  temp <- merge(t, totalCarbon, allow.cartesian=TRUE)
   setkey(temp, pixelIndex)
   plotM <- terra::rast(masterRaster)
   plotM[] <- 0
