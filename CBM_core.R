@@ -437,10 +437,12 @@ annual <- function(sim) {
       is(sim$disturbanceRasters, "RasterStack")) {
     if (is(sim$disturbanceRasters, "character") )
       annualDisturbance <- try(
-        prepInputs(destinationPath = ".",
-                   targetFile = grep(sim$disturbanceRasters, pattern = paste0(time(sim)[1], "[.]grd$"),
-                                     value = TRUE)
-                   , to = sim$masterRaster, method = "near"
+        prepInputs(url = sim$disturbanceRasters,
+                   destinationPath = inputPath(sim),
+                   targetFile = paste0("SaskDist_", time(sim)[1], ".grd"),
+                   fun = "terra::rast",
+                   to = sim$masterRaster,
+                   method = "near"
                   ))
     else {
       if (time(sim) %in% names(sim$disturbanceRasters))
