@@ -183,6 +183,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       ##So, I am making this one until we figure out how to do both more
       ##generically
       sim <- scheduleEvent(sim, end(sim), "CBM_core", "accumulateResults", eventPriority = 11)
+      sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot",  eventPriority = 12)
 
 
       #sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
@@ -225,14 +226,12 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
         ## TODO: for some reason the plot fails the first time, but not subsequently
         retry(quote({
           carbonOutPlot(
-            emissionsProducts = sim$emissionsProducts,
-            masterRaster = sim$masterRaster ## TODO: not used in this function
+            emissionsProducts = sim$emissionsProducts
           )
         }), retries = 2)
 
         barPlot(
-          cbmPools = sim$cbmPools,
-          masterRaster = sim$masterRaster ## TODO: not used in this function
+          cbmPools = sim$cbmPools
         )
 
         NPPplot(
@@ -243,11 +242,10 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       }
 
       spatialPlot(
-        pixelkeep = sim$pixelKeep,
         cbmPools = sim$cbmPools,
-        poolsToPlot = P(sim)$poolsToPlot,
         years = time(sim),
-        masterRaster = sim$masterRaster
+        masterRaster = sim$masterRaster,
+        spatialDT = sim$spatialDT
       )
 
       sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 12)
