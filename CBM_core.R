@@ -183,7 +183,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       ##So, I am making this one until we figure out how to do both more
       ##generically
       sim <- scheduleEvent(sim, end(sim), "CBM_core", "accumulateResults", eventPriority = 11)
-      sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot",  eventPriority = 12)
+      # sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot",  eventPriority = 12)
 
 
       #sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
