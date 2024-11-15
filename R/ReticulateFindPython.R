@@ -128,7 +128,7 @@ reticulate_install_python_windows <- function(version = NULL, prompt = interacti
 
       if (dlPyenv){
 
-        dir.create(pyenvRoot, showWarnings = FALSE)
+        dir.create(pyenvRoot, recursive = TRUE, showWarnings = FALSE)
         .download_unzip_url(
           "https://github.com/pyenv-win/pyenv-win/archive/master.zip",
           destdir = pyenvDir)
