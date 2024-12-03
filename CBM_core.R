@@ -30,133 +30,83 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     # expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = "cbmData", objectClass = "dataset", desc = NA, sourceURL = NA),
-    expectsInput(
-      objectName = "masterRaster", objectClass = "raster",
-      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"
-    ),
-
     expectsInput(
       objectName = "pooldef", objectClass = "character",
-      desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one", sourceURL = NA
-    ),
+      desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one",
+      sourceURL = NA),
     expectsInput(
-      objectName = "pools", objectClass = "matrix",
-      desc = "empty matrix for storage of spinupResult", sourceURL = NA
-    ),
+      objectName = "growth_increments", objectClass = "matrix",
+      desc = "Matrix of the 1/2 increment that will be used to create the `gcHash`", sourceURL = NA),
     expectsInput(
-      objectName = "ages", objectClass = "numeric",
-      desc = "Ages of the stands from the inventory in 1990 with ages <+1 replaces by 2", sourceURL = NA
-    ),
+      objectName = "level3DT", objectClass = "data.table",
+      desc = "the table linking the spu id, with the disturbance_matrix_id and the events.",
+      "The events are the possible raster values from the disturbance rasters of Wulder and White.",
+      sourceURL = NA),
     expectsInput(
-      objectName = "realAges", objectClass = "numeric",
-      desc = "Ages of the stands from the inventory in 1990", sourceURL = NA
-    ),
+      objectName = "spatialDT", objectClass = "data.table",
+      desc = "the table containing one line per pixel",
+      sourceURL = NA),
     expectsInput(
-      objectName = "gcids", objectClass = "numeric",
-      desc = "The identification of which growth curves to use on the specific stands provided by...", sourceURL = NA
-    ),
+      objectName = "spinupSQL", objectClass = "dataset",
+      desc = NA,
+      sourceURL = NA),
+    expectsInput(
+      objectName = "speciesPixelGroup", objectClass = "data.frame",
+      desc = "This table connects species codes to PixelGroups",
+      sourceURL = NA),
     expectsInput(
       objectName = "historicDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
-    ),
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup  event."),
     expectsInput(
       objectName = "lastPassDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
-    ),
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."),
     expectsInput(
-      objectName = "delays", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating regeneration delay post disturbance. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "minRotations", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating minimum number of rotations. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "maxRotations", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating maximum number of rotations. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "returnIntervals", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating the fixed fire return interval. Only Spinup.", sourceURL = NA
-    ),
+      objectName = "realAges", objectClass = "numeric",
+      desc = "Ages of the stands from the inventory in 1990",
+      sourceURL = NA),
     expectsInput(
       objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table",
       desc = paste0(
         "If a character vector, it should be the file paths of the disturbance rasters. ",
-      "If a SpatRaster, it must have multiple layers, one for each year, and it must have names ",
-      "by 4 digit year, e.g., 1998, 1999. If a data.table, it must have a column named 'year', with ",
-      "entries for each year of the simulation, e.g., 1998, 1999")
-    ),
+        "If a SpatRaster, it must have multiple layers, one for each year, and it must have names ",
+        "by 4 digit year, e.g., 1998, 1999. If a data.table, it must have a column named 'year', with ",
+        "entries for each year of the simulation, e.g., 1998, 1999")),
     expectsInput(
-      objectName = "mySpuDmids", objectClass = "data.frame",
-      desc = "Table matching user defined disturbance with disturbance type and matrix ids."
-    ),
+      objectName = "masterRaster", objectClass = "raster",
+      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"),
     expectsInput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
-    ),
-    expectsInput( ## URL RIA CORRECT CHECKED
-      objectName = "userDist", objectClass = "data.table",
-      desc = "User provided file that identifies disturbances for simulation (distName),
-      raster Id if applicable, and wholeStand toggle (1 = whole stand disturbance, 0 = partial disturbance),
-      if not there it will use userDistFile",
-      sourceURL = "https://docs.google.com/spreadsheets/d/1fOikb83aOuLlFYIn6pjmC7Jydjcy77TH/edit?usp=sharing&ouid=108246386320559871010&rtpof=true&sd=true"
-    ),
-    # expectsInput(objectName = "disturbanceEvents", objectClass = "matrix",
-    #              desc = "3 column matrix, PixelGroupID, Year (that sim year), and DisturbanceMatrixId. Not used in Spinup.", sourceURL = NA),
-    expectsInput(objectName = "dbPath", objectClass = "character", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(objectName = "level3DT", objectClass = "data.table", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(
-      objectName = "spatialDT", objectClass = "data.table",
-      desc = "the table containing one line per pixel"
-    ),
-    expectsInput(
-      objectName = "speciesPixelGroup", objectClass = "data.table",
-      desc = "This table connects species codes to PixelGroups"
-    ),
-    expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
+      objectName = "disturbanceMatrix", objectClass = "dataset",
+      desc = NA,
+      sourceURL = NA)
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
-    createsOutput(objectName = "spinupResult", objectClass = "data.frame", desc = NA),
-    createsOutput(
-      objectName = "allProcesses", objectClass = "list",
-      desc = "A list of the constant processes, anything NULL is just a placeholder for dynamic processes"
-    ),
-    createsOutput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
-    ),
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
-      desc = "Three parts: pixelGroup, Age, and Pools "
-    ),
-    # createsOutput(objectName = "disturbanceEvents", objectClass = "matrix",
-    #               desc = "3 column matrix, PixelGroupID, Year, and DisturbanceMatrixId. Not used in Spinup."),
+      desc = "Three parts: pixelGroup, Age, and Pools "),
+    createsOutput(
+      objectName = "gcid_is_sw_hw", objectClass = "data.table",
+      desc = NA),
+    createsOutput(
+      objectName = "spinup_input", objectClass = "data.table",
+      desc = NA),
+    createsOutput(
+      objectName = "spinupResult", objectClass = "data.frame", desc = NA),
+    createsOutput(
+      objectName = "cbm_vars", objectClass = "list",
+      desc = NA),
+    createsOutput(
+      objectName = "pixelGroupC", objectClass = "data.table",
+      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"),
+    createsOutput(
+      objectName = "NPP", objectClass = "data.table",
+      desc = "NPP for each `pixelGroup`"),
+    createsOutput(
+      objectName = "emissionsProducts", objectClass = "data.table",
+      desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
     createsOutput(
       objectName = "pixelKeep", objectClass = "data.table",
       desc = paste("Keeps the pixelIndex from spatialDT with each year's `PixelGroupID` as a column.",
-                   "This is to enable making maps of yearly output.")
-    ),
-    # createsOutput(objectName = "yearEvents", objectClass = "data.frame", desc = NA),
-    createsOutput(objectName = "pools", objectClass = "matrix", desc = NA), ## TODO
-    createsOutput(objectName = "ages", objectClass = "numeric",
-                  desc = "Ages of the stands after simulation"),
-    createsOutput(objectName = "NPP", objectClass = "data.table",
-                  desc = "NPP for each `pixelGroup`"),
-    createsOutput(objectName = "emissionsProducts", objectClass = "data.table",
-                  desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
-    createsOutput(objectName = "spatialDT", objectClass = "data.table",
-                  desc = "this is modified to associate the right pixel group to the pixel id after disturbances"),
-    createsOutput(objectName = "gcids", objectClass = "vector",
-                  desc = "growth component id associated with each `pixelGroup`"),
-    createsOutput(objectName = "spatialUnits", objectClass = "vector",
-                  desc = "spatial unit for each `pixelGroup`"),
-    createsOutput(objectName = "ecozones", objectClass = "vector",
-                  desc = "ecozone for each `pixelGroup`"),
-    createsOutput(objectName = "turnoverRates", objectClass = "data.table",
-                  desc = "table with turnover rates for SPUs")
+                   "This is to enable making maps of yearly output."))
   )
 ))
 
