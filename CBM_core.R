@@ -667,8 +667,10 @@ annual <- function(sim) {
     ## replace the NaN with the increments for that pixelGroup and age and add the
     ## new pixelGroup
   } else {
-    # row_dix doesn't have to be added it is still there from the last annual
-    # event
+    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
+    ## in the Python functions so we are keeping it.
+    cbm_vars$parameters$row_idx <- 1:dim(cbm_vars$parameters)[1]
+
     #add age: ages needs to be update with the ages in cbm_vars$state$age
     cbm_vars$parameters$age <- cbm_vars$state$age
     #make annual_increments
