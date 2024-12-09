@@ -639,7 +639,7 @@ annual <- function(sim) {
     ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
     ##we need it here is to make the match to the annual growth needed for the
     ##libcbmr::cbm_exn_step function below.
-    cbm_vars$parameters$age <- c(cbm_vars$state$age, 1)
+    cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
     annual_increments <- merge(
       cbm_vars$parameters,
       growth_increments,
