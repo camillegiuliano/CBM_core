@@ -627,7 +627,11 @@ annual <- function(sim) {
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
     ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
     ## in the Python functions so we are keeping it.
-    cbm_vars$parameters$row_idx <- sim$level3DT$pixelGroup
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
+    } else {
+      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
+    }
 
     ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
     ##sites, who's age was set to 0, were not being assigned the right growth. I
@@ -669,7 +673,11 @@ annual <- function(sim) {
   } else {
     ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
     ## in the Python functions so we are keeping it.
-    cbm_vars$parameters$row_idx <- sim$level3DT$pixelGroup
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- sim$level3DT$pixelGroup
+    } else {
+      cbm_vars$parameters$row_idx <- cbm_vars$parameters$row_idx
+    }
 
     #add age: ages needs to be update with the ages in cbm_vars$state$age
     cbm_vars$parameters$age <- cbm_vars$state$age
