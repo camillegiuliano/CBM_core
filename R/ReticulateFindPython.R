@@ -12,7 +12,7 @@
 #
 # @return character. Path to Python executable (.exe) file
 ReticulateFindPython <- function(version, versionInstall = version,
-                                 pyenvRoot = tools::R_user_dir("r-CBM_core"), prompt = interactive()){
+                                 pyenvRoot = tools::R_user_dir("r-CBM_core"), prompt = FALSE){
 
   # Get path to Python interpreter
   pyExe <- reticulate_python_exe_path(version, pyenvRoot = pyenvRoot)
@@ -129,7 +129,7 @@ reticulate_install_python_windows <- function(version = NULL, prompt = interacti
       if (dlPyenv){
 
         dir.create(pyenvRoot, recursive = TRUE, showWarnings = FALSE)
-        .download_unzip_url(
+        download_unzip_url(
           "https://github.com/pyenv-win/pyenv-win/archive/master.zip",
           destdir = pyenvDir)
       }
@@ -170,7 +170,7 @@ reticulate_install_python_windows <- function(version = NULL, prompt = interacti
 }
 
 # Download and unzip URL
-.download_unzip_url <- function(url, destdir, overwrite = FALSE){
+download_unzip_url <- function(url, destdir, overwrite = FALSE){
 
   if (file.exists(destdir) & overwrite){
     unlink(destdir, recursive = TRUE)
