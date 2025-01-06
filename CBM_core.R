@@ -323,7 +323,7 @@ spinup <- function(sim) {
 
 ##TODO Comparison of spinup results with other CBM runs needs to be completed.
 ##Scott has it on his list
-  sim$spinupResults <- cbm_vars$pools
+  sim$spinupResult <- cbm_vars$pools
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
 }
