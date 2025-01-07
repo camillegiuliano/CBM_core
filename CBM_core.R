@@ -17,6 +17,11 @@ defineModule(sim, list(
     "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
   parameters = rbind(
+    defineParameter(
+      "regenDelay", "numeric", default = 0, min = 0, max = NA, desc = paste(
+        "The default regeneration delay post disturbance.",
+        "Delays can also be set for each pixel group by including a 'regenDelay' column in the level3DT input object."
+      )),
     defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
                     "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
     defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
@@ -39,8 +44,15 @@ defineModule(sim, list(
       desc = "Matrix of the 1/2 increment that will be used to create the `gcHash`", sourceURL = NA),
     expectsInput(
       objectName = "level3DT", objectClass = "data.table",
-      desc = "the table linking the spu id, with the disturbance_matrix_id and the events.",
-      "The events are the possible raster values from the disturbance rasters of Wulder and White.",
+      desc = paste(
+        "the table linking the spu id, with the disturbance_matrix_id and the events.",
+        "The events are the possible raster values from the disturbance rasters of Wulder and White.",
+        "Columns:", paste(c(
+          # TODO: define all columns
+          paste("regenDelay: numeric (Optional). The regeneration delay post disturbance.",
+                "Defaults to the value of the 'regenDelay' parameter",
+                "if the column does not exist or where the column contains NAs.")
+        ), collapse = "; ")),
       sourceURL = NA),
     expectsInput(
       objectName = "spatialDT", objectClass = "data.table",
@@ -260,6 +272,14 @@ spinup <- function(sim) {
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
   level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
 
+  # Set post disturbance regeneration delays
+  if ("regenDelay" %in% names(level3DT)){
+    if (any(is.na(level3DT$regenDelay))){
+      level3DT$regenDelay[is.na(level3DT$regenDelay)] <- P(sim)$regenDelay
+    }
+  }else{
+    level3DT$regenDelay <- P(sim)$regenDelay
+  }
 
   spinup_parameters <- data.table(
     pixelGroup = level3DT$pixelGroup,
@@ -270,7 +290,7 @@ spinup <- function(sim) {
     ##the tonnesC/ha, tonnesC/yr/ha values by the area is the CBM3 method for
     ##extracting the mass, mass/year values.
     area = 1.0,
-    delay = sim$delays, ##user defined so CBM_dataPrep_SK
+    delay = level3DT$regenDelay,
     return_interval = level3DT$return_interval,
     min_rotations = level3DT$min_rotations,
     max_rotations = level3DT$max_rotations,
@@ -1153,7 +1173,6 @@ annual <- function(sim) {
     # sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
     # sim$lastPassDMIDS <- sim$historicDMIDs
     #
-    # sim$delays <- rep(0, 739)
     # sim$minRotations <- rep(10, 739)
     # sim$maxRotations <- rep(30, 739)
     #
