@@ -647,7 +647,7 @@ annual <- function(sim) {
     ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
     ##we need it here is to make the match to the annual growth needed for the
     ##libcbmr::cbm_exn_step function below.
-    cbm_vars$parameters$age <- c(sim$level3DT$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
     ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
     ## when creating annual_increments.
     cbm_vars$parameters$age <- replace(cbm_vars$parameters$age, cbm_vars$parameters$age == 0 , 1)
