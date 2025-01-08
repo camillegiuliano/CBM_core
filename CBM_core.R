@@ -335,7 +335,7 @@ postSpinup <- function(sim) {
 
   ##TODO: confirm if this is still the case where CBM_vol2biomass won't
   ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
-  sim$level3DT$ages <- sim$realAges
+  # sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event (same order)
   setorderv(sim$level3DT, "pixelGroup")
 
@@ -488,12 +488,14 @@ annual <- function(sim) {
     columns = setdiff(colnames(distPixelCpools),
                                c("pixelGroup", "pixelIndex"))
   )
+  distPixelOld <- cPoolsOnly[distPixels, on = c("pixelGroup")]
+  distPixelCpools$oldGroup <- distPixelOld$pixelGroup
   ##TODO: Check why a bunch of extra columns are being created. remove
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
-    "gcids", "ecozones", cPoolNames)
+    "gcids", "ecozones", "oldGroup", cPoolNames)
   ]
 
   cols <- c("pixelGroup", "newGroup")
@@ -524,7 +526,8 @@ annual <- function(sim) {
   # add c pools and event column for old groups
   part1 <- merge(metaDT, cPoolsOnly)
   # add c pools and event column from the new groups
-  distGroupCpools <- unique(distPixelCpools[, -("pixelIndex")])
+  distGroupCpoolsOld <- unique(distPixelCpools[, c("pixelIndex"):=NULL])
+  distGroupCpools <- unique(distGroupCpoolsOld[, c("oldGroup"):=NULL])
   setkey(distGroupCpools, pixelGroup)
   cols <- c(
     "pixelGroup", "ages", "spatial_unit_id", "gcids", "ecozones", "events"
@@ -608,7 +611,8 @@ annual <- function(sim) {
   ##distPixel and sim$level3DT) is gcids 50
   if (dim(distPixels)[1] > 0) {
     oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
-    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids')])
+    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
+    newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
     ## these two above should have the same dim
     ##TODO make this a check
     dim(oldGCpixelGroup) == dim(newGCpixelGroup)
@@ -618,10 +622,10 @@ annual <- function(sim) {
     growth_incForDist <- data.table(
       row_idx = sort(rep(newGCpixelGroup$pixelGroup, 250)),
       age = rep(1:250, dim(newGCpixelGroup)[1]),
-      merch_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, merch_inc],
-      foliage_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, foliage_inc],
-      other_inc =  sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, other_inc],
-      gcids = factor(oldGCpixelGroup$gcids, levels(sim$level3DT$gcids))
+      merch_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), merch_inc],
+      foliage_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), foliage_inc],
+      other_inc =  sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), other_inc],
+      gcids = factor(newGCpixelGroup$gcids, levels(sim$level3DT$gcids))
     )
 
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
