@@ -647,7 +647,10 @@ annual <- function(sim) {
     ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
     ##we need it here is to make the match to the annual growth needed for the
     ##libcbmr::cbm_exn_step function below.
-    cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    cbm_vars$parameters$age <- c(sim$level3DT$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
+    ## when creating annual_increments.
+    cbm_vars$parameters$age <- replace(cbm_vars$parameters$age, cbm_vars$parameters$age == 0 , 1)
     annual_increments <- merge(
       cbm_vars$parameters,
       growth_increments,
@@ -731,7 +734,6 @@ annual <- function(sim) {
   cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
   cbm_vars$pools[, 2:length(cbm_vars$pools)] <- pixelGroupForAnnual[, Merch: Products]
 
-
   ###################### Working on cbm_vars$flux
   ######################################################
   # we are ASSUMING that these are sorted by pixelGroup like all other tables in
@@ -740,18 +742,20 @@ annual <- function(sim) {
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   if (dim(distPixels)[1] > 0) {
-      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[oldGCpixelGroup$pixelGroup,])
+      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[newGCpixelGroup$oldGroup,])
   }
 
   ###################### Working on cbm_vars$state
   ######################################################
   # we are ASSUMING that these are sorted by pixelGroup like all other tables in
   # cbm_vars
+  # NOTE JAN 2025: THIS IS NOT THE CASE I don't know if this is also true for
+  # cbm_vars$flux, but $state is not in pixelGroup order. I do not know what order it is in.
   # just need to add a row
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   if (dim(distPixels)[1] > 0) {
-    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[oldGCpixelGroup$pixelGroup,])
+    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[newGCpixelGroup$oldGroup,])
   }
   ## setting up the operations order in Python
   ## ASSUMING that the order is the same as we had it before c(
