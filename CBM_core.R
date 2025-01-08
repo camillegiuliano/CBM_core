@@ -335,7 +335,7 @@ postSpinup <- function(sim) {
 
   ##TODO: confirm if this is still the case where CBM_vol2biomass won't
   ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
-  # sim$level3DT$ages <- sim$realAges
+  sim$level3DT$ages <- sim$realAges
   # prepping the pixelGroups for processing in the annual event (same order)
   setorderv(sim$level3DT, "pixelGroup")
 
