@@ -62,7 +62,7 @@ defineModule(sim, list(
       desc = "Ages of the stands from the inventory in 1990",
       sourceURL = NA),
     expectsInput(
-      objectName = "mySpuDmids", objectClass = "data.table", sourceURL = NA,
+      objectName = "mySpuDmids", objectClass = "data.table",
       desc = "Table summarizing the types of disturbances possible within each spatial unit.",
       columns = c(
         rasterID              = "ID links to pixel values in the disturbance rasters",
@@ -74,7 +74,7 @@ defineModule(sim, list(
         description           = "Disturbance description"
       )),
     expectsInput(
-      objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table", sourceURL = NA,
+      objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table",
       desc = paste(
         "A disturbance raster must be available for every simulation year.",
         "Pixel values must be link to 'rasterID' values in the input 'mySpuDmids' table.",
@@ -88,13 +88,13 @@ defineModule(sim, list(
         "2. A data.table with the first column containing pixel values and another named 'year'."
       )),
     expectsInput(
-      objectName = "historicDMtype", objectClass = "numeric", sourceURL = NA,
+      objectName = "historicDMtype", objectClass = "numeric",
       desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup  event."),
     expectsInput(
-      objectName = "lastPassDMtype", objectClass = "numeric", sourceURL = NA,
+      objectName = "lastPassDMtype", objectClass = "numeric",
       desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."),
     expectsInput(
-      objectName = "disturbanceMatrix", objectClass = "dataset", sourceURL = NA,
+      objectName = "disturbanceMatrix", objectClass = "dataset",
       desc = NA)
   ),
   outputObjects = bindrows(
