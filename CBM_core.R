@@ -259,7 +259,7 @@ spinup <- function(sim) {
 
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
   level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
-
+  level3DT <- setkey(level3DT, "pixelGroup")
 
   spinup_parameters <- data.table(
     pixelGroup = level3DT$pixelGroup,
