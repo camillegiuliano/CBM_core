@@ -577,8 +577,21 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
     disturbanceMatrix <- sim$disturbanceMatrix
-    cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as this example only has 1 new pixelGroup in 1998 an din 1999.
-                                                             historic_mean_temperature]
+    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
+    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
+    newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
+
+    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
+    ## in the Python functions so we are keeping it.
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
+    } else {
+      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
+    }
+
+    cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[row_idx %in% pixelCount$pixelGroup]
+    spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
+    cbm_vars$parameters <- cbm_vars$parameters[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
   if (dim(distPixels)[1] > 0) {
@@ -610,9 +623,6 @@ annual <- function(sim) {
   ##pixelGroup 6 as we can see in distPixels). gcids for pixelGroup 6 (in
   ##distPixel and sim$level3DT) is gcids 50
   if (dim(distPixels)[1] > 0) {
-    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
-    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
-    newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
     ## these two above should have the same dim
     ##TODO make this a check
     dim(oldGCpixelGroup) == dim(newGCpixelGroup)
@@ -629,13 +639,6 @@ annual <- function(sim) {
     )
 
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
-    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
-    ## in the Python functions so we are keeping it.
-    if (is.null(cbm_vars$parameters$row_idx)) {
-      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
-    } else {
-      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
-    }
 
     ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
     ##sites, who's age was set to 0, were not being assigned the right growth. I
@@ -647,7 +650,12 @@ annual <- function(sim) {
     ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
     ##we need it here is to make the match to the annual growth needed for the
     ##libcbmr::cbm_exn_step function below.
-    cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    if (is.null(cbm_vars$parameters$age)) {
+      cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    } else {
+      cbm_vars$parameters <- cbm_vars$parameters[, lapply(.SD, function(age) ifelse(is.na(age), 1, age))]
+    }
+
     ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
     ## when creating annual_increments.
     cbm_vars$parameters$age <- replace(cbm_vars$parameters$age, cbm_vars$parameters$age == 0 , 1)
