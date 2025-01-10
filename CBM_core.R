@@ -748,7 +748,7 @@ annual <- function(sim) {
   cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
   cbm_vars$pools[which(is.na(cbm_vars$pools$Merch)), 2:(length(cbm_vars$pools)-1)] <- part2[, Merch:Products]
   }
-
+cbm_vars$pools <- as.data.table(cbm_vars$pools)
 cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGroup),]
 
   ###################### Working on cbm_vars$flux
@@ -758,8 +758,8 @@ cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGr
   # just need to add a row
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
+cbm_vars$flux <- as.data.table(cbm_vars$flux)
   if (dim(distPixels)[1] > 0) {
-    cbm_vars$flux <- as.data.table(cbm_vars$flux)
       cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[newGCpixelGroup$oldGroup,])
       if (is.null(cbm_vars$flux$row_idx)) {
         cbm_vars$flux$row_idx <- 1:nrow(cbm_vars$flux)
@@ -778,8 +778,8 @@ cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGr
   # just need to add a row
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
+cbm_vars$state <- as.data.table(cbm_vars$state)
   if (dim(distPixels)[1] > 0) {
-    cbm_vars$state <- as.data.table(cbm_vars$state)
     cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[newGCpixelGroup$oldGroup,])
     if (is.null(cbm_vars$state$row_idx)) {
       cbm_vars$state$row_idx <- 1:nrow(cbm_vars$state)
@@ -794,7 +794,7 @@ cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGr
   ##"bioturnover", "overmature", "growth 2",
   ##"domDecay", "slow decay", "slow mixing"
   ##)
-
+browser()
   ############## Running Python functions for annual
   #####################################################################
   #remove the extra row_idx columns
