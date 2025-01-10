@@ -736,11 +736,12 @@ annual <- function(sim) {
     # if there are disturbed pixels, adding lines for the new pixelGroups (just
     # one here)
     cbm_vars$pools[nrow(cbm_vars$pools)+dim(newGCpixelGroup)[1],] <- NA
-  }
+
   # this line below do not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
-  cbm_vars$pools[, 2:length(cbm_vars$pools)] <- pixelGroupForAnnual[, Merch: Products]
+  cbm_vars$pools[which(is.na(cbm_vars$pools$Merch)), 2:length(cbm_vars$pools)] <- part2[, Merch:Products]
+  }
 
   ###################### Working on cbm_vars$flux
   ######################################################
