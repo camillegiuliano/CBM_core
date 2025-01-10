@@ -735,13 +735,21 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     # if there are disturbed pixels, adding lines for the new pixelGroups (just
     # one here)
-    cbm_vars$pools[nrow(cbm_vars$pools)+dim(newGCpixelGroup)[1],] <- NA
-
+  cbm_vars$pools[nrow(cbm_vars$pools) + dim(newGCpixelGroup)[1],] <- NA
+  cbm_vars$pools <- as.data.table(cbm_vars$pools)
   # this line below do not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
-  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
-  cbm_vars$pools[which(is.na(cbm_vars$pools$Merch)), 2:length(cbm_vars$pools)] <- part2[, Merch:Products]
+  if (is.null(cbm_vars$pools$row_idx)) {
+    cbm_vars$pools$row_idx <- 1:nrow(cbm_vars$pools)
+  } else {
+    cbm_vars$pools[is.na(cbm_vars$pools$row_idx), "row_idx" := part2[, pixelGroup]]
   }
+
+  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
+  cbm_vars$pools[which(is.na(cbm_vars$pools$Merch)), 2:(length(cbm_vars$pools)-1)] <- part2[, Merch:Products]
+  }
+
+cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGroup),]
 
   ###################### Working on cbm_vars$flux
   ######################################################
@@ -751,7 +759,14 @@ annual <- function(sim) {
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   if (dim(distPixels)[1] > 0) {
+    cbm_vars$flux <- as.data.table(cbm_vars$flux)
       cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[newGCpixelGroup$oldGroup,])
+      if (is.null(cbm_vars$flux$row_idx)) {
+        cbm_vars$flux$row_idx <- 1:nrow(cbm_vars$flux)
+      } else {
+        cbm_vars$flux[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
+      }
+      cbm_vars$flux <- cbm_vars$flux[(cbm_vars$flux$row_idx %in% pixelCount$pixelGroup),]
   }
 
   ###################### Working on cbm_vars$state
@@ -764,7 +779,14 @@ annual <- function(sim) {
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   if (dim(distPixels)[1] > 0) {
+    cbm_vars$state <- as.data.table(cbm_vars$state)
     cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[newGCpixelGroup$oldGroup,])
+    if (is.null(cbm_vars$state$row_idx)) {
+      cbm_vars$state$row_idx <- 1:nrow(cbm_vars$state)
+    } else {
+      cbm_vars$state[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
+    }
+    cbm_vars$state <- cbm_vars$state[(cbm_vars$state$row_idx %in% pixelCount$pixelGroup),]
   }
   ## setting up the operations order in Python
   ## ASSUMING that the order is the same as we had it before c(
@@ -773,9 +795,14 @@ annual <- function(sim) {
   ##"domDecay", "slow decay", "slow mixing"
   ##)
 
-
   ############## Running Python functions for annual
   #####################################################################
+  #remove the extra row_idx columns
+  row_idx <- cbm_vars$pools$row_idx
+  cbm_vars$pools[, row_idx := NULL]
+  cbm_vars$flux[, row_idx := NULL]
+  cbm_vars$state[, row_idx := NULL]
+
   step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, mod$libcbm_default_model_config)
 
   cbm_vars <- libcbmr::cbm_exn_step(
@@ -785,6 +812,11 @@ annual <- function(sim) {
     libcbmr::cbm_exn_get_step_ops_sequence(),
     mod$libcbm_default_model_config
   )
+
+  #add the extra row_idx columns back in
+  cbm_vars$pools$row_idx <- row_idx
+  cbm_vars$flux$row_idx <- row_idx
+  cbm_vars$state$row_idx <- row_idx
 
   sim$cbm_vars <- cbm_vars
 
