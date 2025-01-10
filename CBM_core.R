@@ -259,6 +259,14 @@ spinup <- function(sim) {
 
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
   level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
+  # Set post disturbance regeneration delays
+  if ("regenDelay" %in% names(level3DT)){
+    if (any(is.na(level3DT$regenDelay))){
+      level3DT$regenDelay[is.na(level3DT$regenDelay)] <- P(sim)$regenDelay
+    }
+  }else{
+    level3DT$regenDelay <- P(sim)$regenDelay
+  }
   level3DT <- setkey(level3DT, "pixelGroup")
 
   spinup_parameters <- data.table(
