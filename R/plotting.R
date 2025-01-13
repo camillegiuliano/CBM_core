@@ -11,7 +11,7 @@ NPPplot <- function(spatialDT, NPP, masterRaster) {
   temp <- merge(t, avgNPP, allow.cartesian=TRUE)
   setkey(temp, pixelIndex)
   plotMaster <- terra::rast(masterRaster)
-  plotMaster[] <- 0
+  # plotMaster[] <- 0
   plotMaster[temp$pixelIndex] <- temp$avgNPP
   pixSize <- prod(res(masterRaster))/10000
   temp[, `:=`(pixNPP, avgNPP * pixSize)]

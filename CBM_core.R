@@ -299,6 +299,8 @@ spinup <- function(sim) {
     level3DT$regenDelay <- P(sim)$regenDelay
   }
 
+  level3DT <- setkey(level3DT, "pixelGroup")
+
   spinup_parameters <- data.table(
     pixelGroup = level3DT$pixelGroup,
     age = level3DT$ages,
@@ -510,12 +512,14 @@ annual <- function(sim) {
     columns = setdiff(colnames(distPixelCpools),
                                c("pixelGroup", "pixelIndex"))
   )
+  distPixelOld <- cPoolsOnly[distPixels, on = c("pixelGroup")]
+  distPixelCpools$oldGroup <- distPixelOld$pixelGroup
   ##TODO: Check why a bunch of extra columns are being created. remove
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
-    "gcids", "ecozones", cPoolNames)
+    "gcids", "ecozones", "oldGroup", cPoolNames)
   ]
 
   cols <- c("pixelGroup", "newGroup")
@@ -546,7 +550,8 @@ annual <- function(sim) {
   # add c pools and event column for old groups
   part1 <- merge(metaDT, cPoolsOnly)
   # add c pools and event column from the new groups
-  distGroupCpools <- unique(distPixelCpools[, -("pixelIndex")])
+  distGroupCpoolsOld <- unique(distPixelCpools[, c("pixelIndex"):=NULL])
+  distGroupCpools <- unique(distGroupCpoolsOld[, c("oldGroup"):=NULL])
   setkey(distGroupCpools, pixelGroup)
   cols <- c(
     "pixelGroup", "ages", "spatial_unit_id", "gcids", "ecozones", "events"
@@ -596,8 +601,21 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
     disturbanceMatrix <- sim$disturbanceMatrix
-    cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as this example only has 1 new pixelGroup in 1998 an din 1999.
-                                                             historic_mean_temperature]
+    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
+    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
+    newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
+
+    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
+    ## in the Python functions so we are keeping it.
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
+    } else {
+      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
+    }
+
+    cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[row_idx %in% pixelCount$pixelGroup]
+    spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
+    cbm_vars$parameters <- cbm_vars$parameters[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
   if (dim(distPixels)[1] > 0) {
@@ -629,8 +647,6 @@ annual <- function(sim) {
   ##pixelGroup 6 as we can see in distPixels). gcids for pixelGroup 6 (in
   ##distPixel and sim$level3DT) is gcids 50
   if (dim(distPixels)[1] > 0) {
-    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
-    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids')])
     ## these two above should have the same dim
     ##TODO make this a check
     dim(oldGCpixelGroup) == dim(newGCpixelGroup)
@@ -640,20 +656,13 @@ annual <- function(sim) {
     growth_incForDist <- data.table(
       row_idx = sort(rep(newGCpixelGroup$pixelGroup, 250)),
       age = rep(1:250, dim(newGCpixelGroup)[1]),
-      merch_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, merch_inc],
-      foliage_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, foliage_inc],
-      other_inc =  sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, other_inc],
-      gcids = factor(oldGCpixelGroup$gcids, levels(sim$level3DT$gcids))
+      merch_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), merch_inc],
+      foliage_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), foliage_inc],
+      other_inc =  sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), other_inc],
+      gcids = factor(newGCpixelGroup$gcids, levels(sim$level3DT$gcids))
     )
 
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
-    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
-    ## in the Python functions so we are keeping it.
-    if (is.null(cbm_vars$parameters$row_idx)) {
-      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
-    } else {
-      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
-    }
 
     ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
     ##sites, who's age was set to 0, were not being assigned the right growth. I
@@ -665,7 +674,15 @@ annual <- function(sim) {
     ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
     ##we need it here is to make the match to the annual growth needed for the
     ##libcbmr::cbm_exn_step function below.
-    cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    if (is.null(cbm_vars$parameters$age)) {
+      cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    } else {
+      cbm_vars$parameters <- cbm_vars$parameters[, lapply(.SD, function(age) ifelse(is.na(age), 1, age))]
+    }
+
+    ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
+    ## when creating annual_increments.
+    cbm_vars$parameters$age <- replace(cbm_vars$parameters$age, cbm_vars$parameters$age == 0 , 1)
     annual_increments <- merge(
       cbm_vars$parameters,
       growth_increments,
@@ -742,13 +759,26 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     # if there are disturbed pixels, adding lines for the new pixelGroups (just
     # one here)
-    cbm_vars$pools[nrow(cbm_vars$pools)+dim(newGCpixelGroup)[1],] <- NA
-  }
+  cbm_vars$pools[nrow(cbm_vars$pools) + dim(newGCpixelGroup)[1],] <- NA
+  cbm_vars$pools <- as.data.table(cbm_vars$pools)
   # this line below do not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
-  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
-  cbm_vars$pools[, 2:length(cbm_vars$pools)] <- pixelGroupForAnnual[, Merch: Products]
+  if (is.null(cbm_vars$pools$row_idx)) {
+    cbm_vars$pools$row_idx <- 1:nrow(cbm_vars$pools)
+  } else {
+    cbm_vars$pools[is.na(cbm_vars$pools$row_idx), "row_idx" := part2[, pixelGroup]]
+  }
 
+  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
+  cbm_vars$pools[which(is.na(cbm_vars$pools$Merch)), 2:(length(cbm_vars$pools)-1)] <- part2[, Merch:Products]
+  } else {
+    cbm_vars$pools <- as.data.table(cbm_vars$pools)
+    if (is.null(cbm_vars$pools$row_idx)) {
+      cbm_vars$pools$row_idx <- 1:nrow(cbm_vars$pools)
+    }
+  }
+
+cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGroup),]
 
   ###################### Working on cbm_vars$flux
   ######################################################
@@ -757,19 +787,35 @@ annual <- function(sim) {
   # just need to add a row
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
+cbm_vars$flux <- as.data.table(cbm_vars$flux)
   if (dim(distPixels)[1] > 0) {
-      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[oldGCpixelGroup$pixelGroup,])
+      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[newGCpixelGroup$oldGroup,])
+      if (is.null(cbm_vars$flux$row_idx)) {
+        cbm_vars$flux$row_idx <- 1:nrow(cbm_vars$flux)
+      } else {
+        cbm_vars$flux[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
+      }
+      cbm_vars$flux <- cbm_vars$flux[(cbm_vars$flux$row_idx %in% pixelCount$pixelGroup),]
   }
 
   ###################### Working on cbm_vars$state
   ######################################################
   # we are ASSUMING that these are sorted by pixelGroup like all other tables in
   # cbm_vars
+  # NOTE JAN 2025: THIS IS NOT THE CASE I don't know if this is also true for
+  # cbm_vars$flux, but $state is not in pixelGroup order. I do not know what order it is in.
   # just need to add a row
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
+cbm_vars$state <- as.data.table(cbm_vars$state)
   if (dim(distPixels)[1] > 0) {
-    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[oldGCpixelGroup$pixelGroup,])
+    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[newGCpixelGroup$oldGroup,])
+    if (is.null(cbm_vars$state$row_idx)) {
+      cbm_vars$state$row_idx <- 1:nrow(cbm_vars$state)
+    } else {
+      cbm_vars$state[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
+    }
+    cbm_vars$state <- cbm_vars$state[(cbm_vars$state$row_idx %in% pixelCount$pixelGroup),]
   }
   ## setting up the operations order in Python
   ## ASSUMING that the order is the same as we had it before c(
@@ -778,9 +824,14 @@ annual <- function(sim) {
   ##"domDecay", "slow decay", "slow mixing"
   ##)
 
-
   ############## Running Python functions for annual
   #####################################################################
+  #remove the extra row_idx columns
+  row_idx <- cbm_vars$pools$row_idx
+  cbm_vars$pools[, row_idx := NULL]
+  cbm_vars$flux[, row_idx := NULL]
+  cbm_vars$state[, row_idx := NULL]
+
   step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, mod$libcbm_default_model_config)
 
   cbm_vars <- libcbmr::cbm_exn_step(
@@ -790,6 +841,11 @@ annual <- function(sim) {
     libcbmr::cbm_exn_get_step_ops_sequence(),
     mod$libcbm_default_model_config
   )
+
+  #add the extra row_idx columns back in
+  cbm_vars$pools$row_idx <- row_idx
+  cbm_vars$flux$row_idx <- row_idx
+  cbm_vars$state$row_idx <- row_idx
 
   sim$cbm_vars <- cbm_vars
 
