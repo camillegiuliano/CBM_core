@@ -984,26 +984,26 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   # if (!suppliedElsewhere("ages", sim))  {
   #   sim$PoolCount <- length(sim$pooldef)
   #   sim$pools <- matrix(ncol = sim$PoolCount, nrow = 739, data = 0)
-  #   sim$SKages
+  #   sim$ages <- SKages
   #
-  #   sim$SKrealAges
+  #   sim$realAges <- SKrealAges
   #
   #   if (!suppliedElsewhere("gcids", sim)) {
   #     ## this is where the pixelGroups and their spu eco etc.
   #     message("No spatial information was provided for the growth curves.
   #           The default values (SK simulations) will be used to limit the number of growth curves used.")
-  #     sim$SKgcids
+  #     sim$gcids <- SKgcids
   #   }
   #
   #   if (!suppliedElsewhere("ecozones", sim)) {
   #     message("No spatial information was provided for the growth curves.
   #           The default values (SK simulations) will be used to determine which ecozones these curves are in.")
-  #     sim$SKecozones
+  #     sim$ecozones <- SKecozones
   #   }
   #   if (!suppliedElsewhere("spatialUnits", sim)) {
   #     message("No spatial information was provided for the growth curves.
   #           The default values (SK simulations) will be used to determine which CBM-spatial units these curves are in.")
-  #     sim$SKspatialUnits
+  #     sim$spatialUnits <- SKspatialUnits
   #   }
     # sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
     # sim$lastPassDMIDS <- sim$historicDMIDs
