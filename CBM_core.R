@@ -718,6 +718,11 @@ annual <- function(sim) {
       cbm_vars$parameters$row_idx <- cbm_vars$parameters$row_idx
     }
 
+    if (is.na(cbm_vars$parameters$mean_annual_temperature[1])) {
+      spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
+      cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
+    }
+
     #add age: ages needs to be update with the ages in cbm_vars$state$age
     cbm_vars$parameters$age <- cbm_vars$state$age
     #make annual_increments
