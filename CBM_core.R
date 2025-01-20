@@ -17,6 +17,11 @@ defineModule(sim, list(
     "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
   parameters = rbind(
+    defineParameter(
+      "regenDelay", "numeric", default = 0, min = 0, max = NA, desc = paste(
+        "The default regeneration delay post disturbance.",
+        "Delays can also be set for each pixel group by including a 'regenDelay' column in the level3DT input object."
+      )),
     defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
                     "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
     defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
@@ -30,133 +35,108 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     # expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = "cbmData", objectClass = "dataset", desc = NA, sourceURL = NA),
-    expectsInput(
-      objectName = "masterRaster", objectClass = "raster",
-      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"
-    ),
-
     expectsInput(
       objectName = "pooldef", objectClass = "character",
-      desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one", sourceURL = NA
-    ),
+      desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one",
+      sourceURL = NA),
     expectsInput(
-      objectName = "pools", objectClass = "matrix",
-      desc = "empty matrix for storage of spinupResult", sourceURL = NA
-    ),
+      objectName = "growth_increments", objectClass = "matrix",
+      desc = "Matrix of the 1/2 increment that will be used to create the `gcHash`", sourceURL = NA),
     expectsInput(
-      objectName = "ages", objectClass = "numeric",
-      desc = "Ages of the stands from the inventory in 1990 with ages <+1 replaces by 2", sourceURL = NA
-    ),
+      objectName = "masterRaster", objectClass = "raster",
+      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"),
     expectsInput(
-      objectName = "realAges", objectClass = "numeric",
-      desc = "Ages of the stands from the inventory in 1990", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "gcids", objectClass = "numeric",
-      desc = "The identification of which growth curves to use on the specific stands provided by...", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "historicDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
-    ),
-    expectsInput(
-      objectName = "lastPassDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
-    ),
-    expectsInput(
-      objectName = "delays", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating regeneration delay post disturbance. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "minRotations", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating minimum number of rotations. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "maxRotations", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating maximum number of rotations. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "returnIntervals", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating the fixed fire return interval. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table",
-      desc = paste0(
-        "If a character vector, it should be the file paths of the disturbance rasters. ",
-      "If a SpatRaster, it must have multiple layers, one for each year, and it must have names ",
-      "by 4 digit year, e.g., 1998, 1999. If a data.table, it must have a column named 'year', with ",
-      "entries for each year of the simulation, e.g., 1998, 1999")
-    ),
-    expectsInput(
-      objectName = "mySpuDmids", objectClass = "data.frame",
-      desc = "Table matching user defined disturbance with disturbance type and matrix ids."
-    ),
-    expectsInput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
-    ),
-    expectsInput( ## URL RIA CORRECT CHECKED
-      objectName = "userDist", objectClass = "data.table",
-      desc = "User provided file that identifies disturbances for simulation (distName),
-      raster Id if applicable, and wholeStand toggle (1 = whole stand disturbance, 0 = partial disturbance),
-      if not there it will use userDistFile",
-      sourceURL = "https://docs.google.com/spreadsheets/d/1fOikb83aOuLlFYIn6pjmC7Jydjcy77TH/edit?usp=sharing&ouid=108246386320559871010&rtpof=true&sd=true"
-    ),
-    # expectsInput(objectName = "disturbanceEvents", objectClass = "matrix",
-    #              desc = "3 column matrix, PixelGroupID, Year (that sim year), and DisturbanceMatrixId. Not used in Spinup.", sourceURL = NA),
-    expectsInput(objectName = "dbPath", objectClass = "character", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(objectName = "level3DT", objectClass = "data.table", desc = NA, sourceURL = NA), ## TODO
+      objectName = "level3DT", objectClass = "data.table",
+      desc = paste(
+        "the table linking the spu id, with the disturbance_matrix_id and the events.",
+        "The events are the possible raster values from the disturbance rasters of Wulder and White.",
+        "Columns:", paste(c(
+          # TODO: define all columns
+          paste("regenDelay: numeric (Optional). The regeneration delay post disturbance.",
+                "Defaults to the value of the 'regenDelay' parameter",
+                "if the column does not exist or where the column contains NAs.")
+        ), collapse = "; ")),
+      sourceURL = NA),
     expectsInput(
       objectName = "spatialDT", objectClass = "data.table",
-      desc = "the table containing one line per pixel"
-    ),
+      desc = "the table containing one line per pixel",
+      sourceURL = NA),
     expectsInput(
-      objectName = "speciesPixelGroup", objectClass = "data.table",
-      desc = "This table connects species codes to PixelGroups"
-    ),
-    expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
+      objectName = "spinupSQL", objectClass = "dataset",
+      desc = NA,
+      sourceURL = NA),
+    expectsInput(
+      objectName = "speciesPixelGroup", objectClass = "data.frame",
+      desc = "This table connects species codes to PixelGroups",
+      sourceURL = NA),
+    expectsInput(
+      objectName = "realAges", objectClass = "numeric",
+      desc = "Ages of the stands from the inventory in 1990",
+      sourceURL = NA),
+    expectsInput(
+      objectName = "mySpuDmids", objectClass = "data.table",
+      desc = "Table summarizing the types of disturbances possible within each spatial unit.",
+      columns = c(
+        rasterID              = "ID links to pixel values in the disturbance rasters",
+        wholeStand            = "Specifies if the whole stand is disturbed (1 = TRUE; 0 = FALSE)",
+        spatial_unit_id       = "Spatial unit ID",
+        disturbance_type_id   = "Disturbance type ID",
+        disturbance_matrix_id = "Disturbance matrix ID",
+        name                  = "Disturbance name",
+        description           = "Disturbance description"
+      )),
+    expectsInput(
+      objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table",
+      desc = paste(
+        "A disturbance raster must be available for every simulation year.",
+        "Pixel values must be link to 'rasterID' values in the input 'mySpuDmids' table.",
+        "The module is indifferent to whether this is provided as a single initial input",
+        "or if it is generated by another module yearly during the simulation run.",
+        "This can be provided as either:",
+        "1. A named object such that the yearly disturbance raster",
+        "(a character path to a raster file or a terra SpatRaster)",
+        "can be accessed by subsetting the object with the 4 digit year name",
+        "(e.g. sim$disturbanceRasters[[\"1990\"]]);",
+        "2. A data.table with the first column containing pixel values and another named 'year'."
+      )),
+    expectsInput(
+      objectName = "historicDMtype", objectClass = "numeric", sourceURL = NA,
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup  event."),
+    expectsInput(
+      objectName = "lastPassDMtype", objectClass = "numeric", sourceURL = NA,
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."),
+    expectsInput(
+      objectName = "disturbanceMatrix", objectClass = "dataset", sourceURL = NA,
+      desc = NA)
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
-    createsOutput(objectName = "spinupResult", objectClass = "data.frame", desc = NA),
-    createsOutput(
-      objectName = "allProcesses", objectClass = "list",
-      desc = "A list of the constant processes, anything NULL is just a placeholder for dynamic processes"
-    ),
-    createsOutput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
-    ),
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
-      desc = "Three parts: pixelGroup, Age, and Pools "
-    ),
-    # createsOutput(objectName = "disturbanceEvents", objectClass = "matrix",
-    #               desc = "3 column matrix, PixelGroupID, Year, and DisturbanceMatrixId. Not used in Spinup."),
+      desc = "Three parts: pixelGroup, Age, and Pools "),
+    createsOutput(
+      objectName = "gcid_is_sw_hw", objectClass = "data.table",
+      desc = NA),
+    createsOutput(
+      objectName = "spinup_input", objectClass = "data.table",
+      desc = NA),
+    createsOutput(
+      objectName = "spinupResult", objectClass = "data.frame", desc = NA),
+    createsOutput(
+      objectName = "cbm_vars", objectClass = "list",
+      desc = NA),
+    createsOutput(
+      objectName = "pixelGroupC", objectClass = "data.table",
+      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"),
+    createsOutput(
+      objectName = "NPP", objectClass = "data.table",
+      desc = "NPP for each `pixelGroup`"),
+    createsOutput(
+      objectName = "emissionsProducts", objectClass = "data.table",
+      desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
     createsOutput(
       objectName = "pixelKeep", objectClass = "data.table",
       desc = paste("Keeps the pixelIndex from spatialDT with each year's `PixelGroupID` as a column.",
-                   "This is to enable making maps of yearly output.")
-    ),
-    # createsOutput(objectName = "yearEvents", objectClass = "data.frame", desc = NA),
-    createsOutput(objectName = "pools", objectClass = "matrix", desc = NA), ## TODO
-    createsOutput(objectName = "ages", objectClass = "numeric",
-                  desc = "Ages of the stands after simulation"),
-    createsOutput(objectName = "NPP", objectClass = "data.table",
-                  desc = "NPP for each `pixelGroup`"),
-    createsOutput(objectName = "emissionsProducts", objectClass = "data.table",
-                  desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
-    createsOutput(objectName = "spatialDT", objectClass = "data.table",
-                  desc = "this is modified to associate the right pixel group to the pixel id after disturbances"),
-    createsOutput(objectName = "gcids", objectClass = "vector",
-                  desc = "growth component id associated with each `pixelGroup`"),
-    createsOutput(objectName = "spatialUnits", objectClass = "vector",
-                  desc = "spatial unit for each `pixelGroup`"),
-    createsOutput(objectName = "ecozones", objectClass = "vector",
-                  desc = "ecozone for each `pixelGroup`"),
-    createsOutput(objectName = "turnoverRates", objectClass = "data.table",
-                  desc = "table with turnover rates for SPUs")
+                   "This is to enable making maps of yearly output."))
   )
 ))
 
@@ -310,6 +290,16 @@ spinup <- function(sim) {
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
   level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
 
+  # Set post disturbance regeneration delays
+  if ("regenDelay" %in% names(level3DT)){
+    if (any(is.na(level3DT$regenDelay))){
+      level3DT$regenDelay[is.na(level3DT$regenDelay)] <- P(sim)$regenDelay
+    }
+  }else{
+    level3DT$regenDelay <- P(sim)$regenDelay
+  }
+
+  level3DT <- setkey(level3DT, "pixelGroup")
 
   spinup_parameters <- data.table(
     pixelGroup = level3DT$pixelGroup,
@@ -320,7 +310,7 @@ spinup <- function(sim) {
     ##the tonnesC/ha, tonnesC/yr/ha values by the area is the CBM3 method for
     ##extracting the mass, mass/year values.
     area = 1.0,
-    delay = sim$delays, ##user defined so CBM_dataPrep_SK
+    delay = level3DT$regenDelay,
     return_interval = level3DT$return_interval,
     min_rotations = level3DT$min_rotations,
     max_rotations = level3DT$max_rotations,
@@ -373,7 +363,7 @@ spinup <- function(sim) {
 
 ##TODO Comparison of spinup results with other CBM runs needs to be completed.
 ##Scott has it on his list
-  sim$spinupResults <- cbm_vars$pools
+  sim$spinupResult <- cbm_vars$pools
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
 }
@@ -412,50 +402,35 @@ postSpinup <- function(sim) {
 }
 
 annual <- function(sim) {
-  ################################### -----------------------------------
-  # DISTURBANCES: which pixels are disturbed and update the pixelGroup and data
-  # tables in consequence
-  ###################################
-  #
-  # 1. Read-in the disturbances
-  # The example simulation has a raster stack covering 1984-2011 for an
-  # area in SK. The raster stack like all inputs from user, is read in the
-  # spadesCBM_dataPrep_SK module. However, one raster at a time is read in this annual
-  # event, permitting the rasters to come for each annual event from another
-  # source.
 
-  # 1. Read-in the disturbances, stack read-in from spadesCBM_dataPrep_SK.R in
-  # example. First add a column for disturbed pixels to the spatialDT
+  # 1. Read-in the disturbances and add a column for disturbed pixels to the spatialDT
 
   spatialDT <- sim$spatialDT
   setkeyv(spatialDT, "pixelIndex")
   spatialDT[, events := 0L]
-  if (is(sim$disturbanceRasters, "character") ||
-      is(sim$disturbanceRasters, "SpatRaster") ||
-      is(sim$disturbanceRasters, "RasterStack")) {
-    if (is(sim$disturbanceRasters, "character") )
-      annualDisturbance <- try(
-        prepInputs(url = sim$disturbanceRasters,
-                   destinationPath = inputPath(sim),
-                   targetFile = paste0("SaskDist_", time(sim)[1], ".grd"),
-                   fun = "terra::rast",
-                   to = sim$masterRaster,
-                   method = "near"
-                  ))
-    else {
-      if (time(sim) %in% names(sim$disturbanceRasters))
-        annualDisturbance <- sim$disturbanceRasters[[as.character(time(sim)[1])]]
-      else
-        stop("disturbanceRasters, if a SpatRaster, must have names by 4 digit year, e.g., 1998, 1999")
-      annualDisturbance <- postProcess(annualDisturbance, to = sim$masterRaster, method = "near")
+
+  if (!is(sim$disturbanceRasters, "data.table")){
+
+    if (!as.character(time(sim)) %in% names(sim$disturbanceRasters)) stop(
+      "Disturbance raster for year ", time(sim), " not found")
+
+    annualDisturbance <- sim$disturbanceRasters[[as.character(time(sim))]]
+
+    # Convert to SpatRaster object
+    if (!is(annualDisturbance, "SpatRaster")){
+
+      annualDisturbance <- tryCatch(
+        terra::rast(annualDisturbance),
+        error = function(e) stop(
+          "Disturbances raster for year ", time(sim), " failed to be read as terra SpatRaster: ",
+          e$message, call. = FALSE))
     }
-    if (is(annualDisturbance, "try-error"))  browser()
 
-    pixels <- values(sim$masterRaster)
-    yearEvents <- values(annualDisturbance)[!is.na(pixels)]
-    ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
+    # Align with master raster
+    annualDisturbance <- postProcess(annualDisturbance, to = sim$masterRaster, method = "near")
 
-  # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
+    # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
+    yearEvents <- terra::values(annualDisturbance)[!is.na(terra::values(sim$masterRaster))]
 
     ##TODO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
     ### do I have to make it sim$ here?
@@ -464,12 +439,14 @@ annual <- function(sim) {
     # this could be big so remove it
     rm(yearEvents)
 
-  # 3. get the disturbed pixels only
+    # 3. get the disturbed pixels only
     distPixels <- spatialDT[events > 0, .(
       pixelIndex, pixelGroup, ages, spatial_unit_id,
       gcids, ecozones, events
     )]
+
   } else if (is(sim$disturbanceRasters, "data.table")) {
+
     annualDisturbance <- sim$disturbanceRasters[year == time(sim)]
     setnames(annualDisturbance, names(annualDisturbance)[1], "pixelIndex", skip_absent = TRUE)
     set(annualDisturbance, NULL, "year", NULL)
@@ -486,10 +463,7 @@ annual <- function(sim) {
     setorder(distPixels, pixelIndex)
     setorder(spatialDT, pixelIndex)
     spatialDT[pixelIndex %in% distPixels$pixelIndex, ]$events <- distPixels$events
-  } else {
-    stop("sim$disturbancRasters must be a list of filenames of Rasters (in .grd) or a ",
-         "single data.table with 2 columns, pixels and year")
-    ##TODO: need to add an option to read disturbances from rasters directly
+
   }
 
   pixelCount <- spatialDT[, .N, by = pixelGroup]
@@ -538,12 +512,14 @@ annual <- function(sim) {
     columns = setdiff(colnames(distPixelCpools),
                                c("pixelGroup", "pixelIndex"))
   )
+  distPixelOld <- cPoolsOnly[distPixels, on = c("pixelGroup")]
+  distPixelCpools$oldGroup <- distPixelOld$pixelGroup
   ##TODO: Check why a bunch of extra columns are being created. remove
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
     "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
-    "gcids", "ecozones", cPoolNames)
+    "gcids", "ecozones", "oldGroup", cPoolNames)
   ]
 
   cols <- c("pixelGroup", "newGroup")
@@ -574,7 +550,8 @@ annual <- function(sim) {
   # add c pools and event column for old groups
   part1 <- merge(metaDT, cPoolsOnly)
   # add c pools and event column from the new groups
-  distGroupCpools <- unique(distPixelCpools[, -("pixelIndex")])
+  distGroupCpoolsOld <- unique(distPixelCpools[, c("pixelIndex"):=NULL])
+  distGroupCpools <- unique(distGroupCpoolsOld[, c("oldGroup"):=NULL])
   setkey(distGroupCpools, pixelGroup)
   cols <- c(
     "pixelGroup", "ages", "spatial_unit_id", "gcids", "ecozones", "events"
@@ -624,8 +601,21 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
     disturbanceMatrix <- sim$disturbanceMatrix
-    cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as this example only has 1 new pixelGroup in 1998 an din 1999.
-                                                             historic_mean_temperature]
+    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
+    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
+    newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
+
+    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
+    ## in the Python functions so we are keeping it.
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
+    } else {
+      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
+    }
+
+    cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[row_idx %in% pixelCount$pixelGroup]
+    spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
+    cbm_vars$parameters <- cbm_vars$parameters[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
   if (dim(distPixels)[1] > 0) {
@@ -657,8 +647,6 @@ annual <- function(sim) {
   ##pixelGroup 6 as we can see in distPixels). gcids for pixelGroup 6 (in
   ##distPixel and sim$level3DT) is gcids 50
   if (dim(distPixels)[1] > 0) {
-    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
-    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids')])
     ## these two above should have the same dim
     ##TODO make this a check
     dim(oldGCpixelGroup) == dim(newGCpixelGroup)
@@ -668,16 +656,13 @@ annual <- function(sim) {
     growth_incForDist <- data.table(
       row_idx = sort(rep(newGCpixelGroup$pixelGroup, 250)),
       age = rep(1:250, dim(newGCpixelGroup)[1]),
-      merch_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, merch_inc],
-      foliage_inc = sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, foliage_inc],
-      other_inc =  sim$spinup_input$increments[row_idx %in% oldGCpixelGroup$pixelGroup, other_inc],
-      gcids = factor(oldGCpixelGroup$gcids, levels(sim$level3DT$gcids))
+      merch_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), merch_inc],
+      foliage_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), foliage_inc],
+      other_inc =  sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), other_inc],
+      gcids = factor(newGCpixelGroup$gcids, levels(sim$level3DT$gcids))
     )
 
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
-    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
-    ## in the Python functions so we are keeping it.
-    cbm_vars$parameters$row_idx <- 1:dim(cbm_vars$parameters)[1]
 
     ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
     ##sites, who's age was set to 0, were not being assigned the right growth. I
@@ -689,7 +674,15 @@ annual <- function(sim) {
     ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
     ##we need it here is to make the match to the annual growth needed for the
     ##libcbmr::cbm_exn_step function below.
-    cbm_vars$parameters$age <- c(cbm_vars$state$age, 1)
+    if (is.null(cbm_vars$parameters$age)) {
+      cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    } else {
+      cbm_vars$parameters <- cbm_vars$parameters[, lapply(.SD, function(age) ifelse(is.na(age), 1, age))]
+    }
+
+    ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
+    ## when creating annual_increments.
+    cbm_vars$parameters$age <- replace(cbm_vars$parameters$age, cbm_vars$parameters$age == 0 , 1)
     annual_increments <- merge(
       cbm_vars$parameters,
       growth_increments,
@@ -717,8 +710,19 @@ annual <- function(sim) {
     ## replace the NaN with the increments for that pixelGroup and age and add the
     ## new pixelGroup
   } else {
-    # row_dix doesn't have to be added it is still there from the last annual
-    # event
+    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
+    ## in the Python functions so we are keeping it.
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- sim$level3DT$pixelGroup
+    } else {
+      cbm_vars$parameters$row_idx <- cbm_vars$parameters$row_idx
+    }
+
+    if (is.na(cbm_vars$parameters$mean_annual_temperature[1])) {
+      spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
+      cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
+    }
+
     #add age: ages needs to be update with the ages in cbm_vars$state$age
     cbm_vars$parameters$age <- cbm_vars$state$age
     #make annual_increments
@@ -760,13 +764,26 @@ annual <- function(sim) {
   if (dim(distPixels)[1] > 0) {
     # if there are disturbed pixels, adding lines for the new pixelGroups (just
     # one here)
-    cbm_vars$pools[nrow(cbm_vars$pools)+dim(newGCpixelGroup)[1],] <- NA
-  }
+  cbm_vars$pools[nrow(cbm_vars$pools) + dim(newGCpixelGroup)[1],] <- NA
+  cbm_vars$pools <- as.data.table(cbm_vars$pools)
   # this line below do not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
-  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
-  cbm_vars$pools[, 2:length(cbm_vars$pools)] <- pixelGroupForAnnual[, Merch: Products]
+  if (is.null(cbm_vars$pools$row_idx)) {
+    cbm_vars$pools$row_idx <- 1:nrow(cbm_vars$pools)
+  } else {
+    cbm_vars$pools[is.na(cbm_vars$pools$row_idx), "row_idx" := part2[, pixelGroup]]
+  }
 
+  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
+  cbm_vars$pools[which(is.na(cbm_vars$pools$Merch)), 2:(length(cbm_vars$pools)-1)] <- part2[, Merch:Products]
+  } else {
+    cbm_vars$pools <- as.data.table(cbm_vars$pools)
+    if (is.null(cbm_vars$pools$row_idx)) {
+      cbm_vars$pools$row_idx <- 1:nrow(cbm_vars$pools)
+    }
+  }
+
+cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGroup),]
 
   ###################### Working on cbm_vars$flux
   ######################################################
@@ -775,19 +792,35 @@ annual <- function(sim) {
   # just need to add a row
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
+cbm_vars$flux <- as.data.table(cbm_vars$flux)
   if (dim(distPixels)[1] > 0) {
-      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[oldGCpixelGroup$pixelGroup,])
+      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[newGCpixelGroup$oldGroup,])
+      if (is.null(cbm_vars$flux$row_idx)) {
+        cbm_vars$flux$row_idx <- 1:nrow(cbm_vars$flux)
+      } else {
+        cbm_vars$flux[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
+      }
+      cbm_vars$flux <- cbm_vars$flux[(cbm_vars$flux$row_idx %in% pixelCount$pixelGroup),]
   }
 
   ###################### Working on cbm_vars$state
   ######################################################
   # we are ASSUMING that these are sorted by pixelGroup like all other tables in
   # cbm_vars
+  # NOTE JAN 2025: THIS IS NOT THE CASE I don't know if this is also true for
+  # cbm_vars$flux, but $state is not in pixelGroup order. I do not know what order it is in.
   # just need to add a row
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
+cbm_vars$state <- as.data.table(cbm_vars$state)
   if (dim(distPixels)[1] > 0) {
-    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[oldGCpixelGroup$pixelGroup,])
+    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[newGCpixelGroup$oldGroup,])
+    if (is.null(cbm_vars$state$row_idx)) {
+      cbm_vars$state$row_idx <- 1:nrow(cbm_vars$state)
+    } else {
+      cbm_vars$state[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
+    }
+    cbm_vars$state <- cbm_vars$state[(cbm_vars$state$row_idx %in% pixelCount$pixelGroup),]
   }
   ## setting up the operations order in Python
   ## ASSUMING that the order is the same as we had it before c(
@@ -796,9 +829,14 @@ annual <- function(sim) {
   ##"domDecay", "slow decay", "slow mixing"
   ##)
 
-
   ############## Running Python functions for annual
   #####################################################################
+  #remove the extra row_idx columns
+  row_idx <- cbm_vars$pools$row_idx
+  cbm_vars$pools[, row_idx := NULL]
+  cbm_vars$flux[, row_idx := NULL]
+  cbm_vars$state[, row_idx := NULL]
+
   step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, mod$libcbm_default_model_config)
 
   cbm_vars <- libcbmr::cbm_exn_step(
@@ -808,6 +846,11 @@ annual <- function(sim) {
     libcbmr::cbm_exn_get_step_ops_sequence(),
     mod$libcbm_default_model_config
   )
+
+  #add the extra row_idx columns back in
+  cbm_vars$pools$row_idx <- row_idx
+  cbm_vars$flux$row_idx <- row_idx
+  cbm_vars$state$row_idx <- row_idx
 
   sim$cbm_vars <- cbm_vars
 
@@ -946,254 +989,30 @@ annual <- function(sim) {
   # if (!suppliedElsewhere("ages", sim))  {
   #   sim$PoolCount <- length(sim$pooldef)
   #   sim$pools <- matrix(ncol = sim$PoolCount, nrow = 739, data = 0)
-  #   sim$ages <- c(3,3,3,10,100,100,100,100,100,100,100,100,100,100,100,100,101,101,101
-  #                 ,101,101,101,101,101,101,101,101,101,101,102,102,102,102,102,102,102,102,102
-  #                 ,102,102,102,102,103,103,103,103,103,103,103,103,103,103,103,104,104,104,104
-  #                 ,104,107,108,108,108,108,108,108,108,108,108,109,109,109,109,109,109,109,109
-  #                 ,109,11,11,11,110,110,110,110,110,110,110,110,110,110,110,110,111,111,111
-  #                 ,111,111,111,111,111,111,111,111,112,112,112,112,112,112,112,112,112,112,113
-  #                 ,113,113,113,113,113,113,113,114,116,117,118,118,119,119,119,119,119,119,119
-  #                 ,119,119,12,12,12,12,12,120,120,120,120,120,120,120,120,120,120,120,121
-  #                 ,121,121,121,121,121,121,121,121,121,122,122,122,122,122,122,122,122,122,123
-  #                 ,123,123,123,126,127,127,127,127,128,128,128,128,128,128,128,128,128,128,129
-  #                 ,129,129,129,129,129,129,129,129,13,13,13,130,130,130,130,130,130,130,130
-  #                 ,130,130,131,131,131,131,131,131,131,131,131,132,132,132,132,132,135,135,136
-  #                 ,136,137,137,137,137,137,137,137,138,138,138,138,138,139,139,139,139,14,14
-  #                 ,14,14,140,142,143,143,144,144,144,144,144,145,145,145,145,146,146,146,146
-  #                 ,146,147,15,18,18,18,18,19,19,19,19,19,19,3,3,3,20,20,20
-  #                 ,20,20,20,20,21,21,21,21,21,21,21,21,22,22,22,23,23,28,28
-  #                 ,28,28,29,29,29,29,29,29,3,3,3,30,30,30,30,30,30,30,30
-  #                 ,31,31,31,31,31,31,31,31,32,32,32,32,32,32,32,33,33,33,33
-  #                 ,34,38,38,38,38,38,38,39,39,39,39,39,39,39,39,4,4,40,40
-  #                 ,40,40,40,40,40,40,40,41,41,41,41,41,41,41,41,41,41,42,42
-  #                 ,42,42,42,42,42,42,43,43,43,43,43,43,44,44,44,47,48,48,48
-  #                 ,48,48,48,48,48,48,49,49,49,49,49,49,49,49,49,49,5,5,50
-  #                 ,50,50,50,50,50,50,50,50,50,51,51,51,51,51,51,51,51,51,51
-  #                 ,52,52,52,52,52,52,52,52,52,52,53,53,53,53,53,53,53,53,54
-  #                 ,54,54,57,57,58,58,58,58,58,58,58,59,59,59,59,59,59,59,59
-  #                 ,59,59,6,6,60,60,60,60,60,60,60,60,60,60,61,61,61,61,61
-  #                 ,61,61,61,61,61,61,61,61,62,62,62,62,62,62,62,62,62,62,62
-  #                 ,63,63,63,63,63,63,63,64,67,68,68,68,68,68,68,69,69,69,69
-  #                 ,69,69,69,69,69,70,70,70,70,70,70,70,70,70,70,70,71,71,71
-  #                 ,71,71,71,71,71,71,71,72,72,72,72,72,72,72,72,72,73,73,73
-  #                 ,73,73,74,77,78,78,78,78,78,78,78,78,79,79,79,79,79,79,79
-  #                 ,79,79,79,79,80,80,80,80,80,80,80,80,80,80,80,80,81,81,81
-  #                 ,81,81,81,81,81,81,81,81,81,81,82,82,82,82,82,82,82,82,82
-  #                 ,82,82,82,83,83,83,83,83,83,83,83,83,83,84,84,87,87,87,88
-  #                 ,88,88,88,88,88,88,88,88,89,89,89,89,89,89,89,89,89,89,89
-  #                 ,9,90,90,90,90,90,90,90,90,90,90,90,91,91,91,91,91,91,91
-  #                 ,91,91,91,91,91,92,92,92,92,92,92,92,92,92,92,93,93,93,93
-  #                 ,93,93,93,93,94,94,94,94,97,97,97,97,97,98,98,98,98,98,98
-  #                 ,98,98,98,98,98,99,99,99,99,99,99,99,99,99,99,99,99)
+  #   sim$ages <- SKages
   #
-  #   sim$realAges <- c(
-  #     0,1,1,10,100,100,100,100,100,100,100,100,100,100,100,100,101,101,101,
-  #     101,101,101,101,101,101,101,101,101,101,102,102,102,102,102,102,102,102,102,
-  #     102,102,102,102,103,103,103,103,103,103,103,103,103,103,103,104,104,104,104,
-  #     104,107,108,108,108,108,108,108,108,108,108,109,109,109,109,109,109,109,109,
-  #     109,11,11,11,110,110,110,110,110,110,110,110,110,110,110,110,111,111,111,
-  #     111,111,111,111,111,111,111,111,112,112,112,112,112,112,112,112,112,112,113,
-  #     113,113,113,113,113,113,113,114,116,117,118,118,119,119,119,119,119,119,119,
-  #     119,119,12,12,12,12,12,120,120,120,120,120,120,120,120,120,120,120,121,
-  #     121,121,121,121,121,121,121,121,121,122,122,122,122,122,122,122,122,122,123,
-  #     123,123,123,126,127,127,127,127,128,128,128,128,128,128,128,128,128,128,129,
-  #     129,129,129,129,129,129,129,129,13,13,13,130,130,130,130,130,130,130,130,
-  #     130,130,131,131,131,131,131,131,131,131,131,132,132,132,132,132,135,135,136,
-  #     136,137,137,137,137,137,137,137,138,138,138,138,138,139,139,139,139,14,14,
-  #     14,14,140,142,143,143,144,144,144,144,144,145,145,145,145,146,146,146,146,
-  #     146,147,15,18,18,18,18,19,19,19,19,19,19,2,2,2,20,20,20,
-  #     20,20,20,20,21,21,21,21,21,21,21,21,22,22,22,23,23,28,28,
-  #     28,28,29,29,29,29,29,29,3,3,3,30,30,30,30,30,30,30,30,
-  #     31,31,31,31,31,31,31,31,32,32,32,32,32,32,32,33,33,33,33,
-  #     34,38,38,38,38,38,38,39,39,39,39,39,39,39,39,4,4,40,40,
-  #     40,40,40,40,40,40,40,41,41,41,41,41,41,41,41,41,41,42,42,
-  #     42,42,42,42,42,42,43,43,43,43,43,43,44,44,44,47,48,48,48,
-  #     48,48,48,48,48,48,49,49,49,49,49,49,49,49,49,49,5,5,50,
-  #     50,50,50,50,50,50,50,50,50,51,51,51,51,51,51,51,51,51,51,
-  #     52,52,52,52,52,52,52,52,52,52,53,53,53,53,53,53,53,53,54,
-  #     54,54,57,57,58,58,58,58,58,58,58,59,59,59,59,59,59,59,59,
-  #     59,59,6,6,60,60,60,60,60,60,60,60,60,60,61,61,61,61,61,
-  #     61,61,61,61,61,61,61,61,62,62,62,62,62,62,62,62,62,62,62,
-  #     63,63,63,63,63,63,63,64,67,68,68,68,68,68,68,69,69,69,69,
-  #     69,69,69,69,69,70,70,70,70,70,70,70,70,70,70,70,71,71,71,
-  #     71,71,71,71,71,71,71,72,72,72,72,72,72,72,72,72,73,73,73,
-  #     73,73,74,77,78,78,78,78,78,78,78,78,79,79,79,79,79,79,79,
-  #     79,79,79,79,80,80,80,80,80,80,80,80,80,80,80,80,81,81,81,
-  #     81,81,81,81,81,81,81,81,81,81,82,82,82,82,82,82,82,82,82,
-  #     82,82,82,83,83,83,83,83,83,83,83,83,83,84,84,87,87,87,88,
-  #     88,88,88,88,88,88,88,88,89,89,89,89,89,89,89,89,89,89,89,
-  #     9,90,90,90,90,90,90,90,90,90,90,90,91,91,91,91,91,91,91,
-  #     91,91,91,91,91,92,92,92,92,92,92,92,92,92,92,93,93,93,93,
-  #     93,93,93,93,94,94,94,94,97,97,97,97,97,98,98,98,98,98,98,
-  #     98,98,98,98,98,99,99,99,99,99,99,99,99,99,99,99,99
-  #   )
+  #   sim$realAges <- SKrealAges
   #
   #   if (!suppliedElsewhere("gcids", sim)) {
   #     ## this is where the pixelGroups and their spu eco etc.
   #     message("No spatial information was provided for the growth curves.
   #           The default values (SK simulations) will be used to limit the number of growth curves used.")
-  #     sim$gcids <- c(
-  #       52, 52, 58, 52, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58,
-  #       61, 28, 29, 31, 34, 35, 37, 40, 49, 50, 52, 55, 58, 61, 28, 29,
-  #       31, 34, 37, 40, 49, 50, 52, 55, 56, 58, 61, 28, 29, 31, 34, 40,
-  #       49, 50, 52, 55, 58, 61, 28, 34, 49, 52, 55, 40, 28, 31, 34, 40,
-  #       49, 50, 52, 55, 61, 28, 31, 34, 40, 49, 50, 52, 55, 61, 52, 55,
-  #       58, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 28, 31, 34,
-  #       37, 40, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49, 50, 52,
-  #       55, 61, 28, 31, 34, 40, 49, 52, 55, 61, 28, 61, 52, 61, 62, 28,
-  #       31, 34, 40, 49, 50, 52, 55, 61, 31, 34, 49, 52, 55, 28, 31, 34,
-  #       40, 49, 50, 52, 55, 58, 61, 62, 28, 29, 31, 34, 40, 49, 50, 52,
-  #       55, 61, 28, 34, 40, 49, 50, 52, 55, 61, 62, 28, 34, 40, 61, 49,
-  #       31, 40, 49, 61, 28, 29, 31, 34, 40, 49, 50, 52, 58, 61, 28, 31,
-  #       34, 40, 49, 50, 52, 55, 61, 49, 52, 55, 28, 31, 34, 40, 49, 50,
-  #       52, 55, 58, 61, 28, 31, 34, 40, 49, 50, 52, 55, 61, 40, 49, 50,
-  #       52, 61, 28, 31, 31, 61, 28, 31, 34, 49, 50, 55, 61, 28, 31, 34,
-  #       49, 61, 28, 34, 52, 61, 31, 49, 52, 55, 55, 40, 28, 49, 28, 31,
-  #       34, 49, 52, 28, 31, 58, 61, 28, 31, 34, 49, 50, 61, 52, 49, 52,
-  #       55, 58, 31, 34, 37, 49, 52, 55, 52, 55, 58, 31, 34, 49, 52, 55,
-  #       56, 58, 31, 34, 49, 52, 55, 56, 58, 61, 49, 52, 55, 52, 55, 28,
-  #       34, 49, 55, 28, 31, 34, 37, 52, 55, 49, 52, 55, 28, 31, 34, 37,
-  #       49, 52, 55, 58, 28, 31, 34, 37, 49, 52, 55, 58, 28, 31, 34, 37,
-  #       49, 52, 55, 34, 37, 50, 52, 52, 28, 31, 34, 37, 52, 55, 28, 31,
-  #       34, 37, 49, 52, 55, 58, 52, 55, 28, 31, 34, 37, 40, 49, 52, 55,
-  #       58, 28, 31, 34, 37, 40, 49, 52, 55, 58, 61, 28, 31, 34, 37, 49,
-  #       52, 55, 58, 28, 31, 34, 37, 52, 55, 31, 52, 55, 31, 28, 31, 34,
-  #       37, 40, 49, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55, 58,
-  #       52, 55, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37,
-  #       40, 49, 50, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55, 58,
-  #       28, 31, 34, 37, 49, 52, 55, 58, 34, 49, 55, 28, 31, 28, 31, 34,
-  #       49, 52, 55, 58, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 49, 52,
-  #       28, 31, 34, 37, 40, 49, 50, 52, 55, 58, 28, 29, 31, 34, 35, 37,
-  #       40, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49, 50, 52, 55,
-  #       58, 61, 28, 31, 34, 49, 52, 55, 58, 52, 28, 28, 34, 49, 55, 58,
-  #       61, 28, 34, 37, 49, 50, 52, 55, 58, 61, 28, 31, 34, 37, 40, 49,
-  #       50, 52, 55, 58, 61, 28, 31, 34, 37, 49, 50, 52, 55, 58, 61, 28,
-  #       31, 34, 49, 50, 52, 55, 58, 61, 28, 40, 49, 55, 58, 49, 34, 28,
-  #       31, 34, 49, 50, 52, 55, 58, 28, 31, 34, 37, 40, 49, 50, 52, 55,
-  #       58, 61, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 28, 29,
-  #       31, 34, 37, 40, 49, 50, 52, 55, 56, 58, 61, 28, 29, 31, 34, 37,
-  #       40, 49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 40, 49, 50, 52, 55,
-  #       61, 31, 50, 49, 52, 61, 28, 31, 34, 49, 50, 52, 55, 58, 61, 28,
-  #       31, 34, 37, 40, 49, 50, 52, 55, 58, 61, 52, 28, 31, 34, 37, 40,
-  #       49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 37, 40, 49, 50, 52, 55,
-  #       58, 61, 28, 31, 34, 40, 49, 50, 52, 55, 58, 61, 28, 34, 49, 50,
-  #       52, 55, 58, 61, 49, 50, 55, 61, 49, 52, 55, 58, 61, 28, 29, 31,
-  #       34, 40, 49, 50, 52, 55, 58, 61, 28, 29, 31, 34, 37, 40, 49, 50,
-  #       52, 55, 58, 61
-  #     )
+  #     sim$gcids <- SKgcids
   #   }
   #
   #   if (!suppliedElsewhere("ecozones", sim)) {
   #     message("No spatial information was provided for the growth curves.
   #           The default values (SK simulations) will be used to determine which ecozones these curves are in.")
-  #     sim$ecozones <- c(
-  #       9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6,
-  #       6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9,
-  #       9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6,
-  #       6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-  #       6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6,
-  #       6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 9, 9, 9,
-  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6, 9, 9,
-  #       9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9,
-  #       9, 9, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9,
-  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9,
-  #       9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 6, 6, 6, 9, 6,
-  #       6, 6, 9, 9, 9, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 9, 9, 9, 9, 6,
-  #       6, 9, 6, 6, 6, 9, 9, 6, 6, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 6, 9, 9,
-  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9,
-  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6,
-  #       9, 9, 9, 6, 6, 9, 9, 9, 6, 6, 6, 6, 9, 9, 6, 6, 6, 6, 9, 9, 9,
-  #       9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9,
-  #       9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 6, 9, 9, 6, 6, 6,
-  #       6, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6,
-  #       6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6,
-  #       6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 6, 9, 9, 6, 6, 6,
-  #       6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-  #       6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6,
-  #       6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6,
-  #       9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9,
-  #       9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9, 9, 9,
-  #       9, 6, 6, 9, 9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6,
-  #       9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-  #       6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9,
-  #       9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 6, 6, 6, 9, 9,
-  #       9, 9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6,
-  #       9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6,
-  #       6, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 9, 9, 6, 6, 6, 6, 6, 9, 9, 9, 9, 9, 9, 6, 6, 6, 6, 6, 6, 9,
-  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 9, 9, 6, 6, 6, 6, 9, 9, 9, 6, 9, 6, 6, 6, 9, 9, 9, 9, 6, 6,
-  #       9, 6, 6, 6, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 6, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9, 9, 9, 9, 9, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 6, 6, 9, 9, 9,
-  #       9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       6, 6, 6, 6, 9, 9, 9, 6, 6, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9,
-  #       6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 6, 9, 9,
-  #       9, 6, 9, 9, 9, 6, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9,
-  #       9
-  #     )
+  #     sim$ecozones <- SKecozones
   #   }
   #   if (!suppliedElsewhere("spatialUnits", sim)) {
   #     message("No spatial information was provided for the growth curves.
   #           The default values (SK simulations) will be used to determine which CBM-spatial units these curves are in.")
-  #     sim$spatialUnits <- c(
-  #       28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
-  #       28, 27, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27,
-  #       27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
-  #       28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27, 27, 27,
-  #       28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28,
-  #       28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27,
-  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
-  #       28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 27, 28, 28, 28, 28, 27,
-  #       27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27,
-  #       27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
-  #       28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 28, 28,
-  #       27, 27, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27,
-  #       27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28,
-  #       28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 28, 28,
-  #       28, 28, 27, 27, 27, 28, 27, 27, 27, 28, 28, 28, 28, 27, 27, 27,
-  #       28, 28, 27, 27, 28, 28, 27, 28, 28, 28, 28, 27, 27, 28, 27, 27,
-  #       27, 28, 28, 27, 27, 28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28,
-  #       28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28,
-  #       28, 28, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 27,
-  #       27, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27,
-  #       28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 27, 27, 27, 27,
-  #       28, 28, 28, 27, 27, 28, 28, 28, 27, 27, 27, 27, 28, 28, 27, 27,
-  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28,
-  #       28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 28,
-  #       28, 28, 28, 27, 27, 27, 27, 28, 28, 27, 28, 28, 27, 27, 27, 27,
-  #       27, 27, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
-  #       28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27,
-  #       27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28,
-  #       27, 27, 27, 27, 28, 28, 28, 28, 27, 28, 28, 27, 27, 27, 27, 27,
-  #       28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 28,
-  #       27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27,
-  #       27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-  #       28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 28, 28, 28,
-  #       28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28,
-  #       28, 28, 28, 28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27,
-  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28, 28, 28, 27, 27,
-  #       27, 27, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-  #       28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27,
-  #       27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
-  #       27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-  #       28, 27, 28, 28, 28, 28, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27,
-  #       27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27,
-  #       28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28, 28, 28,
-  #       28, 28, 27, 27, 27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 28, 28,
-  #       28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 28, 27, 27, 27,
-  #       27, 27, 28, 28, 28, 28, 28, 28, 27, 27, 27, 27, 27, 27, 28, 28,
-  #       28, 28, 28, 28
-  #     )
+  #     sim$spatialUnits <- SKspatialUnits
   #   }
     # sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
     # sim$lastPassDMIDS <- sim$historicDMIDs
     #
-    # sim$delays <- rep(0, 739)
     # sim$minRotations <- rep(10, 739)
     # sim$maxRotations <- rep(30, 739)
     #
