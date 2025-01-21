@@ -17,10 +17,15 @@ defineModule(sim, list(
     "PredictiveEcology/LandR@development (>= 1.1.1)"
   ),
   parameters = rbind(
+    defineParameter(
+      "regenDelay", "numeric", default = 0, min = 0, max = NA, desc = paste(
+        "The default regeneration delay post disturbance.",
+        "Delays can also be set for each pixel group by including a 'regenDelay' column in the level3DT input object."
+      )),
     defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
                     "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
     defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
-      desc = "which carbon pools to plot, if any. Defaults to total carbon"
+                    desc = "which carbon pools to plot, if any. Defaults to total carbon"
     ),
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA, "This describes the simulation time at which the first plot event should occur"),
     defineParameter(".plotInterval", "numeric", end(sim) - start(sim), NA, NA, "This describes the simulation time interval between plot events"),
@@ -30,133 +35,90 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     # expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
-    expectsInput(objectName = "cbmData", objectClass = "dataset", desc = NA, sourceURL = NA),
-    expectsInput(
-      objectName = "masterRaster", objectClass = "raster",
-      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"
-    ),
-
     expectsInput(
       objectName = "pooldef", objectClass = "character",
-      desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one", sourceURL = NA
-    ),
+      desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one",
+      sourceURL = NA),
     expectsInput(
-      objectName = "pools", objectClass = "matrix",
-      desc = "empty matrix for storage of spinupResult", sourceURL = NA
-    ),
+      objectName = "growth_increments", objectClass = "matrix",
+      desc = "Matrix of the 1/2 increment that will be used to create the `gcHash`", sourceURL = NA),
     expectsInput(
-      objectName = "ages", objectClass = "numeric",
-      desc = "Ages of the stands from the inventory in 1990 with ages <+1 replaces by 2", sourceURL = NA
-    ),
+      objectName = "level3DT", objectClass = "data.table",
+      desc = paste(
+        "the table linking the spu id, with the disturbance_matrix_id and the events.",
+        "The events are the possible raster values from the disturbance rasters of Wulder and White.",
+        "Columns:", paste(c(
+          # TODO: define all columns
+          paste("regenDelay: numeric (Optional). The regeneration delay post disturbance.",
+                "Defaults to the value of the 'regenDelay' parameter",
+                "if the column does not exist or where the column contains NAs.")
+        ), collapse = "; ")),
+      sourceURL = NA),
     expectsInput(
-      objectName = "realAges", objectClass = "numeric",
-      desc = "Ages of the stands from the inventory in 1990", sourceURL = NA
-    ),
+      objectName = "spatialDT", objectClass = "data.table",
+      desc = "the table containing one line per pixel",
+      sourceURL = NA),
     expectsInput(
-      objectName = "gcids", objectClass = "numeric",
-      desc = "The identification of which growth curves to use on the specific stands provided by...", sourceURL = NA
-    ),
+      objectName = "spinupSQL", objectClass = "dataset",
+      desc = NA,
+      sourceURL = NA),
+    expectsInput(
+      objectName = "speciesPixelGroup", objectClass = "data.frame",
+      desc = "This table connects species codes to PixelGroups",
+      sourceURL = NA),
     expectsInput(
       objectName = "historicDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
-    ),
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup  event."),
     expectsInput(
       objectName = "lastPassDMtype", objectClass = "numeric",
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."
-    ),
+      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."),
     expectsInput(
-      objectName = "delays", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating regeneration delay post disturbance. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "minRotations", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating minimum number of rotations. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "maxRotations", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating maximum number of rotations. Only Spinup.", sourceURL = NA
-    ),
-    expectsInput(
-      objectName = "returnIntervals", objectClass = "numeric",
-      desc = "Vector, one for each stand, indicating the fixed fire return interval. Only Spinup.", sourceURL = NA
-    ),
+      objectName = "realAges", objectClass = "numeric",
+      desc = "Ages of the stands from the inventory in 1990",
+      sourceURL = NA),
     expectsInput(
       objectName = "disturbanceRasters", objectClass = "character|SpatRaster|data.table",
       desc = paste0(
         "If a character vector, it should be the file paths of the disturbance rasters. ",
-      "If a SpatRaster, it must have multiple layers, one for each year, and it must have names ",
-      "by 4 digit year, e.g., 1998, 1999. If a data.table, it must have a column named 'year', with ",
-      "entries for each year of the simulation, e.g., 1998, 1999")
-    ),
+        "If a SpatRaster, it must have multiple layers, one for each year, and it must have names ",
+        "by 4 digit year, e.g., 1998, 1999. If a data.table, it must have a column named 'year', with ",
+        "entries for each year of the simulation, e.g., 1998, 1999")),
     expectsInput(
-      objectName = "mySpuDmids", objectClass = "data.frame",
-      desc = "Table matching user defined disturbance with disturbance type and matrix ids."
-    ),
+      objectName = "masterRaster", objectClass = "raster",
+      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"),
     expectsInput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
-    ),
-    expectsInput( ## URL RIA CORRECT CHECKED
-      objectName = "userDist", objectClass = "data.table",
-      desc = "User provided file that identifies disturbances for simulation (distName),
-      raster Id if applicable, and wholeStand toggle (1 = whole stand disturbance, 0 = partial disturbance),
-      if not there it will use userDistFile",
-      sourceURL = "https://docs.google.com/spreadsheets/d/1fOikb83aOuLlFYIn6pjmC7Jydjcy77TH/edit?usp=sharing&ouid=108246386320559871010&rtpof=true&sd=true"
-    ),
-    # expectsInput(objectName = "disturbanceEvents", objectClass = "matrix",
-    #              desc = "3 column matrix, PixelGroupID, Year (that sim year), and DisturbanceMatrixId. Not used in Spinup.", sourceURL = NA),
-    expectsInput(objectName = "dbPath", objectClass = "character", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(objectName = "level3DT", objectClass = "data.table", desc = NA, sourceURL = NA), ## TODO
-    expectsInput(
-      objectName = "spatialDT", objectClass = "data.table",
-      desc = "the table containing one line per pixel"
-    ),
-    expectsInput(
-      objectName = "speciesPixelGroup", objectClass = "data.table",
-      desc = "This table connects species codes to PixelGroups"
-    ),
-    expectsInput(objectName = "curveID", objectClass = "", desc = NA, sourceURL = NA), ## TODO
+      objectName = "disturbanceMatrix", objectClass = "dataset",
+      desc = NA,
+      sourceURL = NA)
   ),
   outputObjects = bindrows(
-    createsOutput(objectName = "opMatrixCBM", objectClass = "matrix", desc = NA),
-    createsOutput(objectName = "spinupResult", objectClass = "data.frame", desc = NA),
-    createsOutput(
-      objectName = "allProcesses", objectClass = "list",
-      desc = "A list of the constant processes, anything NULL is just a placeholder for dynamic processes"
-    ),
-    createsOutput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"
-    ),
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
-      desc = "Three parts: pixelGroup, Age, and Pools "
-    ),
-    # createsOutput(objectName = "disturbanceEvents", objectClass = "matrix",
-    #               desc = "3 column matrix, PixelGroupID, Year, and DisturbanceMatrixId. Not used in Spinup."),
+      desc = "Three parts: pixelGroup, Age, and Pools "),
+    createsOutput(
+      objectName = "gcid_is_sw_hw", objectClass = "data.table",
+      desc = NA),
+    createsOutput(
+      objectName = "spinup_input", objectClass = "data.table",
+      desc = NA),
+    createsOutput(
+      objectName = "spinupResult", objectClass = "data.frame", desc = NA),
+    createsOutput(
+      objectName = "cbm_vars", objectClass = "list",
+      desc = NA),
+    createsOutput(
+      objectName = "pixelGroupC", objectClass = "data.table",
+      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"),
+    createsOutput(
+      objectName = "NPP", objectClass = "data.table",
+      desc = "NPP for each `pixelGroup`"),
+    createsOutput(
+      objectName = "emissionsProducts", objectClass = "data.table",
+      desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
     createsOutput(
       objectName = "pixelKeep", objectClass = "data.table",
       desc = paste("Keeps the pixelIndex from spatialDT with each year's `PixelGroupID` as a column.",
-                   "This is to enable making maps of yearly output.")
-    ),
-    # createsOutput(objectName = "yearEvents", objectClass = "data.frame", desc = NA),
-    createsOutput(objectName = "pools", objectClass = "matrix", desc = NA), ## TODO
-    createsOutput(objectName = "ages", objectClass = "numeric",
-                  desc = "Ages of the stands after simulation"),
-    createsOutput(objectName = "NPP", objectClass = "data.table",
-                  desc = "NPP for each `pixelGroup`"),
-    createsOutput(objectName = "emissionsProducts", objectClass = "data.table",
-                  desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
-    createsOutput(objectName = "spatialDT", objectClass = "data.table",
-                  desc = "this is modified to associate the right pixel group to the pixel id after disturbances"),
-    createsOutput(objectName = "gcids", objectClass = "vector",
-                  desc = "growth component id associated with each `pixelGroup`"),
-    createsOutput(objectName = "spatialUnits", objectClass = "vector",
-                  desc = "spatial unit for each `pixelGroup`"),
-    createsOutput(objectName = "ecozones", objectClass = "vector",
-                  desc = "ecozone for each `pixelGroup`"),
-    createsOutput(objectName = "turnoverRates", objectClass = "data.table",
-                  desc = "table with turnover rates for SPUs")
+                   "This is to enable making maps of yearly output."))
   )
 ))
 
@@ -190,7 +152,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       #sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 12 )
       # sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last())
     },
-     annual = {
+    annual = {
       # ! ----- EDIT BELOW ----- ! #
       # do stuff for this event
       sim <- annual(sim)
@@ -269,8 +231,8 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       # ! ----- STOP EDITING ----- ! #
     },
     warning(paste("Undefined event type: '", current(sim)[1, "eventType", with = FALSE],
-      "' in module '", current(sim)[1, "moduleName", with = FALSE], "'",
-      sep = ""
+                  "' in module '", current(sim)[1, "moduleName", with = FALSE], "'",
+                  sep = ""
     ))
   )
   return(invisible(sim))
@@ -310,6 +272,16 @@ spinup <- function(sim) {
   level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
   level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
 
+  # Set post disturbance regeneration delays
+  if ("regenDelay" %in% names(level3DT)){
+    if (any(is.na(level3DT$regenDelay))){
+      level3DT$regenDelay[is.na(level3DT$regenDelay)] <- P(sim)$regenDelay
+    }
+  }else{
+    level3DT$regenDelay <- P(sim)$regenDelay
+  }
+
+  level3DT <- setkey(level3DT, "pixelGroup")
 
   spinup_parameters <- data.table(
     pixelGroup = level3DT$pixelGroup,
@@ -320,7 +292,7 @@ spinup <- function(sim) {
     ##the tonnesC/ha, tonnesC/yr/ha values by the area is the CBM3 method for
     ##extracting the mass, mass/year values.
     area = 1.0,
-    delay = sim$delays, ##user defined so CBM_dataPrep_SK
+    delay = level3DT$regenDelay,
     return_interval = level3DT$return_interval,
     min_rotations = level3DT$min_rotations,
     max_rotations = level3DT$max_rotations,
@@ -371,9 +343,9 @@ spinup <- function(sim) {
     mod$libcbm_default_model_config
   ) |> Cache()
 
-##TODO Comparison of spinup results with other CBM runs needs to be completed.
-##Scott has it on his list
-  sim$spinupResults <- cbm_vars$pools
+  ##TODO Comparison of spinup results with other CBM runs needs to be completed.
+  ##Scott has it on his list
+  sim$spinupResult <- cbm_vars$pools
   sim$cbm_vars <- cbm_vars
   return(invisible(sim))
 }
@@ -441,7 +413,7 @@ annual <- function(sim) {
                    fun = "terra::rast",
                    to = sim$masterRaster,
                    method = "near"
-                  ))
+        ))
     else {
       if (time(sim) %in% names(sim$disturbanceRasters))
         annualDisturbance <- sim$disturbanceRasters[[as.character(time(sim)[1])]]
@@ -455,7 +427,7 @@ annual <- function(sim) {
     yearEvents <- values(annualDisturbance)[!is.na(pixels)]
     ## good check here would be: length(pixels[!is.na(pixels)] == nrow(sim$spatialDT)
 
-  # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
+    # 2. Add this year's events to the spatialDT, so each disturbed pixels has its event
 
     ##TODO: put in a check here where sum(.N) == length(pixels[!is.na(pixels)])
     ### do I have to make it sim$ here?
@@ -464,7 +436,7 @@ annual <- function(sim) {
     # this could be big so remove it
     rm(yearEvents)
 
-  # 3. get the disturbed pixels only
+    # 3. get the disturbed pixels only
     distPixels <- spatialDT[events > 0, .(
       pixelIndex, pixelGroup, ages, spatial_unit_id,
       gcids, ecozones, events
@@ -536,7 +508,7 @@ annual <- function(sim) {
   distPixelCpools$newGroup <- LandR::generatePixelGroups(
     distPixelCpools, maxPixelGroup,
     columns = setdiff(colnames(distPixelCpools),
-                               c("pixelGroup", "pixelIndex"))
+                      c("pixelGroup", "pixelIndex"))
   )
   ##TODO: Check why a bunch of extra columns are being created. remove
   ##unnecessary cols from generatePixelGroups. Also this function changes the
@@ -581,7 +553,7 @@ annual <- function(sim) {
   )
 
   ## year 2000 has no disturbance
-    part2 <- merge(metaDT, distGroupCpools, by = cols)
+  part2 <- merge(metaDT, distGroupCpools, by = cols)
   if(dim(distPixels)[1] > 0){
     pixelGroupForAnnual <- rbind(part1, part2)
   } else {
@@ -625,7 +597,7 @@ annual <- function(sim) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
     disturbanceMatrix <- sim$disturbanceMatrix
     cbm_vars$parameters$mean_annual_temperature <- sim$spinupSQL[id %in% part2$spatial_unit_id, # this has not been tested as this example only has 1 new pixelGroup in 1998 an din 1999.
-                                                             historic_mean_temperature]
+                                                                 historic_mean_temperature]
   }
   ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
   if (dim(distPixels)[1] > 0) {
@@ -677,7 +649,11 @@ annual <- function(sim) {
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
     ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
     ## in the Python functions so we are keeping it.
-    cbm_vars$parameters$row_idx <- 1:dim(cbm_vars$parameters)[1]
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
+    } else {
+      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
+    }
 
     ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
     ##sites, who's age was set to 0, were not being assigned the right growth. I
@@ -689,7 +665,7 @@ annual <- function(sim) {
     ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
     ##we need it here is to make the match to the annual growth needed for the
     ##libcbmr::cbm_exn_step function below.
-    cbm_vars$parameters$age <- c(cbm_vars$state$age, 1)
+    cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
     annual_increments <- merge(
       cbm_vars$parameters,
       growth_increments,
@@ -717,8 +693,14 @@ annual <- function(sim) {
     ## replace the NaN with the increments for that pixelGroup and age and add the
     ## new pixelGroup
   } else {
-    # row_dix doesn't have to be added it is still there from the last annual
-    # event
+    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
+    ## in the Python functions so we are keeping it.
+    if (is.null(cbm_vars$parameters$row_idx)) {
+      cbm_vars$parameters$row_idx <- sim$level3DT$pixelGroup
+    } else {
+      cbm_vars$parameters$row_idx <- cbm_vars$parameters$row_idx
+    }
+
     #add age: ages needs to be update with the ages in cbm_vars$state$age
     cbm_vars$parameters$age <- cbm_vars$state$age
     #make annual_increments
@@ -748,8 +730,8 @@ annual <- function(sim) {
 
   # need to keep the growth increments that we added for the next annual event
   if (dim(distPixels)[1] > 0) {
-      sim$spinup_input$increments <- growth_increments
-      }
+    sim$spinup_input$increments <- growth_increments
+  }
 
   ###################### END cbm_vars$parameters
 
@@ -776,7 +758,7 @@ annual <- function(sim) {
   # this line below does not change the - attr(*,
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
   if (dim(distPixels)[1] > 0) {
-      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[oldGCpixelGroup$pixelGroup,])
+    cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[oldGCpixelGroup$pixelGroup,])
   }
 
   ###################### Working on cbm_vars$state
@@ -906,7 +888,7 @@ annual <- function(sim) {
 
   emissionsProducts <- cbind(emissions, products)
   emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
-          pixelCount[["N"]])
+                                 pixelCount[["N"]])
   emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
 
@@ -1190,66 +1172,65 @@ annual <- function(sim) {
   #       28, 28, 28, 28
   #     )
   #   }
-    # sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
-    # sim$lastPassDMIDS <- sim$historicDMIDs
-    #
-    # sim$delays <- rep(0, 739)
-    # sim$minRotations <- rep(10, 739)
-    # sim$maxRotations <- rep(30, 739)
-    #
-    # sim$returnIntervals <- read.csv(file.path(getwd(), "modules","CBM_core",
-    #                                           "data", "returnInt.csv"))
+  # sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
+  # sim$lastPassDMIDS <- sim$historicDMIDs
+  #
+  # sim$minRotations <- rep(10, 739)
+  # sim$maxRotations <- rep(30, 739)
+  #
+  # sim$returnIntervals <- read.csv(file.path(getwd(), "modules","CBM_core",
+  #                                           "data", "returnInt.csv"))
 
 
   ##All these are provided in the out$ for now
 
-    # dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
-    # sim$disturbanceRasters <- list.files(
-    #   file.path(dPath, "disturbance_testArea"),
-    #   pattern = "[.]grd$",
-    #   full.names = TRUE
-    # )
-    #
-    # sim$userDist <- read.csv(file.path(dataPath(sim), "userDist.csv"))
-    #
-    #
+  # dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
+  # sim$disturbanceRasters <- list.files(
+  #   file.path(dPath, "disturbance_testArea"),
+  #   pattern = "[.]grd$",
+  #   full.names = TRUE
+  # )
+  #
+  # sim$userDist <- read.csv(file.path(dataPath(sim), "userDist.csv"))
+  #
+  #
 
-    # # if (!suppliedElsewhere(sim$dbPath)) {
-    # #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
-    # # }
-    # ##TODO these two will come from CBM_dataPrep_XX
-    # sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
-    #
-    # # sim$spatialDT <- read.csv(file.path(dataPath(sim),
-    # #                                     "spatialDT.csv"))
-    #
-    # #sim$curveID <- "gcids" # not needed in the Python
-    #
-    # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
-    #                                       "mySpuDmids.csv"))
-    #
-    # if (!suppliedElsewhere("masterRaster", sim)) {
-    #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
-    # }
-    #
+  # # if (!suppliedElsewhere(sim$dbPath)) {
+  # #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
+  # # }
+  # ##TODO these two will come from CBM_dataPrep_XX
+  # sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
+  #
+  # # sim$spatialDT <- read.csv(file.path(dataPath(sim),
+  # #                                     "spatialDT.csv"))
+  #
+  # #sim$curveID <- "gcids" # not needed in the Python
+  #
+  # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
+  #                                       "mySpuDmids.csv"))
+  #
+  # if (!suppliedElsewhere("masterRaster", sim)) {
+  #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
+  # }
+  #
 
-    # if (!suppliedElsewhere(sim$dbPath)) {
-    #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
-    # }
-    ##TODO these two will come from CBM_dataPrep_XX
-    #sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
+  # if (!suppliedElsewhere(sim$dbPath)) {
+  #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
+  # }
+  ##TODO these two will come from CBM_dataPrep_XX
+  #sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
 
-    # sim$spatialDT <- read.csv(file.path(dataPath(sim),
-    #                                     "spatialDT.csv"))
+  # sim$spatialDT <- read.csv(file.path(dataPath(sim),
+  #                                     "spatialDT.csv"))
 
-    #sim$curveID <- "gcids" # not needed in the Python
+  #sim$curveID <- "gcids" # not needed in the Python
 
-    # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
-    #                                       "mySpuDmids.csv"))
-    #
-    # if (!suppliedElsewhere("masterRaster", sim)) {
-    #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
-    # }
+  # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
+  #                                       "mySpuDmids.csv"))
+  #
+  # if (!suppliedElsewhere("masterRaster", sim)) {
+  #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
+  # }
 
 
 
