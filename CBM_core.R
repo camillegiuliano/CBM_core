@@ -5,7 +5,6 @@ defineModule(sim, list(
   authors = person("Celine", "Boisvenue", email = "celine.boisvenue@nrcan-rncan.gc.ca", role = c("aut", "cre")),
   childModules = character(0),
   version = list(CBM_core = "0.0.2"),
-  spatialExtent = terra::ext(rep(0, 4)),
   timeframe = as.POSIXlt(c(NA, NA)),
   timeunit = "year",
   citation = list("citation.bib"),
