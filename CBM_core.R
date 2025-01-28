@@ -13,7 +13,8 @@ defineModule(sim, list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
     "PredictiveEcology/CBMutils@development", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
-    "PredictiveEcology/LandR@development (>= 1.1.1)"
+    "PredictiveEcology/LandR@development (>= 1.1.1)",
+    "PredictiveEcology/libcbmr"
   ),
   parameters = rbind(
     defineParameter(
