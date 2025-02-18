@@ -10,7 +10,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
+    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite", "cowplot",
     "PredictiveEcology/CBMutils@development", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)",
@@ -202,23 +202,32 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
     },
     plot = {
       ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
+      figPath <- file.path(outputPath(sim), "CBM_core_figures")
       if (time(sim) != start(sim)) {
-        ## TODO: for some reason the plot fails the first time, but not subsequently
-        retry(quote({
-          carbonOutPlot(
-            emissionsProducts = sim$emissionsProducts
-          )
-        }), retries = 2)
+        cPlot <- carbonOutPlot(
+          emissionsProducts = sim$emissionsProducts)
+        SpaDES.core::Plots(cPlot,
+                           filename = "carbonOutPlot",
+                           path = figPath,
+                           ggsaveArgs = list(width = 14, height = 5, units = "in", dpi = 300),
+                           types = "png")
 
-        barPlot(
-          cbmPools = sim$cbmPools
-        )
+        bPlot <- barPlot(
+          cbmPools = sim$cbmPools)
+        SpaDES.core::Plots(bplot,
+                           filename = "barPlot",
+                           path = figPath,
+                           ggsaveArgs = list(width = 7, height = 5, units = "in", dpi = 300),
+                           types = "png")
 
-        NPPplot(
+        nPlot <- NPPplot(
           spatialDT = sim$spatialDT,
           NPP = sim$NPP,
-          masterRaster = sim$masterRaster
-        )
+          masterRaster = sim$masterRaster)
+        SpaDES.core::Plots(nPlot,
+                           filename = "NPPTest",
+                           path = figPath,
+                           types = "png")
       }
 
       spatialPlot(
