@@ -10,7 +10,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
+    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite", "cowplot",
     "PredictiveEcology/CBMutils@development", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)",
@@ -202,23 +202,32 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
     },
     plot = {
       ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
+      figPath <- file.path(outputPath(sim), "CBM_core_figures")
       if (time(sim) != start(sim)) {
-        ## TODO: for some reason the plot fails the first time, but not subsequently
-        retry(quote({
-          carbonOutPlot(
-            emissionsProducts = sim$emissionsProducts
-          )
-        }), retries = 2)
+        cPlot <- carbonOutPlot(
+          emissionsProducts = sim$emissionsProducts)
+        SpaDES.core::Plots(cPlot,
+                           filename = "carbonOutPlot",
+                           path = figPath,
+                           ggsaveArgs = list(width = 14, height = 5, units = "in", dpi = 300),
+                           types = "png")
 
-        barPlot(
-          cbmPools = sim$cbmPools
-        )
+        bPlot <- barPlot(
+          cbmPools = sim$cbmPools)
+        SpaDES.core::Plots(bplot,
+                           filename = "barPlot",
+                           path = figPath,
+                           ggsaveArgs = list(width = 7, height = 5, units = "in", dpi = 300),
+                           types = "png")
 
-        NPPplot(
+        nPlot <- NPPplot(
           spatialDT = sim$spatialDT,
           NPP = sim$NPP,
-          masterRaster = sim$masterRaster
-        )
+          masterRaster = sim$masterRaster)
+        SpaDES.core::Plots(nPlot,
+                           filename = "NPPTest",
+                           path = figPath,
+                           types = "png")
       }
 
       spatialPlot(
@@ -800,7 +809,7 @@ cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGr
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
 cbm_vars$flux <- as.data.table(cbm_vars$flux)
   if (dim(distPixels)[1] > 0) {
-      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[newGCpixelGroup$oldGroup,])
+      cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[match(newGCpixelGroup$oldGroup, cbm_vars$flux$row_idx),])
       if (is.null(cbm_vars$flux$row_idx)) {
         cbm_vars$flux$row_idx <- 1:nrow(cbm_vars$flux)
       } else {
@@ -820,7 +829,7 @@ cbm_vars$flux <- as.data.table(cbm_vars$flux)
   # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
 cbm_vars$state <- as.data.table(cbm_vars$state)
   if (dim(distPixels)[1] > 0) {
-    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[newGCpixelGroup$oldGroup,])
+    cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[match(newGCpixelGroup$oldGroup, cbm_vars$state$row_idx),])
     if (is.null(cbm_vars$state$row_idx)) {
       cbm_vars$state$row_idx <- 1:nrow(cbm_vars$state)
     } else {
