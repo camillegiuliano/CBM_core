@@ -13,7 +13,8 @@ defineModule(sim, list(
     "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite",
     "PredictiveEcology/CBMutils@development", "PredictiveEcology/reproducible",
     "PredictiveEcology/SpaDES.core@development",
-    "PredictiveEcology/LandR@development (>= 1.1.1)"
+    "PredictiveEcology/LandR@development (>= 1.1.1)",
+    "PredictiveEcology/libcbmr"
   ),
   parameters = rbind(
     defineParameter(
@@ -473,6 +474,12 @@ annual <- function(sim) {
 
   # mySpuDmids was created in CBM_dataPrep_XX
   mySpuDmids <- copy(sim$mySpuDmids)
+
+  # Check that there is one disturbance_matrix_id for each spatial_unit_id and rasterID
+  if (nrow(unique(mySpuDmids[, .(spatial_unit_id, rasterID, disturbance_matrix_id)])) >
+      nrow(unique(mySpuDmids[, .(spatial_unit_id, rasterID)]))) stop(
+        "'mySpuDmids' must have only 1 'disturbance_matrix_id' each combination of 'spatial_unit_id' and 'rasterID'")
+
   mySpuDmids[, "events" := rasterID][, rasterID := NULL]
   cols <- c("spatial_unit_id", "events")
   wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
