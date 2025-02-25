@@ -628,6 +628,13 @@ annual <- function(sim) {
       cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
     }
 
+    # Adding ages
+    if (is.null(cbm_vars$parameters$age)) {
+      cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
+    } else {
+      cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[, age := ifelse(is.na(age), 1, age)]
+    }
+
     cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[row_idx %in% pixelCount$pixelGroup]
     spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
     cbm_vars$parameters <- cbm_vars$parameters[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
@@ -678,22 +685,6 @@ annual <- function(sim) {
     )
 
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
-
-    ##TODO there was no age 0 growth increments, it starts at 1, so disturbed
-    ##sites, who's age was set to 0, were not being assigned the right growth. I
-    ##am setting it to age = 1, but this needs to be solved.
-    ##TODO Scott confirmed that resetting the ages happens internally in the Python
-    ##functions. First, check at the end of this annual (post Step function) if
-    ##this is correct for pixelGroup 42 (disturbed by fire dmid 371) - CORRECT.
-    ##Second, need to make sure we take that into account. This really means that
-    ##the ages (changed internally) will be tracked in cbm_vars$state. The reason
-    ##we need it here is to make the match to the annual growth needed for the
-    ##libcbmr::cbm_exn_step function below.
-    if (is.null(cbm_vars$parameters$age)) {
-      cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
-    } else {
-      cbm_vars$parameters <- cbm_vars$parameters[, lapply(.SD, function(age) ifelse(is.na(age), 1, age))]
-    }
 
     ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
     ## when creating annual_increments.
@@ -838,6 +829,7 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
     }
     cbm_vars$state <- cbm_vars$state[(cbm_vars$state$row_idx %in% pixelCount$pixelGroup),]
   }
+
   ## setting up the operations order in Python
   ## ASSUMING that the order is the same as we had it before c(
   ##"disturbance", "growth 1", "domturnover",
@@ -867,6 +859,8 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   cbm_vars$pools$row_idx <- row_idx
   cbm_vars$flux$row_idx <- row_idx
   cbm_vars$state$row_idx <- row_idx
+  # update cbm_vars$parameters$age to match with cbm_vars$state$age
+  cbm_vars$parameters$age <- cbm_vars$state$age
 
   sim$cbm_vars <- cbm_vars
 
