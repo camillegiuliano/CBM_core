@@ -79,6 +79,7 @@ defineModule(sim, list(
       columns = c(
         rasterID              = "ID links to pixel values in the disturbance rasters",
         wholeStand            = "Specifies if the whole stand is disturbed (1 = TRUE; 0 = FALSE)",
+        sw_hw                 = "Optional column specifying if disturbance applies to SW or HW",
         spatial_unit_id       = "Spatial unit ID",
         disturbance_type_id   = "Disturbance type ID",
         disturbance_matrix_id = "Disturbance matrix ID",
@@ -481,23 +482,34 @@ annual <- function(sim) {
   # libcbm resets ages to 0 internally but for transparency we are doing it here
   # to (and it gives an opportunity for a check)
 
-  # mySpuDmids was created in CBM_dataPrep_XX
+  # List possible disturbances for each growth curve ID
   mySpuDmids <- copy(sim$mySpuDmids)
+  if ("rasterID" %in% names(mySpuDmids)) mySpuDmids[, "events" := rasterID][, rasterID := NULL]
+  if (!"sw_hw"   %in% names(mySpuDmids)) mySpuDmids <- rbind(
+    copy(mySpuDmids)[, sw_hw := "sw"], copy(mySpuDmids)[, sw_hw := "hw"])
 
-  # Check that there is one disturbance_matrix_id for each spatial_unit_id and rasterID
-  if (nrow(unique(mySpuDmids[, .(spatial_unit_id, rasterID, disturbance_matrix_id)])) >
-      nrow(unique(mySpuDmids[, .(spatial_unit_id, rasterID)]))) stop(
-        "'mySpuDmids' must have only 1 'disturbance_matrix_id' each combination of 'spatial_unit_id' and 'rasterID'")
+  ## Check that there is one disturbance_matrix_id for each disturbance setting
+  distUnq <- c("spatial_unit_id", "sw_hw", "events")
+  if (nrow(unique(mySpuDmids[, c(distUnq, "disturbance_matrix_id"), with = FALSE])) >
+      nrow(unique(mySpuDmids[, distUnq, with = FALSE]))) stop(
+        "'mySpuDmids' must have only 1 'disturbance_matrix_id' each combination of ",
+        paste(sQuote(distUnq), collapse = ", "))
 
-  mySpuDmids[, "events" := rasterID][, rasterID := NULL]
-  cols <- c("spatial_unit_id", "events")
-  wholeStandDist <- merge.data.table(distPixels, mySpuDmids, by = cols)
+  gcidDist <- merge(
+    copy(sim$gcid_is_sw_hw)[, .(gcids, is_sw, sw_hw = ifelse(is_sw, "sw", "hw"))],
+    mySpuDmids,
+    by = "sw_hw", allow.cartesian = TRUE)
+  setkey(gcidDist, NULL)
+  if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(gcidDist$gcids)
+
+  # Set disturbed pixels to age = 0
   ##TODO check if this works the way it is supposed to
   # read-in the mySpuDmids, make a vector of 0 and 1 or 2 the length of distPixels$events
-  setkey(wholeStandDist,pixelIndex)
-  setkey(distPixels,pixelIndex)
-  distPixels$ages[which(wholeStandDist$wholeStand == 1)] <- 0
-  setkey(distPixels,pixelGroup)
+  distWhole <- merge(distPixels, gcidDist, by = c("spatial_unit_id", "gcids", "events"))
+  setkey(distPixels, pixelIndex)
+  setkey(distWhole, pixelIndex)
+  distPixels$ages[which(distWhole$wholeStand == 1)] <- 0
+  setkey(distPixels, pixelGroup)
 
   # 5. new pixelGroup----------------------------------------------------
   # make a column of new pixelGroup that includes events and carbon from
@@ -554,7 +566,6 @@ annual <- function(sim) {
   setnames(sim$pixelKeep, "pixelGroup", paste0("pixelGroup", time(sim)[1]))
 
   # 7. Update the meta data for the pixelGroups. The first meta data is the
-  # $level3DT created in the spadesCBMinputs module. When new pixels groups are
   # create the meta data gets updated here.
 
   # only the column pixelIndex is different between distPixelCpools and pixelGroupC
@@ -586,8 +597,8 @@ annual <- function(sim) {
 
   # 9. From the events column, create a vector of the disturbance matrix
   # identification so it links back to the CBM default disturbance matrices.
-  DM <- merge(pixelGroupForAnnual, mySpuDmids,
-              by = c("spatial_unit_id", "events"), all.x = TRUE)
+  DM <- merge(pixelGroupForAnnual, gcidDist,
+              by = c("spatial_unit_id", "gcids", "events"), all.x = TRUE)
   DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
   setkeyv(DM, "pixelGroup")
 
