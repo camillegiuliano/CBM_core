@@ -6,10 +6,6 @@ date: "26 June 2024"
 output: pdf_document
 editor_options: 
   chunk_output_type: console
-bibliography:
-  - citation.bib
-biblatexoptions: [refsegment=chapter]
-link-citations: true
 ---
 ```{r setup-CBM_core, include = FALSE}
 ```
