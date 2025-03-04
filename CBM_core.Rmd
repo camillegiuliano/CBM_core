@@ -8,7 +8,6 @@ editor_options:
   chunk_output_type: console
 bibliography:
   - citation.bib
-csl: citations/ecology-letters.csl
 biblatexoptions: [refsegment=chapter]
 link-citations: true
 ---
