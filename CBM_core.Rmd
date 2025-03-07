@@ -12,6 +12,10 @@ editor_options:
 
 # CBM_core
 
+::: {.callout-important}
+This documentation is work in progress. Potential discrepancies and omissions may exist for the time being. If you find any regarding this module, contact us [here]("https://github.com/PredictiveEcology/CBM_core/issues").
+:::
+
 ## Overview
 
 This is the core modules of Spades CBM.
@@ -26,9 +30,9 @@ The SQligth (used in CBM_defaults) has has a column named `forest_type_id` that 
 |-----------------|-----------------|-----------------------|-----------------|
 | growth_increments | Data table |                                                              | CBM_vol2biomass |
 | forestTypeID      | Data table | Defines forest types and their respective IDs                | CM_defaults     |
-| level3DT          | Data table | pixelGroup level table with all collapsed raster information |                 |
-| spatialDT         | Data table | Pixel level table with all collapsed raster information      | CBM_dataPrep_x  |
-| masterRaster      | SpatRaster |                                                              | CBM_dataPrep_x  |
+| level3DT          | Data table | pixelGroup level table with all collapsed raster information | CBM_dataPrep_SK |
+| spatialDT         | Data table | Pixel level table with all collapsed raster information      | CBM_dataPrep_SK |
+| masterRaster      | SpatRaster |                                                              | CBM_dataPrep_SK |
 | pooldel           | Character  | Vector of pools                                              | CBM_defaults    |
 | spinupSQL         | Data table | Parameters for CBM_core spinup event                         | CBM_defaults    |
 | disturbanceMatrix | Data table | Default disturbance data                                     | CBM_defaults    |
