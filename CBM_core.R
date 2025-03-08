@@ -141,17 +141,13 @@ defineModule(sim, list(
   )
 ))
 
-## event types
-#   - type `init` is required for initialiazation
 doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
   switch(
     eventType,
     init = {
-      ### check for more detailed object dependencies:
-      ### (use `checkObject` or similar)
 
-      # do stuff for this event
-      sim <- spinup(sim) ## this is the spinup
+      # spinup
+      sim <- spinup(sim)
 
       # schedule future event(s)
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "postSpinup")
@@ -171,24 +167,24 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       #sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 12 )
       # sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last())
     },
-     annual = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
+
+    annual = {
+
       sim <- annual(sim)
       sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual")
-      # ! ----- STOP EDITING ----- ! #
     },
+
     postSpinup = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
+
       sim <- postSpinup(sim)
+
       ## These turnover rates are now in
       # sim$turnoverRates <- calcTurnoverRates(
       #   turnoverRates = sim$cbmData@turnoverRates,
       #   spatialUnitIds = sim$cbmData@spatialUnitIds, spatialUnits = sim$spatialUnits
       #)
-      # ! ----- STOP EDITING ----- ! #
     },
+
     accumulateResults = {
       outputDetails <- as.data.table(outputs(sim))
       objsToLoad <- c("cbmPools", "NPP")
@@ -201,6 +197,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
         }
       }
     },
+
     plot = {
       ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
       figPath <- file.path(outputPath(sim), "CBM_core_figures")
@@ -240,38 +237,17 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
       sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 12)
     },
+
     savePools = {
-      # ! ----- EDIT BELOW ----- ! #
-      # do stuff for this event
 
       colnames(sim$cbmPools) <- c(c("simYear", "pixelCount", "pixelGroup", "ages"), sim$pooldef)
       write.csv(file = file.path(outputPath(sim), "cPoolsPixelYear.csv"), sim$cbmPools)
-
-
-      # e.g., call your custom functions/methods here
-      # you can define your own methods below this `doEvent` function
-
-      # schedule future event(s)
-
-      # e.g.,
-      # sim <- scheduleEvent(sim, time(sim) + P(sim)$.saveInterval, "CBM_core", "savePools")
-
-      # ! ----- STOP EDITING ----- ! #
     },
-    warning(paste("Undefined event type: '", current(sim)[1, "eventType", with = FALSE],
-      "' in module '", current(sim)[1, "moduleName", with = FALSE], "'",
-      sep = ""
-    ))
+
+    warning(noEventWarning(sim))
   )
   return(invisible(sim))
 }
-
-## event functions
-#   - follow the naming convention `modulenameEventtype()`;
-#   - `modulenameInit()` function is required for initiliazation;
-#   - keep event functions short and clean, modularize by calling subroutines from section below.
-
-### template initialization
 
 spinup <- function(sim) {
   ##TODO this will be reinstated once we call the other CBM modules
