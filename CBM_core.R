@@ -63,7 +63,7 @@ defineModule(sim, list(
       sourceURL = NA),
     expectsInput(
       objectName = "spinupSQL", objectClass = "dataset",
-      desc = NA,
+      desc = "Table containing many necesary spinup parameters used in CBM_core",
       sourceURL = NA),
     expectsInput(
       objectName = "speciesPixelGroup", objectClass = "data.frame",
@@ -116,15 +116,16 @@ defineModule(sim, list(
       desc = "Three parts: pixelGroup, Age, and Pools "),
     createsOutput(
       objectName = "gcid_is_sw_hw", objectClass = "data.table",
-      desc = NA),
+      desc = "Table that flags each of the study area's gcids as softwood or hardwood"),
     createsOutput(
       objectName = "spinup_input", objectClass = "data.table",
-      desc = NA),
+      desc = "input parameters for the spinup functions"),
     createsOutput(
-      objectName = "spinupResult", objectClass = "data.frame", desc = NA),
+      objectName = "spinupResult", objectClass = "data.frame",
+      desc = "Results from the spinup functions"),
     createsOutput(
       objectName = "cbm_vars", objectClass = "list",
-      desc = NA),
+      desc = "List of 4 data tables: parameters, pools, flux, and state"),
     createsOutput(
       objectName = "pixelGroupC", objectClass = "data.table",
       desc = "This is the data table that has all the vectors to create the inputs for the annual processes"),
