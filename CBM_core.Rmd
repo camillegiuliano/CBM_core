@@ -28,21 +28,26 @@ The SQligth (used in CBM_defaults) has has a column named `forest_type_id` that 
 
 | Name              | Class      | Description                                                  | Source          |
 |-----------------|-----------------|-----------------------|-----------------|
-| growth_increments | Data table |                                                              | CBM_vol2biomass |
-| forestTypeID      | Data table | Defines forest types and their respective IDs                | CM_defaults     |
+| growth_increments | Data table | 1/2 growth increment matrix | CBM_vol2biomass |
 | level3DT          | Data table | pixelGroup level table with all collapsed raster information | CBM_dataPrep_SK |
 | spatialDT         | Data table | Pixel level table with all collapsed raster information      | CBM_dataPrep_SK |
-| masterRaster      | SpatRaster |                                                              | CBM_dataPrep_SK |
-| pooldel           | Character  | Vector of pools                                              | CBM_defaults    |
+| masterRaster      | SpatRaster | Raster of study area | User provided, for SK: <https://drive.google.com/file/d/1zUyFH8k6Ef4c_GiWMInKbwAl6m6gvLJW>                                                             |
+| pooldef           | Character  | Vector of pools                                              | CBM_defaults    |
 | spinupSQL         | Data table | Parameters for CBM_core spinup event                         | CBM_defaults    |
+| speciesPixelGroup | Data table | Data table | Table connecting pixel groups to species IDs | CBM_dataPrep_SK |
+| realAges | Numeric | Extracted ages for each pixel group | CBM_dataPrep_SK |
+| mySpuDmids | Data table | Summary table of possible CBM-CFS3 disturbances within study area spatial units | CBM_dataPrep_SK |
+| disturbanceRasters | Character | Disturbance rasters for the study area for the duration of simulation | User provided, for SK: <https://drive.google.com/file/d/12YnuQYytjcBej0_kdodLchPg7z9LygCt> |
 | disturbanceMatrix | Data table | Default disturbance data                                     | CBM_defaults    |
+| historicDMtype | Numeric | Historical disturbance type for each pixel group | CBM_dataPrep_SK |
+| lastPassDMtype | Numeric | Last pass disturebance type for each pizel group | CBM_dataPrep_SK |
 
 ## List of output objects
 
 | Name              | Class      | Description                                                     |
 |------------------|------------------|-------------------------------------|
-| spinup_input      | List       |                                                                 |
-| cbm_vars          | List       |                                                                 |
+| spinup_input      | List       | input parameters for the spinup functions                       |
+| cbm_vars          | List       | List of 4 data tables: parameters, pools, flux, and state       |
 | spinupResults     | Data frame | Pools post spinup in order of pixelGroup                        |
 | pixelGroupC       | Data table | All vectors (pixelGroup columns) and pools for simulation year. |
 | pixelKeep         | Data table | Tracking all pixels' pixel group through simulations            |
