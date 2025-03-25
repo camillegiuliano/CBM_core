@@ -24,25 +24,29 @@ This is the core modules of Spades CBM.
 ### Notes on forest type
 The SQligth (used in CBM_defaults) has has a column named `forest_type_id` that identifies a softwood forest (sw) as 1, a mixed forest as 2, and a hardwood forest (hw) as 3. This distinction is important because it determines how the root biomass will be calculated (sw differently than hw). The definition of `fotrest_type_id` is constant and is the same that is used in `canfi_species.csv` (species level identification of codes that is needed in the volumne to biomass translation in CBM_vol2biomass), in `gcMeta.csv` (SK specific growth curve metadata), and in `sim$growth_increments` because it built from `gcMeta` and `canfi_species`. The `sim$growth_increment$forest_type_id` is the one used to create the sw flag needed for input in the spinup event. After that, the sw_hw flag (1=sw, 0=hw) is stored in the `sim$cbm_vars$state$sw_hw` column.
 
-## List of input objects
+## Background
+
+## Inputs
 
 | Name              | Class      | Description                                                  | Source          |
 |-----------------|-----------------|-----------------------|-----------------|
 | growth_increments | Data table | 1/2 growth increment matrix | CBM_vol2biomass |
 | level3DT          | Data table | pixelGroup level table with all collapsed raster information | CBM_dataPrep_SK |
 | spatialDT         | Data table | Pixel level table with all collapsed raster information      | CBM_dataPrep_SK |
-| masterRaster      | SpatRaster | Raster of study area | User provided, for SK: <https://drive.google.com/file/d/1zUyFH8k6Ef4c_GiWMInKbwAl6m6gvLJW>                                                             |
+| masterRaster      | SpatRaster | Raster of study area | User provided, for SK: [Google Drive](https://drive.google.com/file/d/1zUyFH8k6Ef4c_GiWMInKbwAl6m6gvLJW)                                                             |
 | pooldef           | Character  | Vector of pools                                              | CBM_defaults    |
 | spinupSQL         | Data table | Parameters for CBM_core spinup event                         | CBM_defaults    |
 | speciesPixelGroup | Data table | Data table | Table connecting pixel groups to species IDs | CBM_dataPrep_SK |
 | realAges | Numeric | Extracted ages for each pixel group | CBM_dataPrep_SK |
 | mySpuDmids | Data table | Summary table of possible CBM-CFS3 disturbances within study area spatial units | CBM_dataPrep_SK |
-| disturbanceRasters | Character | Disturbance rasters for the study area for the duration of simulation | User provided, for SK: <https://drive.google.com/file/d/12YnuQYytjcBej0_kdodLchPg7z9LygCt> |
+| disturbanceRasters | Character | Disturbance rasters for the study area for the duration of simulation | User provided, for SK: [Google Drive](https://drive.google.com/file/d/12YnuQYytjcBej0_kdodLchPg7z9LygCt) |
 | disturbanceMatrix | Data table | Default disturbance data                                     | CBM_defaults    |
 | historicDMtype | Numeric | Historical disturbance type for each pixel group | CBM_dataPrep_SK |
 | lastPassDMtype | Numeric | Last pass disturebance type for each pizel group | CBM_dataPrep_SK |
 
-## List of output objects
+## Module functioning
+
+## Outputs
 
 | Name              | Class      | Description                                                     |
 |------------------|------------------|-------------------------------------|
@@ -55,19 +59,9 @@ The SQligth (used in CBM_defaults) has has a column named `forest_type_id` that 
 | NPP               | Data table | Net primary production per pixel group                          |
 | emissionsProducts | matrix     | Total emissions and products for study area per simulation year |
 
-## Module flow (rename this section later)
+## Links to other modules
 
-1.  
-
-2.  
-
-3.  
-
-4.  
-
-## OLD VERSION
-
-## Overview
-
-NPP: Net primary productivity is for both above and below ground productivity. Provide an overview of what the module does / how to use the module.
+- [CBM_defaults](https://github.com/PredictiveEcology/CBM_defaults)
+- [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git)
+- [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass)
 
