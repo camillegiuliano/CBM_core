@@ -30,6 +30,7 @@ jobs:
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
       GOOGLE_AUTH: ${{ secrets.GOOGLE_AUTH }}
+      BRANCH_NAME: ${{ github.base_ref || github.ref_name }}
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
 
     steps:
@@ -78,10 +79,10 @@ jobs:
           cat("\nTESTING WITH MODULES:\n -", paste(getOption("spades.test.modules"), collapse = "\n - "), "\n\n")
 
           # Authorize Google Drive
-          if (Sys.getenv("GOOGLE_AUTH") != ""){
-            install.packages("googledrive")
-            googledrive::drive_auth(path = Sys.getenv("GOOGLE_AUTH"))
-          }
+          install.packages("googledrive")
+          tryCatch(
+            googledrive::drive_auth(path = Sys.getenv("GOOGLE_AUTH")),
+            error = function(e) warning(e$message))
 
           # Run tests
           testthat::test_dir("tests/testthat", stop_on_failure = TRUE)
