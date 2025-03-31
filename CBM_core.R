@@ -10,9 +10,8 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "ggplot2", "quickPlot", "magrittr", "terra", "RSQLite", "cowplot",
-    "PredictiveEcology/CBMutils@development", "PredictiveEcology/reproducible",
-    "PredictiveEcology/SpaDES.core@development",
+    "data.table", "terra",
+    "PredictiveEcology/CBMutils@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)",
     "PredictiveEcology/libcbmr"
   ),
@@ -544,7 +543,7 @@ annual <- function(sim) {
   # create the meta data gets updated here.
 
   # only the column pixelIndex is different between distPixelCpools and pixelGroupC
-  metaDT <- unique(updateSpatialDT[, -("pixelIndex")]) # %>% .[order(pixelGroup), ]
+  metaDT <- unique(updateSpatialDT[, -("pixelIndex")]) # |> .[order(pixelGroup), ]
   setkey(metaDT, pixelGroup)
 
   # 8. link the meta data (metaDT) with the appropriate carbon pools
