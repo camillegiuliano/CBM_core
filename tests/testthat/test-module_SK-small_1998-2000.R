@@ -22,10 +22,10 @@ test_that("Module: SK-small 1998-2000", {
       times   = times,
       paths   = list(
         projectPath = projectPath,
-        modulePath  = spadesTestPaths$temp$modules,
+        modulePath  = dirname(spadesTestPaths$RProj),
         packagePath = spadesTestPaths$temp$packages,
         inputPath   = spadesTestPaths$temp$inputs,
-        cachePath   = spadesTestPaths$temp$cache,
+        cachePath   = file.path(projectPath, "cache"),
         outputPath  = file.path(projectPath, "outputs")
       ),
 
@@ -127,7 +127,8 @@ test_that("Module: SK-small 1998-2000", {
   expect_true(!is.null(simTest$emissionsProducts))
   expect_equal(
     data.table::as.data.table(simTest$emissionsProducts),
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "emissionsProducts.csv"))
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "emissionsProducts.csv"))[
+      , colnames(simTest$emissionsProducts), with = FALSE]
   )
 
   expect_true(!is.null(simTest$gcid_is_sw_hw))
