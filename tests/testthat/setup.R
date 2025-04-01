@@ -20,5 +20,5 @@ spadesTestPaths <- SpaDEStestSetUpDirectories(require = "googledrive", copyModul
 
 # Try to authorize Google Drive
 if (!googledrive::drive_has_token()){
-  tryCatch(googledrive::drive_auth(path = ""), error = function(e) warning(e$message))
+  tryCatch(googledrive::drive_auth(), error = function(e) warning(e$message))
 }
