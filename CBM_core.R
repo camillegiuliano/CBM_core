@@ -21,8 +21,8 @@ defineModule(sim, list(
         "The default regeneration delay post disturbance.",
         "Delays can also be set for each pixel group by including a 'regenDelay' column in the level3DT input object."
       )),
-    defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Products"), NA_character_, NA_character_,
-                    "A vector of columns for emissions and products; currently must be c('CO2', 'CH4', 'CO', 'Products')"),
+    defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Emissions"), NA_character_, NA_character_,
+                    "A vector of columns to return for emissions and products"),
     defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
       desc = "which carbon pools to plot, if any. Defaults to total carbon"
     ),
@@ -134,7 +134,9 @@ defineModule(sim, list(
       desc = "NPP for each `pixelGroup`"),
     createsOutput(
       objectName = "emissionsProducts", objectClass = "data.table",
-      desc = "Co2, CH4, CO and Products columns for each simulation year - filled up at each annual event."),
+      desc = paste(
+        "Emissions and product totals for each simulation year.",
+        "Choose which columns to return with the 'emissionsProductsCols' parameter.")),
     createsOutput(
       objectName = "pixelKeep", objectClass = "data.table",
       desc = paste("Keeps the pixelIndex from spatialDT with each year's `PixelGroupID` as a column.",
@@ -936,11 +938,16 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
                                  DisturbanceDOMCOEmission))]
   ##TODO: this combined emissions column might not be needed.
 
+  ##NOTE: SK: CH4 and CO are 0 in 1999 and 2000
   emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
   emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
-  emissions[, `:=`(CO, (DisturbanceBioCOEmission + DisturbanceDOMCOEmission))]
-  emissions <- emissions[, c("CO2", "CH4", "CO","Emissions")] ##NOTE: CH4 and CO are 0 in 1999 and 2000
-  emissions <- as.data.table(c(emissions))
+  emissions[, `:=`(CO,  (DisturbanceBioCOEmission  + DisturbanceDOMCOEmission))]
+
+  reqCols <- c("CO2", "CH4", "CO", "Emissions")
+  epCols  <- intersect(names(emissions), c(P(sim)$emissionsProductsCols, reqCols))
+  if (!identical(sort(P(sim)$emissionsProductsCols), sort(epCols))) warning(
+    "'emissionsProducts' including required columns: ", paste(shQuote(reqCols), collapse = ", "))
+  emissions <- emissions[, epCols, with = FALSE]
 
   emissionsProducts <- cbind(emissions, products)
   emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
@@ -966,7 +973,6 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
 
 .inputObjects<- function(sim) {
 
-  P(sim)$emissionsProductsCols <- c("CO2", "CH4", "CO", "Products")
   P(sim)$poolsToPlot <- "totalCarbon"
   P(sim)$.plotInitialTime <- 1990
   P(sim)$.plotInterval <- 1

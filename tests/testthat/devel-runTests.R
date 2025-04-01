@@ -41,3 +41,15 @@
   testthat::test_dir("tests/testthat", reporter = testthat::SummaryReporter)
 
 
+## RUN TEST SUBSETS ----
+
+  # Run module tests
+  testthat::test_dir("tests/testthat", filter = "^module")
+
+  # Run multi module integration tests
+  testthat::test_dir("tests/testthat", filter = "^multiModule")
+
+  # Run SK-small tests
+  testthat::test_dir("tests/testthat", filter = "SK-small")
+
+
