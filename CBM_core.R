@@ -534,7 +534,11 @@ annual <- function(sim) {
   updateSpatialDT <- rbind(spatialDT[!(pixelIndex %in% distPixelCpools$pixelIndex),],
                            distPixelCpools[, .SD, .SDcols = colnames(spatialDT)])
   setkeyv(updateSpatialDT, "pixelIndex")
+
+  # Set pixel count
   pixelCount <- updateSpatialDT[, .N, by = pixelGroup]
+  data.table::setkey(pixelCount, pixelGroup)
+
   # adding the new pixelGroup to the pixelKeep. pixelKeep is 1st created in the
   # postspinup event and update in each annual event (in this script).
   setkeyv(sim$pixelKeep, "pixelIndex")
@@ -877,13 +881,10 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
   # pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
-  pooldef <- sim$pooldef
-  updatePools <- data.table(
-    simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
-    pixelCount = pixelCount[["N"]],
-    pixelGroup = sim$pixelGroupC$pixelGroup,
-    ages = sim$pixelGroupC$ages,
-    sim$pixelGroupC[, ..pooldef]
+  updatePools <- cbind(
+    simYear    = rep(time(sim)[1], nrow(sim$pixelGroupC)),
+    pixelCount = pixelCount[order(pixelGroup)]$N,
+    sim$pixelGroupC[, c("pixelGroup", "ages", sim$pooldef), with = FALSE]
   )
 
   sim$cbmPools <- updatePools #rbind(sim$cbmPools, updatePools)
