@@ -388,7 +388,7 @@ postSpinup <- function(sim) {
 
 annual <- function(sim) {
 
-  spatialDT <- sim$spatialDT
+  spatialDT <- sim$spatialDT[, .(pixelIndex, pixelGroup, spatial_unit_id, gcids, ages)]
   setkeyv(spatialDT, "pixelIndex")
 
   # 1. Read disturbances for the year
@@ -457,10 +457,7 @@ annual <- function(sim) {
   }
 
   # 3. Isolate disturbed pixels
-  distPixels <- spatialDT[events > 0, .(
-    pixelIndex, pixelGroup, ages, spatial_unit_id,
-    gcids, ecozones, events
-  )]
+  distPixels <- spatialDT[events > 0,]
 
   # 4. Reset the ages for disturbed pixels in stand replacing disturbances.
   # libcbm resets ages to 0 internally but for transparency we are doing it here
@@ -517,8 +514,7 @@ annual <- function(sim) {
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
-    "newGroup", "pixelGroup", "pixelIndex", "events", "ages", "spatial_unit_id",
-    "gcids", "ecozones", "oldGroup", cPoolNames)
+    "newGroup", names(spatialDT), cPoolNames), "oldGroup"
   ]
 
   cols <- c("pixelGroup", "newGroup")
@@ -556,7 +552,7 @@ annual <- function(sim) {
   distGroupCpools <- unique(distGroupCpoolsOld[, c("oldGroup"):=NULL])
   setkey(distGroupCpools, pixelGroup)
   cols <- c(
-    "pixelGroup", "ages", "spatial_unit_id", "gcids", "ecozones", "events"
+    "pixelGroup", "ages", "spatial_unit_id", "gcids", "events"
   )
 
   ## year 2000 has no disturbance
@@ -873,6 +869,7 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   agesUp[, ages.x := NULL]
   setnames(agesUp, old = "ages.y", new = "ages")
   sim$spatialDT <- agesUp
+  setkeyv(sim$spatialDT, "pixelIndex")
 
   # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
   # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
