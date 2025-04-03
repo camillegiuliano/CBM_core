@@ -883,7 +883,7 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   # pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
   updatePools <- cbind(
     simYear    = rep(time(sim)[1], nrow(sim$pixelGroupC)),
-    pixelCount = pixelCount[order(pixelGroup)]$N,
+    pixelCount = pixelCount[["N"]],
     sim$pixelGroupC[, c("pixelGroup", "ages", sim$pooldef), with = FALSE]
   )
 
