@@ -326,7 +326,7 @@ spinup <- function(sim) {
 
   ## Use an area of 1m for each pixel
   ## Results will later be multiplied by area to total emissions
-  cohortSpinup <- SpinupCohorts(
+  cohortSpinup <- cbmExnSpinupCohorts(
     cohortDT      = cohortDT,
     standDT       = standDT,
     gcMetaDT      = gcMetaDT,
@@ -338,7 +338,7 @@ spinup <- function(sim) {
   )
 
   # Spinup
-  spinupOut <- Spinup(
+  spinupOut <- cbmExnSpinup(
     cohortDT   = cohortSpinup,
     spinupSQL  = sim$spinupSQL[, mean_annual_temperature := historic_mean_temperature],
     growthIncr = sim$growth_increments,

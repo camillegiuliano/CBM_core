@@ -2,7 +2,7 @@
 #' Spinup
 #'
 #' Spinup cohort data with libcbmr.
-Spinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
+cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
 
   ## Prepare input for spinup ----
 
@@ -73,12 +73,13 @@ Spinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
 #' Spinup cohorts
 #'
 #' Prepare cohort, stand, and growth curve data into a table ready for spinup.
-SpinupCohorts <- function(cohortDT, standDT, gcMetaDT,
-                          gc_id         = "gc_id",
-                          default_area  = 1,
-                          default_delay = 0L,
-                          default_historical_disturbance_type = 1L,
-                          default_last_pass_disturbance_type  = 1L){
+cbmExnSpinupCohorts <- function(
+    cohortDT, standDT, gcMetaDT,
+    gc_id         = "gc_id",
+    default_area  = 1,
+    default_delay = 0L,
+    default_historical_disturbance_type = 1L,
+    default_last_pass_disturbance_type  = 1L){
 
   # Set required columns
   reqCols <- list(
