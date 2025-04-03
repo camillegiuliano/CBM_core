@@ -324,6 +324,13 @@ spinup <- function(sim) {
 
   gcMetaDT <- unique(sim$growth_increments[, .(gcids, species_id, sw_hw = forest_type_id == 1)])
 
+  if (!"delay" %in% names(cohortDT)) message(
+    "Spinup using the default regeneration delay: ", P(sim)$default_delay)
+  if (!"historical_disturbance_type" %in% names(standDT)) message(
+    "Spinup using the default historical disturbance type ID: ", P(sim)$default_historical_disturbance_type)
+  if (!"last_pass_disturbance_type"  %in% names(standDT)) message(
+    "Spinup using the default last pass disturbance type ID: ", P(sim)$default_last_pass_disturbance_type)
+
   ## Use an area of 1m for each pixel
   ## Results will later be multiplied by area to total emissions
   cohortSpinup <- cbmExnSpinupCohorts(
