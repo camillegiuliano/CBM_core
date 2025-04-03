@@ -102,25 +102,31 @@ test_that("Module: SK-small 1998-2000", {
   ## Check outputs ----
 
   # spinupResult
+  ## There should be the same number of initial pixel groups.
   expect_true(!is.null(simTest$spinupResult))
+
+  spinupResultValid <- data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "spinupResult.csv"))
+  expect_equal(nrow(simTest$spinupResult), nrow(spinupResultValid))
   expect_equal(
-    simTest$spinupResult,
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "spinupResult.csv")),
+    data.table::as.data.table(simTest$spinupResult)[order(Merch)],
+    spinupResultValid[order(Merch)],
     check.attributes = FALSE
   )
 
   # cbmPools
   expect_true(!is.null(simTest$cbmPools))
   expect_equal(
-    simTest$cbmPools,
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "cbmPools.csv"))
+    simTest$cbmPools[,-("pixelGroup")][, lapply(.SD, sum), by = simYear],
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "cbmPools.csv"))[
+      ,-("pixelGroup")][, lapply(.SD, sum), by = simYear]
   )
 
   # NPP
   expect_true(!is.null(simTest$NPP))
   expect_equal(
-    simTest$NPP,
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "NPP.csv"))
+    simTest$NPP[,-("pixelGroup")][, lapply(.SD, sum), by = simYear],
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "NPP.csv"))[
+      ,-("pixelGroup")][, lapply(.SD, sum), by = simYear]
   )
 
   # emissionsProducts

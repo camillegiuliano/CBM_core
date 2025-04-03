@@ -17,15 +17,26 @@ defineModule(sim, list(
   ),
   parameters = rbind(
     defineParameter(
-      "regenDelay", "numeric", default = 0, min = 0, max = NA, desc = paste(
+      "default_delay", "integer", default = 0L, min = 0L, max = NA_integer_, desc = paste(
         "The default regeneration delay post disturbance.",
-        "Delays can also be set for each pixel group by including a 'regenDelay' column in the level3DT input object."
+        "This can instead be set for each cohort with the spatialDT 'delay' column."
       )),
-    defineParameter("emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Emissions"), NA_character_, NA_character_,
-                    "A vector of columns to return for emissions and products"),
-    defineParameter("poolsToPlot", "character", "totalCarbon", NA, NA,
-      desc = "which carbon pools to plot, if any. Defaults to total carbon"
-    ),
+    defineParameter(
+      "default_historical_disturbance_type", "integer", default = 1L, NA_integer_, NA_integer_, desc = paste(
+        "The default historical disturbance type ID. Examples: 1 = wildfire; 2 = clearcut.",
+        "This can instead be set for each stand with the spatialDT 'historical_disturbance_type' column."
+      )),
+    defineParameter(
+      "default_last_pass_disturbance_type", "numeric", default = 1L, NA_integer_, NA_integer_, desc = paste(
+        "The default last pass disturbance type ID. Examples: 1 = wildfire; 2 = clearcut.",
+        "This can instead be set for each stand with the spatialDT 'last_pass_disturbance_type' column."
+      )),
+    defineParameter(
+      "emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Emissions"), NA_character_, NA_character_,
+      desc = "A vector of columns to return for emissions and products"),
+    defineParameter(
+      "poolsToPlot", "character", default = "totalCarbon", NA, NA,
+      desc = "which carbon pools to plot, if any. Defaults to total carbon"),
     defineParameter(".plotInitialTime", "numeric", NA, NA, NA, "This describes the simulation time at which the first plot event should occur"),
     defineParameter(".plotInterval", "numeric", end(sim) - start(sim), NA, NA, "This describes the simulation time interval between plot events"),
     defineParameter(".saveInitialTime", "numeric", NA, NA, NA, "This describes the simulation time at which the first save event should occur"),
@@ -44,18 +55,6 @@ defineModule(sim, list(
     expectsInput(
       objectName = "masterRaster", objectClass = "raster",
       desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"),
-    expectsInput(
-      objectName = "level3DT", objectClass = "data.table",
-      desc = paste(
-        "the table linking the spu id, with the disturbance_matrix_id and the events.",
-        "The events are the possible raster values from the disturbance rasters of Wulder and White.",
-        "Columns:", paste(c(
-          # TODO: define all columns
-          paste("regenDelay: numeric (Optional). The regeneration delay post disturbance.",
-                "Defaults to the value of the 'regenDelay' parameter",
-                "if the column does not exist or where the column contains NAs.")
-        ), collapse = "; ")),
-      sourceURL = NA),
     expectsInput(
       objectName = "spatialDT", objectClass = "data.table",
       desc = "the table containing one line per pixel",
@@ -101,16 +100,13 @@ defineModule(sim, list(
         description           = "Disturbance description"
       )),
     expectsInput(
-      objectName = "historicDMtype", objectClass = "numeric", sourceURL = NA,
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup  event."),
-    expectsInput(
-      objectName = "lastPassDMtype", objectClass = "numeric", sourceURL = NA,
-      desc = "Vector, one for each stand/pixelGroup, indicating historical disturbance type (1 = wildfire). Only used in the spinup event."),
-    expectsInput(
       objectName = "disturbanceMatrix", objectClass = "dataset", sourceURL = NA,
       desc = NA)
   ),
   outputObjects = bindrows(
+    createsOutput(
+      objectName = "level3DT", objectClass = "data.frame",
+      desc = "Table of pixel groups"),
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
       desc = "Three parts: pixelGroup, Age, and Pools "),
@@ -149,11 +145,14 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
     eventType,
     init = {
 
-      # spinup
-      sim <- spinup(sim)
+      # Initiate module
+      sim <- Init(sim)
 
-      # schedule future event(s)
+      # Schedule spinup
+      sim <- scheduleEvent(sim, start(sim), "CBM_core", "spinup")
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "postSpinup")
+
+      # Schedule annual event
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual")
 
       # need this to be after the saving of outputs -- so very low priority
@@ -169,6 +168,11 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       #sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
       #sim <- scheduleEvent(sim, P(sim)$.plotInitialTime, "CBM_core", "plot", eventPriority = 12 )
       # sim <- scheduleEvent(sim, end(sim), "CBM_core", "savePools", .last())
+    },
+
+    spinup = {
+
+      sim <- spinup(sim)
     },
 
     annual = {
@@ -252,121 +256,115 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
   return(invisible(sim))
 }
 
-spinup <- function(sim) {
-  ##TODO this will be reinstated once we call the other CBM modules
-  # io <- inputObjects(sim, currentModule(sim))
-  # objectNamesExpected <- io$objectName
-  # available <- objectNamesExpected %in% ls(sim)
-  # if (any(!available)) {
-  #   stop(
-  #     "The inputObjects for CBM_core are not all available:",
-  #     "These are missing:", paste(objectNamesExpected[!available], collapse = ", "),
-  #     ". \n\nHave you run ",
-  #     paste0("spadesCBM", c("defaults", "dataPrep", "vol2biomass"), collapse = ", "),
-  #     "?"
-  #   )
-  # }
-  #
+Init <- function(sim){
 
-  # sim$growth_increments is built in CBM_vol2biomass
-  gcid_is_sw_hw <- sim$growth_increments[, .(is_sw = any(forest_type_id == 1)), .(gcids)]
-  gcid_is_sw_hw$gcid <- factor(gcid_is_sw_hw$gcids, levels(sim$level3DT$gcids))
-  sim$gcid_is_sw_hw <- gcid_is_sw_hw
-  level3DT <- sim$level3DT[gcid_is_sw_hw[,1:2], on = "gcids"]
-  spinupSQL <- sim$spinupSQL
-  spinupParamsSPU <- spinupSQL[id %in% unique(level3DT$spatial_unit_id), ] # this has not been tested as this example raster only has 1 new pixelGroup in 1998 an din 1999.
+  # Determine if growth curves are for SW or HW
+  sim$gcid_is_sw_hw <- unique(sim$growth_increments[, .(gcids, is_sw = forest_type_id == 1)])
 
-  level3DT <- merge(level3DT, spinupParamsSPU[,c(1,8:10)], by.x = "spatial_unit_id", by.y = "id")
-  level3DT <- level3DT[sim$speciesPixelGroup, on=.(pixelGroup=pixelGroup)] #this connects species codes to PixelGroups.
+  ## Temporary:
+  ## match inputs sorted by sim$level3DT$pixelGroup with other keys
+  ## Remove sim$level3DT and sim$spatialDT$pixelGroup
+  if (is.null(sim$level3DT)) stop("sim$level3DT required to map ages to old pixel groups")
 
-  # Set post disturbance regeneration delays
-  if ("regenDelay" %in% names(level3DT)){
-    if (any(is.na(level3DT$regenDelay))){
-      level3DT$regenDelay[is.na(level3DT$regenDelay)] <- P(sim)$regenDelay
-    }
-  }else{
-    level3DT$regenDelay <- P(sim)$regenDelay
+  if (!is.null(sim$realAges)){
+
+    sim$realAges <- merge(
+      sim$spatialDT[, .(pixelIndex, pixelGroup)],
+      data.table::data.table(pixelGroup = sim$level3DT$pixelGroup, ages = sim$realAges),
+      by = "pixelGroup", all.x = TRUE
+    )[, .(pixelIndex, ages)]
   }
 
-  level3DT <- setkey(level3DT, "pixelGroup")
+  sim$growth_increments <- sim$growth_increments[
+    unique(merge(
+      sim$speciesPixelGroup,
+      sim$level3DT[, .(pixelGroup, gcids)],
+      by = "pixelGroup")[, .(gcids = as.character(gcids), species_id)]),
+    on = "gcids",]
 
-  spinup_parameters <- data.table(
-    pixelGroup = level3DT$pixelGroup,
-    age = level3DT$ages,
-    ##Notes: The area column will have no effect on the C dynamics of this
-    ##script, since the internal working values are tonnesC/ha.  It may be
-    ##useful to keep the column anyways for results processing since multiplying
-    ##the tonnesC/ha, tonnesC/yr/ha values by the area is the CBM3 method for
-    ##extracting the mass, mass/year values.
-    area = 1.0,
-    delay = level3DT$regenDelay,
-    return_interval = level3DT$return_interval,
-    min_rotations = level3DT$min_rotations,
-    max_rotations = level3DT$max_rotations,
-    spatial_unit_id = level3DT$spatial_unit_id,
-    sw_hw = as.integer(level3DT$is_sw),
-    species = level3DT$species_id,
-    mean_annual_temperature = level3DT$historic_mean_temperature,
-    historical_disturbance_type = sim$historicDMtype,
-    last_pass_disturbance_type =  sim$lastPassDMtype
-  )
-  ### the next section is an artifact of not perfect understanding of the data
-  ##provided. Once growth_increments will come from CBM_vol2biomass, this will
-  ##be easier.
+  sim$spatialDT$pixelGroup <- NULL
+  sim$level3DT <- NULL
 
-  ##Need to add pixelGroup to sim$growth_increments
-  df2 <- merge(sim$growth_increments, level3DT[,.(pixelGroup, gcids)],
-               by = "gcids",
-               allow.cartesian = TRUE)
-  setkeyv(df2, c("pixelGroup", "age"))
+  return(invisible(sim))
 
+}
 
-  #drop growth increments age 0
-  growth_increments <- df2[age > 0,.(row_idx = pixelGroup,
-                                     age,
-                                     merch_inc,
-                                     foliage_inc,
-                                     other_inc,
-                                     gcids)]
+spinup <- function(sim) {
 
-  spinup_input <- list(
-    parameters = spinup_parameters,
-    increments = growth_increments
-  )
-  sim$spinup_input <- spinup_input
+  # Prepare cohort and stand data into a table for spinup
+  cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
+  if ("delay" %in% names(sim$spatialDT)) cohortDT$delay <- spatialDT$delay
 
-  ##First call to a Python function
-  mod$libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
-  spinup_op_seq <- libcbmr::cbm_exn_get_spinup_op_sequence()
+  standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
+  if ("historical_disturbance_type" %in% names(sim$spatialDT)){
+    standDT$historical_disturbance_type <- spatialDT$historical_disturbance_type
+  }
+  if ("last_pass_disturbance_type" %in% names(sim$spatialDT)){
+    standDT$last_pass_disturbance_type <- spatialDT$last_pass_disturbance_type
+  }
 
-  spinup_ops <- libcbmr::cbm_exn_spinup_ops(
-    spinup_input, mod$libcbm_default_model_config
+  gcMetaDT <- unique(sim$growth_increments[, .(gcids, species_id, sw_hw = forest_type_id == 1)])
+
+  ## Use an area of 1m for each pixel
+  ## Results will later be multiplied by area to total emissions
+  cohortSpinup <- SpinupCohorts(
+    cohortDT      = cohortDT,
+    standDT       = standDT,
+    gcMetaDT      = gcMetaDT,
+    gc_id         = "gcids",
+    default_area  = 1,
+    default_delay = P(sim)$default_delay,
+    default_historical_disturbance_type = P(sim)$default_historical_disturbance_type,
+    default_last_pass_disturbance_type  = P(sim)$default_last_pass_disturbance_type
   )
 
-  cbm_vars <- libcbmr::cbm_exn_spinup(
-    spinup_input,
-    spinup_ops,
-    spinup_op_seq,
-    mod$libcbm_default_model_config
+  # Spinup
+  spinupOut <- Spinup(
+    cohortDT   = cohortSpinup,
+    spinupSQL  = sim$spinupSQL[, mean_annual_temperature := historic_mean_temperature],
+    growthIncr = sim$growth_increments,
+    gc_id      = "gcids"
   ) |> Cache()
 
-##TODO Comparison of spinup results with other CBM runs needs to be completed.
-##Scott has it on his list
-  sim$spinupResult <- cbm_vars$pools
-  sim$cbm_vars <- cbm_vars
+  sim$spinup_input <- spinupOut["increments"]
+
+  sim$cbm_vars     <- spinupOut$output
+  sim$spinupResult <- spinupOut$output$pools
+
+  # Save cohort group key as pixelGroup
+  pixelGroupKey <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
+  sim$spatialDT <- merge(sim$spatialDT, pixelGroupKey, by = "pixelIndex", all.x = TRUE)
+
   return(invisible(sim))
 }
 
 postSpinup <- function(sim) {
+
   ##TODO need to track emissions and products. First check that cbm_vars$fluxes
   ##are yearly (question for Scott or we found out by mapping the Python
   ##functions ourselves)
 
+  #TODO: track this below! Do we need this seperate object now? This is a spot
+  #where we could simplify. But currently it is needed throught annual event.
+
+  # Initiate pixel group table
+  sim$level3DT <- unique(sim$spatialDT[, -("pixelIndex")])
+  data.table::setkeyv(sim$level3DT, "pixelGroup")
+
+  ## Set sim$level3DT$gcids to be a factor
+  set(sim$level3DT, j = "gcids",
+      value = factor(CBMutils::gcidsCreate(sim$level3DT[, "gcids", with = FALSE])))
+
+  # Apply real ages
   ##TODO: confirm if this is still the case where CBM_vol2biomass won't
   ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
-  sim$level3DT$ages <- sim$realAges
-  # prepping the pixelGroups for processing in the annual event (same order)
-  setorderv(sim$level3DT, "pixelGroup")
+  if (!is.null(sim$realAges)){
+
+    sim$level3DT <- merge(
+      sim$level3DT[, -("ages")],
+      unique(merge(sim$spatialDT, sim$realAges, by = "pixelIndex")[, .(pixelGroup, ages = ages.y)]),
+      by = "pixelGroup", all.x = TRUE)
+  }
 
   #TODO: track this below! Do we need this seperate object now? This is a spot
   #where we could simplify. But currently it is needed throught annual event.
@@ -381,8 +379,6 @@ postSpinup <- function(sim) {
   # Keep the pixels from each simulation year (in the postSpinup event)
   # at the end of each sim, this should be the same length at this vector
   ## got place for a vector length check!!
-  setorderv(sim$spatialDT, "pixelGroup")
-
   sim$pixelKeep <- sim$spatialDT[, .(pixelIndex, pixelGroup)]
   setnames(sim$pixelKeep, c("pixelIndex", "pixelGroup0"))
 
@@ -648,7 +644,7 @@ annual <- function(sim) {
   #there in $flux or $pools. Checking that the tables are in the same pixelGroup
   #order.
   ##TODO Good place for some checks??
-  which(cbm_vars$pools$Merch == pixelGroupForAnnual$Merch)
+  which(cbm_vars$pools$Merch == pixelGroupForAnnual$Merch[1:length(cbm_vars$pools$Merch)])
   # [1]  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
   # [40] 40 41
   ## ASSUMPTION: the Merch matches so all tables are in the same sorting order
