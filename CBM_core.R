@@ -64,7 +64,7 @@ defineModule(sim, list(
       desc = "CBM-CFS3 species IDs linked to legacy ID `level3DT$pixelGroup`",
       columns = c(
         pixelGroup = "legacy ID `level3DT$pixelGroup`",
-        species_id = "CBM-CFS3 species ID",
+        species_id = "CBM-CFS3 species ID"
       )),
     expectsInput(
       objectName = "realAges", objectClass = "integer", sourceURL = NA,
@@ -80,7 +80,7 @@ defineModule(sim, list(
         age         = "Cohort age",
         merch_inc   = "merch_inc",   #TODO: define
         foliage_inc = "foliage_inc", #TODO: define
-        other_inc   = "other_inc",   #TODO: define
+        other_inc   = "other_inc"    #TODO: define
       )),
     expectsInput(
       objectName = "pooldef", objectClass = "character",
