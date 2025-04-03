@@ -44,32 +44,51 @@ defineModule(sim, list(
     defineParameter(".useCache", "logical", FALSE, NA, NA, "Should this entire module be run with caching activated? This is generally intended for data-type modules, where stochasticity and time are not relevant")
   ),
   inputObjects = bindrows(
-    # expectsInput("objectName", "objectClass", "input object description", sourceURL, ...),
+    expectsInput(
+      objectName = "masterRaster", objectClass = "raster",
+      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"),
+    expectsInput(
+      objectName = "spatialDT", objectClass = "data.table", sourceURL = NA,
+      desc = "Table of pixel attributes",
+      columns = c(
+        pixelIndex      = "Stand ID",
+        spatial_unit_id = "CBM-CFS3 spatial unit ID",
+        gcids           = "Growth curve ID",
+        ages            = "Stand age at the simulation start year",
+        delay           = "Optional. Regeneration delay post disturbance in years. Defaults to the 'default_delay' parameter"
+        historical_disturbance_type = "Historic CBM-CFS3 disturbance type ID. Defaults to the 'historical_disturbance_type' parameter",
+        last_pass_disturbance_type  = "Last pass CBM-CFS3 disturbance type ID. Defaults to the 'last_pass_disturbance_type' parameter"
+      )),
+    expectsInput(
+      objectName = "speciesPixelGroup", objectClass = "data.table", sourceURL = NA,
+      desc = "CBM-CFS3 species IDs linked to legacy ID `level3DT$pixelGroup`"
+      columns = c(
+        pixelGroup = "legacy ID `level3DT$pixelGroup`",
+        species_id = "CBM-CFS3 species ID",
+      )),
+    expectsInput(
+      objectName = "realAges", objectClass = "integer", sourceURL = NA,
+      desc = paste(
+        "Optional vector of real cohort ages ordered by legacy ID `level3DT$pixelGroup`.",
+        "If the ages are altered for the spinup in the 'cohortDT' table,",
+        "use this input to set the real ages after the spinup.")),
+    expectsInput(
+      objectName = "growth_increments", objectClass = "data.table", sourceURL = NA,
+      desc = "Table of growth increments.",
+      columns = c(
+        gcids       = "Growth curve ID",
+        age         = "Cohort age",
+        merch_inc   = "merch_inc",   #TODO: define
+        foliage_inc = "foliage_inc", #TODO: define
+        other_inc   = "other_inc",   #TODO: define
+      )),
     expectsInput(
       objectName = "pooldef", objectClass = "character",
       desc = "Vector of names (characters) for each of the carbon pools, with `Input` being the first one",
       sourceURL = NA),
     expectsInput(
-      objectName = "growth_increments", objectClass = "matrix",
-      desc = "Matrix of the 1/2 increment that will be used to create the `gcHash`", sourceURL = NA),
-    expectsInput(
-      objectName = "masterRaster", objectClass = "raster",
-      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"),
-    expectsInput(
-      objectName = "spatialDT", objectClass = "data.table",
-      desc = "the table containing one line per pixel",
-      sourceURL = NA),
-    expectsInput(
       objectName = "spinupSQL", objectClass = "dataset",
       desc = "Table containing many necesary spinup parameters used in CBM_core",
-      sourceURL = NA),
-    expectsInput(
-      objectName = "speciesPixelGroup", objectClass = "data.frame",
-      desc = "This table connects species codes to PixelGroups",
-      sourceURL = NA),
-    expectsInput(
-      objectName = "realAges", objectClass = "numeric",
-      desc = "Ages of the stands from the inventory in 1990",
       sourceURL = NA),
     expectsInput(
       objectName = "disturbanceEvents", objectClass = "data.table",
