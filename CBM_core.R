@@ -278,11 +278,11 @@ Init <- function(sim){
   ## match inputs sorted by sim$level3DT$pixelGroup with other keys
   ## Remove sim$level3DT and sim$spatialDT$pixelGroup
   if (is.null(sim$level3DT)) stop("sim$level3DT required to map ages to old pixel groups")
-
+  speciesPixelGroup <- sim$speciesPixelGroup[, c("pixelGroup", "species_id")]
   gcidSpecies <- unique(
-    merge(sim$speciesPixelGroup,
+    merge(speciesPixelGroup,
           sim$level3DT[, .(pixelGroup, gcids)],
-          by = c("pixelGroup", "gcids"))[, .(gcids, species_id)])
+          by = "pixelGroup")[, .(gcids, species_id)])
   
   if (is.numeric(sim$growth_increments$gcids)){
     gcidSpecies$gcids <- as.numeric(as.character(gcidSpecies$gcids))
