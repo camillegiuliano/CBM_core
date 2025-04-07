@@ -75,7 +75,6 @@ test_that("Module: SK-small 1998-2000", {
       spatialDT         = file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv")         |> data.table::fread(),
       spinupSQL         = file.path(spadesTestPaths$testdata, "SK-small/input", "spinupSQL.csv")         |> data.table::fread(),
       speciesPixelGroup = file.path(spadesTestPaths$testdata, "SK-small/input", "speciesPixelGroup.csv") |> data.table::fread(),
-      realAges          = file.path(spadesTestPaths$testdata, "SK-small/input", "realAges.txt")          |> readLines() |> as.integer(),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
       disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMeta.csv")   |> data.table::fread(),
       historicDMtype    = file.path(spadesTestPaths$testdata, "SK-small/input", "historicDMtype.txt")    |> readLines() |> as.integer(),
