@@ -282,7 +282,8 @@ Init <- function(sim){
   gcidSpecies <- unique(
     merge(sim$speciesPixelGroup,
           sim$level3DT[, .(pixelGroup, gcids)],
-          by = "pixelGroup")[, .(gcids, species_id)])
+          by = c("pixelGroup", "gcids"))[, .(gcids, species_id)])
+  
   if (is.numeric(sim$growth_increments$gcids)){
     gcidSpecies$gcids <- as.numeric(as.character(gcidSpecies$gcids))
   }
