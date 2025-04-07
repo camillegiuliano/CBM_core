@@ -495,12 +495,12 @@ annual <- function(sim) {
     distMeta,
     by = "sw_hw", allow.cartesian = TRUE)
   setkey(gcidDist, NULL)
-  if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(gcidDist$gcids)
+  if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(as.character(gcidDist$gcids))
 
   # Set disturbed pixels to age = 0
   ##TODO check if this works the way it is supposed to
   # read-in the disturbanceMeta, make a vector of 0 and 1 or 2 the length of distPixels$events
-  distWhole <- merge(distPixels, gcidDist, by = c("spatial_unit_id", "gcids", "events"))
+  distWhole <- merge(distPixels, gcidDist, by = c("spatial_unit_id", "gcids", "events"), all.x = TRUE)
   setkey(distPixels, pixelIndex)
   setkey(distWhole, pixelIndex)
   distPixels$ages[which(distWhole$wholeStand == 1)] <- 0
