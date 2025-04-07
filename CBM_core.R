@@ -278,12 +278,13 @@ spinup <- function(sim) {
 
   # Prepare cohort and stand data into a table for spinup
   cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
-  if ("delay" %in% names(sim$spatialDT)) cohortDT$delay <- spatialDT$delay
+  if ("delay" %in% names(sim$spatialDT)) cohortDT[, delay := spatialDT$delay]
 
   # Use alternative ages for spinup
   ##TODO: confirm if still the case where CBM_vol2biomass won't translate <3 years old
   if ("ageSpinup" %in% names(sim$spatialDT)){
-    cohortDT$ages <- sim$spatialDT$ageSpinup
+    cohortDT[, agesReal := ages]
+    cohortDT[, ages     := sim$spatialDT$ageSpinup]
   }
 
   standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
@@ -343,10 +344,9 @@ postSpinup <- function(sim) {
 
   #TODO: track this below! Do we need this seperate object now? This is a spot
   #where we could simplify. But currently it is needed throught annual event.
-
   # Initiate pixel group table
-  sim$level3DT <- unique(sim$spatialDT[, -("pixelIndex")])
-  data.table::setkeyv(sim$level3DT, "pixelGroup")
+  sim$level3DT <- unique(sim$spatialDT[, setdiff(names(sim$spatialDT), c("pixelIndex", "ageSpinup")), with = FALSE])
+  data.table::setkey(sim$level3DT, pixelGroup)
 
   ## Set sim$level3DT$gcids to be a factor
   set(sim$level3DT, j = "gcids",
@@ -373,7 +373,6 @@ postSpinup <- function(sim) {
 }
 
 annual <- function(sim) {
-
   spatialDT <- sim$spatialDT[, .(pixelIndex, pixelGroup, spatial_unit_id, gcids, ages)]
   setkeyv(spatialDT, "pixelIndex")
 
@@ -651,6 +650,21 @@ annual <- function(sim) {
     )
 
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
+
+    ## for RIA, growth curves are shorter than some of the ages coming out of the spinup, for this reason we are trailing the final value
+    ## of the curve by another 100 years here. This will trail the increments an extra 100 years if a pixel group's max age exceeds that of the growth curves.
+    if (!max(cbm_vars$state$age) == max(growth_increments$age)){
+    lastInc <- growth_increments[age == 299, .(row_idx, merch_inc, foliage_inc, other_inc, gcids)]
+    maxAge <- max(growth_increments$age)
+    extendAge <- (maxAge + 1):(maxAge + 100)
+    trailingCurves <- lastInc[, .( age = extendAge,
+                                   merch_inc = merch_inc,
+                                   foliage_inc = foliage_inc,
+                                   other_inc = other_inc,
+                                   gcids = gcids), by = row_idx]
+    growth_increments <- rbind(growth_increments, trailingCurves)
+    setkey(growth_increments, row_idx, age)
+    }
 
     ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
     ## when creating annual_increments.

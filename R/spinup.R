@@ -15,7 +15,7 @@ cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
   )
 
   # Read input tables
-  cohortDT   <- readDataTable(cohortDT,   "cohortDT",   colRequired = reqCols$cohortDT)
+  cohortDT   <- readDataTable(cohortDT,   "cohortDT",   colRequired = reqCols$cohortDT, colKeep = names(cohortDT))
   spinupSQL  <- readDataTable(spinupSQL,  "spinupSQL",  colRequired = reqCols$spinupSQL)
   growthIncr <- readDataTable(growthIncr, "growthIncr", colRequired = reqCols$growthIncr)
 
@@ -27,12 +27,12 @@ cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
   if (is.character(cohortDT$sw_hw)) cohortDT$sw_hw <- as.integer(cohortDT$sw_hw == "sw")
 
   # Create cohort groups: groups of cohorts with the same attributes
+  cohortGroupCols <- setdiff(names(cohortDT), c("cohortID", "pixelIndex"))
   cohortDT$pixelIndex <- cohortDT$cohortID
-  cohortGroupCols <- setdiff(reqCols$cohortDT, "cohortID")
   cohortDT$cohortGroupID <- LandR::generatePixelGroups(cohortDT, maxPixelGroup = 0, columns = cohortGroupCols)
 
   # Isolate unique groups and join with spatial unit data
-  cohortGroups <- unique(cohortDT[, c("cohortGroupID", cohortGroupCols), with = FALSE])
+  cohortGroups <- unique(cohortDT[, c("cohortGroupID", setdiff(reqCols$cohortDT, "cohortID")), with = FALSE])
   cohortGroups <- merge(cohortGroups, spinupSQL, by.x = "spatial_unit_id", by.y = "id", all.x = TRUE)
   setkeyv(cohortGroups, "cohortGroupID")
 
@@ -96,11 +96,14 @@ cbmExnSpinupCohorts <- function(
   )
   optCols <- list(
     standDT  = c("area", "historical_disturbance_type", "last_pass_disturbance_type"),
-    cohortDT = c("delay")
+    cohortDT = names(cohortDT)
   )
 
   ## Special case: rename "ages" column
-  if ("ages" %in% names(cohortDT) & !"age" %in% names(cohortDT)) cohortDT$age <- cohortDT$ages
+  if ("ages" %in% names(cohortDT) & !"age" %in% names(cohortDT)){
+    cohortDT[, age  := ages]
+    cohortDT[, ages := NULL]
+  }
 
   # Read input tables
   standDT  <- readDataTable(standDT,  "standDT",   colRequired = reqCols$standDT,  colKeep = optCols$standDT)
@@ -196,7 +199,7 @@ readDataTable <- function(table = NULL, tableName = NULL, colRequired = NULL, co
       c(tableName, "table")[[1]], " missing column(s): ",
       paste(shQuote(setdiff(colRequired, names(table))), collapse = ", "))
 
-    table <- table[, c(colRequired, intersect(colKeep, names(table))), with = FALSE]
+    table <- table[, unique(c(colRequired, intersect(colKeep, names(table)))), with = FALSE]
   }
 
   return(table)
