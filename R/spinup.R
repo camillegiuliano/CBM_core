@@ -19,6 +19,13 @@ cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
   spinupSQL  <- readDataTable(spinupSQL,  "spinupSQL",  colRequired = reqCols$spinupSQL)
   growthIncr <- readDataTable(growthIncr, "growthIncr", colRequired = reqCols$growthIncr)
 
+  # Set growth curve IDs to character
+  if (!is.character(cohortDT[[gc_id]]))   cohortDT[[gc_id]]   <- as.character(cohortDT[[gc_id]])
+  if (!is.character(growthIncr[[gc_id]])) growthIncr[[gc_id]] <- as.character(growthIncr[[gc_id]])
+
+  # Set sw_hw to be integer
+  if (is.character(cohortDT$sw_hw)) cohortDT$sw_hw <- as.integer(cohortDT$sw_hw == "sw")
+
   # Create cohort groups: groups of cohorts with the same attributes
   cohortDT$pixelIndex <- cohortDT$cohortID
   cohortGroupCols <- setdiff(reqCols$cohortDT, "cohortID")
