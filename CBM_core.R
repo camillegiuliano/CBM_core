@@ -294,12 +294,14 @@ Init <- function(sim){
     )[, .(pixelIndex, ages)]
   }
 
-  sim$growth_increments <- sim$growth_increments[
-    unique(merge(
-      sim$speciesPixelGroup,
-      sim$level3DT[, .(pixelGroup, gcids)],
-      by = "pixelGroup")[, .(gcids = as.character(gcids), species_id)]),
-    on = "gcids",]
+  gcidSpecies <- unique(
+    merge(sim$speciesPixelGroup,
+          sim$level3DT[, .(pixelGroup, gcids)],
+          by = "pixelGroup")[, .(gcids, species_id)])
+  if (is.numeric(sim$growth_increments$gcids)){
+    gcidSpecies$gcids <- as.numeric(as.character(gcidSpecies$gcids))
+  }
+  sim$growth_increments <- sim$growth_increments[gcidSpecies, on = "gcids"]
 
   sim$spatialDT$pixelGroup <- NULL
   sim$level3DT <- NULL

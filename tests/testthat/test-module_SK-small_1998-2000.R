@@ -61,26 +61,16 @@ test_that("Module: SK-small 1998-2000", {
       )),
 
       masterRaster      = terra::rast(res = 30),
-      pooldef           = file.path(spadesTestPaths$testdata, "SK-small/input", "pooldef.txt")           |> readLines(),
-      growth_increments = {
-        tbl <- data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "growth_increments.csv"))
-        tbl$gcids <- factor(tbl$gcids)
-        tbl
-      },
-      level3DT          = {
-        tbl <- data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "level3DT.csv"))
-        tbl$gcids <- factor(CBMutils::gcidsCreate(tbl[, .(gcids)]))
-        tbl
-      },
       spatialDT         = file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv")         |> data.table::fread(),
-      spinupSQL         = file.path(spadesTestPaths$testdata, "SK-small/input", "spinupSQL.csv")         |> data.table::fread(),
+      level3DT          = file.path(spadesTestPaths$testdata, "SK-small/input", "level3DT.csv")          |> data.table::fread(),
       speciesPixelGroup = file.path(spadesTestPaths$testdata, "SK-small/input", "speciesPixelGroup.csv") |> data.table::fread(),
       realAges          = file.path(spadesTestPaths$testdata, "SK-small/input", "realAges.txt")          |> readLines() |> as.integer(),
+      growth_increments = file.path(spadesTestPaths$testdata, "SK-small/input", "growth_increments.csv") |> data.table::fread(),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
       disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMeta.csv")   |> data.table::fread(),
-      historicDMtype    = file.path(spadesTestPaths$testdata, "SK-small/input", "historicDMtype.txt")    |> readLines() |> as.integer(),
-      lastPassDMtype    = file.path(spadesTestPaths$testdata, "SK-small/input", "lastPassDMtype.txt")    |> readLines() |> as.integer(),
-      disturbanceMatrix = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMatrix.csv") |> data.table::fread()
+      disturbanceMatrix = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMatrix.csv") |> data.table::fread(),
+      pooldef           = file.path(spadesTestPaths$testdata, "SK-small/input", "pooldef.txt")           |> readLines(),
+      spinupSQL         = file.path(spadesTestPaths$testdata, "SK-small/input", "spinupSQL.csv")         |> data.table::fread()
     )
   )
 
