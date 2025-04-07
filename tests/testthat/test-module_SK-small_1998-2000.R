@@ -63,7 +63,6 @@ test_that("Module: SK-small 1998-2000", {
       masterRaster      = terra::rast(res = 30),
       spatialDT         = file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv")         |> data.table::fread(),
       level3DT          = file.path(spadesTestPaths$testdata, "SK-small/input", "level3DT.csv")          |> data.table::fread(),
-      realAges          = file.path(spadesTestPaths$testdata, "SK-small/input", "realAges.txt")          |> readLines() |> as.integer(),
       gcMeta            = file.path(spadesTestPaths$testdata, "SK-small/input", "gcMeta.csv")            |> data.table::fread(),
       growth_increments = file.path(spadesTestPaths$testdata, "SK-small/input", "growth_increments.csv") |> data.table::fread(),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
