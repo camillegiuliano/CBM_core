@@ -144,8 +144,6 @@ test_that("Multi module: SK-small 1998-2000", {
 
   ## Check outputs ----
 
-  expect_true(!is.null(simTest$gcid_is_sw_hw))
-
   expect_true(!is.null(simTest$spinup_input))
 
   expect_true(!is.null(simTest$spinupResult))

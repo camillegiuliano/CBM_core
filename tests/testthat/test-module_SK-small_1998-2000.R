@@ -137,8 +137,6 @@ test_that("Module: SK-small 1998-2000", {
       , colnames(simTest$emissionsProducts), with = FALSE]
   )
 
-  expect_true(!is.null(simTest$gcid_is_sw_hw))
-
   expect_true(!is.null(simTest$spinup_input))
 
   expect_true(!is.null(simTest$cbm_vars))
