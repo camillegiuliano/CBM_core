@@ -55,6 +55,7 @@ defineModule(sim, list(
         spatial_unit_id = "CBM-CFS3 spatial unit ID",
         gcids           = "Growth curve ID",
         ages            = "Stand age at the simulation start year",
+        ageSpinup       = "Optional. Alternative stand age at the simulation start year to use in the spinup",
         delay           = "Optional. Regeneration delay post disturbance in years. Defaults to the 'default_delay' parameter",
         historical_disturbance_type = "Historic CBM-CFS3 disturbance type ID. Defaults to the 'historical_disturbance_type' parameter",
         last_pass_disturbance_type  = "Last pass CBM-CFS3 disturbance type ID. Defaults to the 'last_pass_disturbance_type' parameter"
@@ -66,12 +67,6 @@ defineModule(sim, list(
         pixelGroup = "legacy ID `level3DT$pixelGroup`",
         species_id = "CBM-CFS3 species ID"
       )),
-    expectsInput(
-      objectName = "realAges", objectClass = "integer", sourceURL = NA,
-      desc = paste(
-        "Optional vector of real cohort ages ordered by legacy ID `level3DT$pixelGroup`.",
-        "If the ages are altered for the spinup in the 'cohortDT' table,",
-        "use this input to set the real ages after the spinup.")),
     expectsInput(
       objectName = "growth_increments", objectClass = "data.table", sourceURL = NA,
       desc = "Table of growth increments.",
@@ -285,15 +280,6 @@ Init <- function(sim){
   ## Remove sim$level3DT and sim$spatialDT$pixelGroup
   if (is.null(sim$level3DT)) stop("sim$level3DT required to map ages to old pixel groups")
 
-  if (!is.null(sim$realAges)){
-
-    sim$realAges <- merge(
-      sim$spatialDT[, .(pixelIndex, pixelGroup)],
-      data.table::data.table(pixelGroup = sim$level3DT$pixelGroup, ages = sim$realAges),
-      by = "pixelGroup", all.x = TRUE
-    )[, .(pixelIndex, ages)]
-  }
-
   gcidSpecies <- unique(
     merge(sim$speciesPixelGroup,
           sim$level3DT[, .(pixelGroup, gcids)],
@@ -315,6 +301,12 @@ spinup <- function(sim) {
   # Prepare cohort and stand data into a table for spinup
   cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
   if ("delay" %in% names(sim$spatialDT)) cohortDT$delay <- spatialDT$delay
+
+  # Use alternative ages for spinup
+  ##TODO: confirm if still the case where CBM_vol2biomass won't translate <3 years old
+  if ("ageSpinup" %in% names(sim$spatialDT)){
+    cohortDT$ages <- sim$spatialDT$ageSpinup
+  }
 
   standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
   if ("historical_disturbance_type" %in% names(sim$spatialDT)){
@@ -382,17 +374,6 @@ postSpinup <- function(sim) {
   ## Set sim$level3DT$gcids to be a factor
   set(sim$level3DT, j = "gcids",
       value = factor(CBMutils::gcidsCreate(sim$level3DT[, "gcids", with = FALSE])))
-
-  # Apply real ages
-  ##TODO: confirm if this is still the case where CBM_vol2biomass won't
-  ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
-  if (!is.null(sim$realAges)){
-
-    sim$level3DT <- merge(
-      sim$level3DT[, -("ages")],
-      unique(merge(sim$spatialDT, sim$realAges, by = "pixelIndex")[, .(pixelGroup, ages = ages.y)]),
-      by = "pixelGroup", all.x = TRUE)
-  }
 
   #TODO: track this below! Do we need this seperate object now? This is a spot
   #where we could simplify. But currently it is needed throught annual event.
