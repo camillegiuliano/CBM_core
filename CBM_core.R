@@ -300,12 +300,13 @@ spinup <- function(sim) {
 
   # Prepare cohort and stand data into a table for spinup
   cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
-  if ("delay" %in% names(sim$spatialDT)) cohortDT$delay <- spatialDT$delay
+  if ("delay" %in% names(sim$spatialDT)) cohortDT[, delay := spatialDT$delay]
 
   # Use alternative ages for spinup
   ##TODO: confirm if still the case where CBM_vol2biomass won't translate <3 years old
   if ("ageSpinup" %in% names(sim$spatialDT)){
-    cohortDT$ages <- sim$spatialDT$ageSpinup
+    cohortDT[, agesReal := ages]
+    cohortDT[, ages     := sim$spatialDT$ageSpinup]
   }
 
   standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
@@ -368,8 +369,8 @@ postSpinup <- function(sim) {
   #where we could simplify. But currently it is needed throught annual event.
 
   # Initiate pixel group table
-  sim$level3DT <- unique(sim$spatialDT[, -("pixelIndex")])
-  data.table::setkeyv(sim$level3DT, "pixelGroup")
+  sim$level3DT <- unique(sim$spatialDT[, setdiff(names(sim$spatialDT), c("pixelIndex", "ageSpinup")), with = FALSE])
+  data.table::setkey(sim$level3DT, pixelGroup)
 
   ## Set sim$level3DT$gcids to be a factor
   set(sim$level3DT, j = "gcids",
