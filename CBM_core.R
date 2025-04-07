@@ -280,12 +280,14 @@ Init <- function(sim){
   ## Remove sim$level3DT and sim$spatialDT$pixelGroup
   if (is.null(sim$level3DT)) stop("sim$level3DT required to map ages to old pixel groups")
 
-  sim$growth_increments <- sim$growth_increments[
-    unique(merge(
-      sim$speciesPixelGroup,
-      sim$level3DT[, .(pixelGroup, gcids)],
-      by = "pixelGroup")[, .(gcids = as.character(gcids), species_id)]),
-    on = "gcids",]
+  gcidSpecies <- unique(
+    merge(sim$speciesPixelGroup,
+          sim$level3DT[, .(pixelGroup, gcids)],
+          by = "pixelGroup")[, .(gcids, species_id)])
+  if (is.numeric(sim$growth_increments$gcids)){
+    gcidSpecies$gcids <- as.numeric(as.character(gcidSpecies$gcids))
+  }
+  sim$growth_increments <- sim$growth_increments[gcidSpecies, on = "gcids"]
 
   sim$spatialDT$pixelGroup <- NULL
   sim$level3DT <- NULL
@@ -476,12 +478,12 @@ annual <- function(sim) {
     distMeta,
     by = "sw_hw", allow.cartesian = TRUE)
   setkey(gcidDist, NULL)
-  if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(gcidDist$gcids)
+  if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(as.character(gcidDist$gcids))
 
   # Set disturbed pixels to age = 0
   ##TODO check if this works the way it is supposed to
   # read-in the disturbanceMeta, make a vector of 0 and 1 or 2 the length of distPixels$events
-  distWhole <- merge(distPixels, gcidDist, by = c("spatial_unit_id", "gcids", "events"))
+  distWhole <- merge(distPixels, gcidDist, by = c("spatial_unit_id", "gcids", "events"), all.x = TRUE)
   setkey(distPixels, pixelIndex)
   setkey(distWhole, pixelIndex)
   distPixels$ages[which(distWhole$wholeStand == 1)] <- 0
