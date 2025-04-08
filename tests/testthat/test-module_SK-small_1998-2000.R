@@ -63,7 +63,7 @@ test_that("Module: SK-small 1998-2000", {
       masterRaster      = terra::rast(res = 30),
       spatialDT         = file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv")         |> data.table::fread(),
       level3DT          = file.path(spadesTestPaths$testdata, "SK-small/input", "level3DT.csv")          |> data.table::fread(),
-      speciesPixelGroup = file.path(spadesTestPaths$testdata, "SK-small/input", "speciesPixelGroup.csv") |> data.table::fread(),
+      gcMeta            = file.path(spadesTestPaths$testdata, "SK-small/input", "gcMeta.csv")            |> data.table::fread(),
       growth_increments = file.path(spadesTestPaths$testdata, "SK-small/input", "growth_increments.csv") |> data.table::fread(),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
       disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMeta.csv")   |> data.table::fread(),
@@ -125,8 +125,6 @@ test_that("Module: SK-small 1998-2000", {
     data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "emissionsProducts.csv"))[
       , colnames(simTest$emissionsProducts), with = FALSE]
   )
-
-  expect_true(!is.null(simTest$gcid_is_sw_hw))
 
   expect_true(!is.null(simTest$spinup_input))
 

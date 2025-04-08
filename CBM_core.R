@@ -61,15 +61,16 @@ defineModule(sim, list(
         last_pass_disturbance_type  = "Last pass CBM-CFS3 disturbance type ID. Defaults to the 'last_pass_disturbance_type' parameter"
       )),
     expectsInput(
-      objectName = "speciesPixelGroup", objectClass = "data.table", sourceURL = NA,
-      desc = "CBM-CFS3 species IDs linked to legacy ID `level3DT$pixelGroup`",
+      objectName = "gcMeta", objectClass = "data.table", sourceURL = NA,
+      desc = "Growth curve metadata",
       columns = c(
-        pixelGroup = "legacy ID `level3DT$pixelGroup`",
-        species_id = "CBM-CFS3 species ID"
+        gcids      = "Growth curve ID",
+        species_id = "CBM-CFS3 species ID",
+        sw_hw      = "'sw' or 'hw'"
       )),
     expectsInput(
       objectName = "growth_increments", objectClass = "data.table", sourceURL = NA,
-      desc = "Table of growth increments.",
+      desc = "Growth curve increments",
       columns = c(
         gcids       = "Growth curve ID",
         age         = "Cohort age",
@@ -124,9 +125,6 @@ defineModule(sim, list(
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
       desc = "Three parts: pixelGroup, Age, and Pools "),
-    createsOutput(
-      objectName = "gcid_is_sw_hw", objectClass = "data.table",
-      desc = "Table that flags each of the study area's gcids as softwood or hardwood"),
     createsOutput(
       objectName = "spinup_input", objectClass = "data.table",
       desc = "input parameters for the spinup functions"),
@@ -271,26 +269,6 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 }
 
 Init <- function(sim){
-  # Determine if growth curves are for SW or HW
-  sim$gcid_is_sw_hw <- unique(sim$growth_increments[, .(gcids, is_sw = forest_type_id == 1)])
-
-  ## Temporary:
-  ## match inputs sorted by sim$level3DT$pixelGroup with other keys
-  ## Remove sim$level3DT and sim$spatialDT$pixelGroup
-  if (is.null(sim$level3DT)) stop("sim$level3DT required to map ages to old pixel groups")
-  speciesPixelGroup <- sim$speciesPixelGroup[, c("pixelGroup", "species_id")]
-  gcidSpecies <- unique(
-    merge(speciesPixelGroup,
-          sim$level3DT[, .(pixelGroup, gcids)],
-          by = "pixelGroup")[, .(gcids, species_id)])
-  
-  if (is.numeric(sim$growth_increments$gcids)){
-    gcidSpecies$gcids <- as.numeric(as.character(gcidSpecies$gcids))
-  }
-  sim$growth_increments <- sim$growth_increments[gcidSpecies, on = "gcids"]
-
-  sim$spatialDT$pixelGroup <- NULL
-  sim$level3DT <- NULL
 
   return(invisible(sim))
 
@@ -317,8 +295,6 @@ spinup <- function(sim) {
     standDT$last_pass_disturbance_type <- spatialDT$last_pass_disturbance_type
   }
 
-  gcMetaDT <- unique(sim$growth_increments[, .(gcids, species_id, sw_hw = forest_type_id == 1)])
-
   if (!"delay" %in% names(cohortDT)) message(
     "Spinup using the default regeneration delay: ", P(sim)$default_delay)
   if (!"historical_disturbance_type" %in% names(standDT)) message(
@@ -331,7 +307,7 @@ spinup <- function(sim) {
   cohortSpinup <- cbmExnSpinupCohorts(
     cohortDT      = cohortDT,
     standDT       = standDT,
-    gcMetaDT      = gcMetaDT,
+    gcMetaDT      = sim$gcMeta,
     gc_id         = "gcids",
     default_area  = 1,
     default_delay = P(sim)$default_delay,
@@ -353,6 +329,7 @@ spinup <- function(sim) {
   sim$spinupResult <- spinupOut$output$pools
 
   # Save cohort group key as pixelGroup
+  sim$spatialDT$pixelGroup <- NULL
   pixelGroupKey <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
   sim$spatialDT <- merge(sim$spatialDT, pixelGroupKey, by = "pixelIndex", all.x = TRUE)
 
@@ -472,10 +449,7 @@ annual <- function(sim) {
   # to (and it gives an opportunity for a check)
 
   # List possible disturbances for each growth curve ID
-  gcidDist <- merge(
-    copy(sim$gcid_is_sw_hw)[, .(gcids, is_sw, sw_hw = ifelse(is_sw, "sw", "hw"))],
-    distMeta,
-    by = "sw_hw", allow.cartesian = TRUE)
+  gcidDist <- merge(distMeta, sim$gcMeta[, .(gcids, sw_hw)], by = "sw_hw", allow.cartesian = TRUE)
   setkey(gcidDist, NULL)
   if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(as.character(gcidDist$gcids))
 
@@ -678,7 +652,7 @@ annual <- function(sim) {
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
 
     ## for RIA, growth curves are shorter than some of the ages coming out of the spinup, for this reason we are trailing the final value
-    ## of the curve by another 100 years here. This will trail the increments an extra 100 years if a pixel group's max age exceeds that of the growth curves. 
+    ## of the curve by another 100 years here. This will trail the increments an extra 100 years if a pixel group's max age exceeds that of the growth curves.
     if (!max(cbm_vars$state$age) == max(growth_increments$age)){
     lastInc <- growth_increments[age == 299, .(row_idx, merch_inc, foliage_inc, other_inc, gcids)]
     maxAge <- max(growth_increments$age)
@@ -751,7 +725,7 @@ annual <- function(sim) {
     annual_increments[, age := NULL]
     setkeyv(annual_increments, "row_idx")
   }
-  
+
   cbm_vars$parameters$merch_inc <- annual_increments$merch_inc.y
   cbm_vars$parameters$foliage_inc <- annual_increments$foliage_inc.y
   cbm_vars$parameters$other_inc <- annual_increments$other_inc.y
