@@ -13,18 +13,17 @@ editor_options:
 # CBM_core
 
 :::{.rmdimportant}
-This documentation is work in progress. Potential discrepancies and omissions may exist for the time being. If you find any regarding this module, contact us [here]("https://github.com/PredictiveEcology/CBM_core/issues").
+This documentation is work in progress. Potential discrepancies and omissions may exist for the time being. If you find any, please contact us [here]("https://github.com/PredictiveEcology/CBM_core/issues").
 :::
 
 ## Overview
 
-This is the core modules of Spades CBM.
-
-
-### Notes on forest type
-The SQligth (used in CBM_defaults) has has a column named `forest_type_id` that identifies a softwood forest (sw) as 1, a mixed forest as 2, and a hardwood forest (hw) as 3. This distinction is important because it determines how the root biomass will be calculated (sw differently than hw). The definition of `fotrest_type_id` is constant and is the same that is used in `canfi_species.csv` (species level identification of codes that is needed in the volumne to biomass translation in CBM_vol2biomass), in `gcMeta.csv` (SK specific growth curve metadata), and in `sim$growth_increments` because it built from `gcMeta` and `canfi_species`. The `sim$growth_increment$forest_type_id` is the one used to create the sw flag needed for input in the spinup event. After that, the sw_hw flag (1=sw, 0=hw) is stored in the `sim$cbm_vars$state$sw_hw` column.
+[CBM_core](https://github.com/PredictiveEcology/CBM_core.git) is the central module of [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git). This is where all the carbon transfers are calculated at every time step, where disturbances are applied, and stocks are tracked. It doesn't run on its own, it needs parameters from either [CBM_defaults](https://github.com/PredictiveEcology/CBM_defaults.git), [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git), and [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) or the equivalent information from the user. In *SpaDES-speak*, this module has five events (`init`, `spinup`, `postspinup`, `annual`, `accumulateResults`). Only in two of these events do carbon transactions occur: `spinup` and `annual`. The other events are tools to enable these transactions. All events are scheduled only once except for the `annual` event, who schedules itself until the end of the simulation horizon. Only in this module are the Python functions from the [libcbm](https://github.com/cat-cfs/libcbm_py/tree/main) package called. The functions used in this module are the [libcbm cbm-exn](https://github.com/cat-cfs/libcbm_py/tree/main/libcbm/model/cbm_exn) exclusively, these were designed to accept external biomass increments.
 
 ## Background
+
+In [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), the general approach described in our [Overview](link to the overview section) section and in @kurz2009 is applied. There are 18 internal carbon pools in [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git) (see Table 1 in Overview) and one for the atmosphere. Disturbances are the first carbon transfer to be applied to each record. Half the annual increment is then added (transfer from the atmosphere to the three above ground biomass pools - `Merch`, `Foliage`, and `Other`). Disturbances are processes externally to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), in our example the are processes in [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git). Disturbance matrices specify the proportion of carbon in each pool to be transferred to other pools or to be taken out of the system (via forest products (pool named `Products`) or back to the atmosphere). The amount of carbon transferred from the atmosphere to the aboveground biomass pools is determined from the growth curves, which were translated from $m^3/ha$ to carbon increments in [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) and provided to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git). Dead Organic Matter ([DOM](link to lexicon)) turnover happens next and transfers carbon from the pools representing snags (stem snags and branches snags), to the MediumSoil, and AboveGroundFastSoil pools. Biomass turnover follows with transfers from the Merch, Foliage, Other, fine and coarse roots, to the pools representing the snags (both stem and branch snage), AboveGroundVeryFastSoil,	BelowGroundFastSoil, AboveGroundVeryFastSoil and BelowGroundVeryFastSoil pools. The second half of the growth is then added to the three above ground biomass pools - `Merch`, `Foliage`, and `Other. 
+
 
 ## Inputs
 
