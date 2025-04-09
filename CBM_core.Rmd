@@ -23,6 +23,18 @@ This documentation is work in progress. Potential discrepancies and omissions ma
 ## Background
 
 In [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), the general approach described in our [Overview](link to the overview section) section and in @kurz2009 is applied. There are 18 internal carbon pools in [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git) (see Table 1 in Overview) and one for the atmosphere. Disturbances are the first carbon transfer to be applied to each record. Half the annual increment is then added (transfer from the atmosphere to the three above ground biomass pools - `Merch`, `Foliage`, and `Other`). Disturbances are processes externally to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), in our example the are processes in [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git). Disturbance matrices specify the proportion of carbon in each pool to be transferred to other pools or to be taken out of the system (via forest products (pool named `Products`) or back to the atmosphere). The amount of carbon transferred from the atmosphere to the aboveground biomass pools is determined from the growth curves, which were translated from $m^3/ha$ to carbon increments in [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) and provided to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git). Dead Organic Matter ([DOM](link to lexicon)) turnover happens next and transfers carbon from the pools representing snags (stem snags and branches snags), to the MediumSoil, and AboveGroundFastSoil pools. Biomass turnover follows with transfers from the Merch, Foliage, Other, fine and coarse roots, to the pools representing the snags (both stem and branch snage), AboveGroundVeryFastSoil,	BelowGroundFastSoil, AboveGroundVeryFastSoil and BelowGroundVeryFastSoil pools. The second half of the growth is then added to the three above ground biomass pools - `Merch`, `Foliage`, and `Other. 
+overmature decline
+Based on reading the code: it's triggered when the net increment becomes negative. The transfers are portioned in the same way as CBM3's annual process turnovers (like the pool to pool, or pool to multiple pool transfers) the amount is equal to the loss of each individual biomass pool according to the negative increment..
+NPP
+NPP is
+calculated as the sum of net growth (i.e. growth that results
+in positive increment) and growth that replaces material lost
+to biomass turnover during the year. In young, actively growing
+stands, a large proportion of NPP results in positive growth
+increment while in older, mature stands, a larger proportion
+of NPP is allocated to replacement of material lost to turnover.
+NPP is calculated in this manner because the CBM-CFS3 does
+not simulate photosynthesis and autotrophic respiration.
 
 
 ## Inputs
