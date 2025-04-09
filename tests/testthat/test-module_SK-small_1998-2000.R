@@ -67,7 +67,6 @@ test_that("Module: SK-small 1998-2000", {
       growth_increments = file.path(spadesTestPaths$testdata, "SK-small/input", "growth_increments.csv") |> data.table::fread(),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
       disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMeta.csv")   |> data.table::fread(),
-      disturbanceMatrix = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMatrix.csv") |> data.table::fread(),
       pooldef           = file.path(spadesTestPaths$testdata, "SK-small/input", "pooldef.txt")           |> readLines(),
       spinupSQL         = file.path(spadesTestPaths$testdata, "SK-small/input", "spinupSQL.csv")         |> data.table::fread()
     )
