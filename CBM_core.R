@@ -113,10 +113,7 @@ defineModule(sim, list(
         disturbance_matrix_id = "Disturbance matrix ID",
         name                  = "Disturbance name",
         description           = "Disturbance description"
-      )),
-    expectsInput(
-      objectName = "disturbanceMatrix", objectClass = "dataset", sourceURL = NA,
-      desc = NA)
+      ))
   ),
   outputObjects = bindrows(
     createsOutput(
@@ -447,20 +444,14 @@ annual <- function(sim) {
   # 4. Reset the ages for disturbed pixels in stand replacing disturbances.
   # libcbm resets ages to 0 internally but for transparency we are doing it here
   # to (and it gives an opportunity for a check)
+  if (nrow(distPixels) > 0){
 
-  # List possible disturbances for each growth curve ID
-  gcidDist <- merge(distMeta, sim$gcMeta[, .(gcids, sw_hw)], by = "sw_hw", allow.cartesian = TRUE)
-  setkey(gcidDist, NULL)
-  if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(as.character(gcidDist$gcids))
+    distPixels <- merge(distPixels, sim$gcMeta[, .(gcids, sw_hw)], by = "gcids", all.x = TRUE)
+    distPixels <- merge(distPixels, distMeta, by = c("spatial_unit_id", "sw_hw", "events"), all.x = TRUE)
+    data.table::setkey(distPixels, pixelIndex)
 
-  # Set disturbed pixels to age = 0
-  ##TODO check if this works the way it is supposed to
-  # read-in the disturbanceMeta, make a vector of 0 and 1 or 2 the length of distPixels$events
-  distWhole <- merge(distPixels, gcidDist, by = c("spatial_unit_id", "gcids", "events"), all.x = TRUE)
-  setkey(distPixels, pixelIndex)
-  setkey(distWhole, pixelIndex)
-  distPixels$ages[which(distWhole$wholeStand == 1)] <- 0
-  setkey(distPixels, pixelGroup)
+    distPixels[wholeStand == 1, ages := 0]
+  }
 
   # 5. new pixelGroup----------------------------------------------------
   # make a column of new pixelGroup that includes events and carbon from
@@ -482,7 +473,7 @@ annual <- function(sim) {
                   "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
   cPoolsOnly <- pixelGroupC[, .SD, .SDcols = c("pixelGroup", cPoolNames)]
 
-  distPixelCpools <- cPoolsOnly[distPixels, on = c("pixelGroup")]
+  distPixelCpools <- cPoolsOnly[distPixels[, .SD, .SDcols = names(spatialDT)], on = "pixelGroup"]
 
 
   distPixelCpools$newGroup <- LandR::generatePixelGroups(
@@ -496,7 +487,7 @@ annual <- function(sim) {
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
-    "newGroup", names(spatialDT), cPoolNames), "oldGroup"
+    names(spatialDT), cPoolNames, "newGroup", "oldGroup")
   ]
 
   cols <- c("pixelGroup", "newGroup")
@@ -549,16 +540,6 @@ annual <- function(sim) {
   setkeyv(pixelGroupForAnnual, "pixelGroup")
 
 
-  # 9. From the events column, create a vector of the disturbance matrix
-  # identification so it links back to the CBM default disturbance matrices.
-  DM <- merge(pixelGroupForAnnual, gcidDist,
-              by = c("spatial_unit_id", "gcids", "events"), all.x = TRUE)
-  DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
-  setkeyv(DM, "pixelGroup")
-
-  ## this is the vector to be fed into the sim$opMatrixCBM[,"disturbance"]<-DMIDS
-  DMIDS <- as.vector(DM$disturbance_matrix_id)
-
   # END of dealing with disturbances and updating all relevant data tables.
   ################################### -----------------------------------
 
@@ -580,7 +561,6 @@ annual <- function(sim) {
   ## We are currently only working in spu 28
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
-    disturbanceMatrix <- sim$disturbanceMatrix
     oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
     newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
     newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
@@ -604,14 +584,26 @@ annual <- function(sim) {
     spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
     cbm_vars$parameters <- cbm_vars$parameters[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
   }
-  ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
+
+  # Set disturbance type IDs
   if (dim(distPixels)[1] > 0) {
-    distMatass <- as.data.table(disturbanceMatrix)
-    DMIDS[DMIDS > 0] <- distMatass[disturbance_matrix_id %in% DMIDS[DMIDS > 0],][spatial_unit_id %in% part2$spatial_unit_id, disturbance_type_id]
-    cbm_vars$parameters$disturbance_type <- DMIDS
-  } else {
+
+    newDTypeIDs <- unique(
+      merge(distPixels, sim$pixelKeep, by = "pixelIndex", all.x = TRUE)[
+        , c(paste0("pixelGroup", time(sim)), "disturbance_type_id"), with = FALSE])
+
+    cbm_vars$parameters <- merge(
+      cbm_vars$parameters, newDTypeIDs,
+      by.x = "row_idx", by.y = paste0("pixelGroup", time(sim)),
+      all.x = TRUE)
+    cbm_vars$parameters[, disturbance_type    := data.table::fcoalesce(disturbance_type_id, 0L)]
+    cbm_vars$parameters[, disturbance_type_id := NULL]
+
+    rm(newDTypeIDs)
+
+  }else{
     ##there might be a disturbance_type left over from the previous annual event
-    cbm_vars$parameters$disturbance_type <- rep(0, length(cbm_vars$parameters$disturbance_type))
+    cbm_vars$parameters$disturbance_type <- 0L
   }
 
   ##growth_increments
