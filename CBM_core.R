@@ -10,7 +10,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "terra",
+    "data.table", "terra", "reticulate",
     "PredictiveEcology/CBMutils@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)",
     "PredictiveEcology/libcbmr"
@@ -267,6 +267,28 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
 Init <- function(sim){
 
+  # Set up Python virtual environment
+  reticulate::virtualenv_create(
+    "r-spadesCBM",
+    python = if (!reticulate::virtualenv_exists("r-spadesCBM")){
+      CBMutils::ReticulateFindPython(version = ">=3.9,<=3.12.7", versionInstall = "3.10:latest")
+    },
+    packages = c(
+      "numpy<2",
+      "pandas>=1.1.5",
+      "scipy",
+      "numexpr>=2.8.7",
+      "numba",
+      "pyyaml",
+      "mock",
+      "openpyxl",
+      "libcbm"
+    ))
+
+  # Use Python virtual environment
+  reticulate::use_virtualenv("r-spadesCBM")
+
+  # Return simList
   return(invisible(sim))
 
 }
