@@ -305,7 +305,7 @@ spinup <- function(sim) {
     cohortDT      = cohortDT,
     standDT       = standDT,
     gcMetaDT      = sim$gcMeta,
-    gc_id         = "gcids",
+    gcIndex       = "gcids",
     default_area  = 1,
     default_delay = P(sim)$default_delay,
     default_historical_disturbance_type = P(sim)$default_historical_disturbance_type,
@@ -317,7 +317,7 @@ spinup <- function(sim) {
     cohortDT   = cohortSpinup,
     spinupSQL  = sim$spinupSQL[, mean_annual_temperature := historic_mean_temperature],
     growthIncr = sim$growth_increments,
-    gc_id      = "gcids"
+    gcIndex    = "gcids"
   ) |> Cache()
 
   sim$spinup_input <- spinupOut["increments"]
@@ -933,7 +933,7 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   emissions <- emissions[, epCols, with = FALSE]
 
   emissionsProducts <- cbind(emissions, products)
-  emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
+  emissionsProducts <- colSums(emissionsProducts * prod(terra::res(sim$masterRaster)) / 10000 *
           pixelCount[["N"]])
   emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
