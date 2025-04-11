@@ -18,23 +18,11 @@ This documentation is work in progress. Potential discrepancies and omissions ma
 
 ## Overview
 
-[CBM_core](https://github.com/PredictiveEcology/CBM_core.git) is the central module of [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git). This is where all the carbon transfers are calculated at every time step, where disturbances are applied, and stocks are tracked. It doesn't run on its own, it needs parameters from either [CBM_defaults](https://github.com/PredictiveEcology/CBM_defaults.git), [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git), and [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) or the equivalent information from the user. In *SpaDES-speak*, this module has five events (`init`, `spinup`, `postspinup`, `annual`, `accumulateResults`). Only in two of these events do carbon transactions occur: `spinup` and `annual`. The other events are tools to enable these transactions. All events are scheduled only once except for the `annual` event, who schedules itself until the end of the simulation horizon. Only in this module are the Python functions from the [libcbm](https://github.com/cat-cfs/libcbm_py/tree/main) package called. The functions used in this module are the [libcbm cbm-exn](https://github.com/cat-cfs/libcbm_py/tree/main/libcbm/model/cbm_exn) exclusively, these were designed to accept external biomass increments.
+[CBM_core](https://github.com/PredictiveEcology/CBM_core.git) is the central module of [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git). This is where all the carbon transfers are calculated at every time step, where disturbances are applied, and stocks are tracked. It doesn't run on its own, it needs parameters from either [CBM_defaults](https://github.com/PredictiveEcology/CBM_defaults.git), [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git), and [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) (as per the provided example for managed forests of Saskatchewan) or the equivalent information from the user. In *SpaDES-speak*, this module has five events (`Init`, `spinup`, `postspinup`, `annual`, `accumulateResults`). Only in two of these events do carbon transactions occur: `spinup` and `annual`. The other events are tools to enable these transactions. All events are scheduled only once except for the `annual` event, who schedules itself until the end of the simulation horizon. Only in this module are the Python functions from the [libcbm](https://github.com/cat-cfs/libcbm_py/tree/main) package called. The functions used in this module are the [libcbm cbm-exn](https://github.com/cat-cfs/libcbm_py/tree/main/libcbm/model/cbm_exn) exclusively, these were designed to accept external biomass increments.
 
 ## Background
 
-In [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), the general approach described in our [Overview](link to the overview section) section and in @kurz2009 is applied. There are 18 internal carbon pools in [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git) (see Table 1 in Overview) and one for the atmosphere. Disturbances are the first carbon transfer to be applied to each record. Half the annual increment is then added (transfer from the atmosphere to the three above ground biomass pools - `Merch`, `Foliage`, and `Other`). Disturbances are processes externally to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), in our example the are processes in [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git). Disturbance matrices specify the proportion of carbon in each pool to be transferred to other pools or to be taken out of the system (via forest products (pool named `Products`) or back to the atmosphere). The amount of carbon transferred from the atmosphere to the aboveground biomass pools is determined from the growth curves, which were translated from $m^3/ha$ to carbon increments in [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) and provided to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git). Dead Organic Matter ([DOM](link to lexicon)) turnover happens next and transfers carbon from the pools representing snags (stem snags and branches snags), to the MediumSoil, and AboveGroundFastSoil pools. Biomass turnover follows with transfers from the Merch, Foliage, Other, fine and coarse roots, to the pools representing the snags (both stem and branch snage), AboveGroundVeryFastSoil,	BelowGroundFastSoil, AboveGroundVeryFastSoil and BelowGroundVeryFastSoil pools. The second half of the growth is then added to the three above ground biomass pools - `Merch`, `Foliage`, and `Other. 
-overmature decline
-Based on reading the code: it's triggered when the net increment becomes negative. The transfers are portioned in the same way as CBM3's annual process turnovers (like the pool to pool, or pool to multiple pool transfers) the amount is equal to the loss of each individual biomass pool according to the negative increment..
-NPP
-NPP is
-calculated as the sum of net growth (i.e. growth that results
-in positive increment) and growth that replaces material lost
-to biomass turnover during the year. In young, actively growing
-stands, a large proportion of NPP results in positive growth
-increment while in older, mature stands, a larger proportion
-of NPP is allocated to replacement of material lost to turnover.
-NPP is calculated in this manner because the CBM-CFS3 does
-not simulate photosynthesis and autotrophic respiration.
+In [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), the general approach described in our [Overview](link to the overview section) section and in @kurz2009 is applied. 
 
 
 ## Inputs
@@ -56,6 +44,42 @@ not simulate photosynthesis and autotrophic respiration.
 | lastPassDMtype | Numeric | Last pass disturebance type for each pizel group | CBM_dataPrep_SK |
 
 ## Module functioning
+
+### Events
+
+Describe events - what does init do 
+what does spinup do
+
+
+### Carbon Transfers
+
+There are 18 internal carbon pools in [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git) (see Table 1 in Overview), one for the atmosphere and one for harvested wood exiting the system. Disturbances are the first carbon transfer to be applied to each record. Half the annual increment is then added (transfer from the atmosphere to the three above ground biomass pools - `Merch`, `Foliage`, and `Other`). Disturbances inputs are processes externally to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), in our example the are processes in [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git), leaving [CBM_core](https://github.com/PredictiveEcology/CBM_core.git) free of spatial data manipulations. Disturbance matrices specify the proportion of carbon in each pool to be transferred to other pools or to be taken out of the system (via forest products (pool named `Products`) or back to the atmosphere). Figure XX gives an example of transfers during a fire in SK. 
+
+**INSERT VINI'S DIST MATRIX TRANSFER FIGURE**. 
+
+The amount of carbon transferred from the atmosphere to the above ground biomass pools is determined from the growth curves, which were translated from $m^3/ha$ to carbon increments in [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) and provided to [CBM_core](https://github.com/PredictiveEcology/CBM_core.git) in carbon increments (tonnes of carbon/ha). Dead Organic Matter ([DOM](link to lexicon)) turnover happens next and transfers carbon from the pools representing snags (stem snags and branches snags), to the `MediumSoil`, and `AboveGroundFastSoil` pools. Biomass turnover follows with transfers from the `Merch`, `Foliage`, `Other`, `FineRoots` and `CoarseRoots`, to the pools representing the snags (both stem and branch snags), `AboveGroundVeryFastSoil`,	`BelowGroundFastSoil`, `AboveGroundVeryFastSoil` and `BelowGroundVeryFastSoil pools`. Carbon is never lost in the system, but increments are at times negative.  To accommodate negative increment values, a carbon transfer labelled `overmature_decline`, moves carbon between the `Merch`, `Other`, `Foliage`, `CoarseRoots` and `FineRoots` to pools representing stem an branch snags, and the `AboveGroundFastSoil`, `AboveGroundVeryFastSoil`, `BelowGroundFastSoil`, and `BelowGroundVeryFastSoil` pools. The transfers are portioned in the same way as annual process turnover and the amount is equal to the loss of each individual biomass pool according to the negative increment. Following the `overmature_decline` transfers, the second half of the growth is added to the three above ground biomass pools - `Merch`, `Foliage`, and `Other`. 
+omdecay 
+Next, the transfers due to decay are 
+
+D
+slowdecay slowmixing
+
+
+
+### Parameters
+
+### Results
+
+NPP
+NPP is
+calculated as the sum of net growth (i.e. growth that results
+in positive increment) and growth that replaces material lost
+to biomass turnover during the year. In young, actively growing
+stands, a large proportion of NPP results in positive growth
+increment while in older, mature stands, a larger proportion
+of NPP is allocated to replacement of material lost to turnover.
+NPP is calculated in this manner because the CBM-CFS3 does
+not simulate photosynthesis and autotrophic respiration.
 
 ## Outputs
 
