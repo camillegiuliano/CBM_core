@@ -69,7 +69,7 @@ The amount of carbon transferred from the atmosphere to the above ground biomass
 Next, the transfers due to decay are performed. Applied decay rates ($a_k$) are calculated for each DOM pool($_k$) as per **Equation 1** (see @kurz2009). 
 
 **Equation 1.** 
-$a_k = D_k X TempMod X StandMod$
+$a_k = D_k * TempMod * StandMod$
 
 Where:
 
@@ -79,7 +79,7 @@ $TempMod$ is a temperature modifier, as per **Equation 2**,  and $StandMod$ is a
 
 **Equation 2,**
 
-$TempMod = e^{((MAT_i -RefTemp)} * ln(Q_10) X 0.1)$
+$TempMod = e^{((MAT_i -RefTemp)} * ln(Q_10) * 0.1)$
 
 Where:
 
@@ -92,7 +92,7 @@ $Q_10$ is a temperature coefficient.
 
 **Equation 3.**
 
-$StandMod =  1+(max_r - 1) X e^{(-b X TotBio/MaxBio)}$
+$StandMod =  1+(max_r - 1) * e^{(-b * TotBio/MaxBio)}$
 
 Where:
 
