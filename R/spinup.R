@@ -2,48 +2,55 @@
 #' Spinup
 #'
 #' Spinup cohort data with libcbmr.
-cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
+cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gcIndex = "gcIndex"){
 
   ## Prepare input for spinup ----
 
   # Set required columns
   reqCols <- list(
-    cohortDT   = c("cohortID", "area", "spatial_unit_id", "species", "sw_hw", "age", gc_id,
+    cohortDT   = c("cohortID", "area", "spatial_unit_id", "species", "sw_hw", "age", gcIndex,
                    "delay", "historical_disturbance_type", "last_pass_disturbance_type"),
     spinupSQL  = c("id", "return_interval", "min_rotations", "max_rotations", "mean_annual_temperature"),
-    growthIncr = c(gc_id, "age", "merch_inc", "foliage_inc", "other_inc")
+    growthIncr = c(gcIndex, "age", "merch_inc", "foliage_inc", "other_inc")
   )
 
   # Read input tables
-  cohortDT   <- readDataTable(cohortDT,   "cohortDT",   colRequired = reqCols$cohortDT)
+  cohortDT   <- readDataTable(cohortDT,   "cohortDT",   colRequired = reqCols$cohortDT, colKeep = names(cohortDT))
   spinupSQL  <- readDataTable(spinupSQL,  "spinupSQL",  colRequired = reqCols$spinupSQL)
   growthIncr <- readDataTable(growthIncr, "growthIncr", colRequired = reqCols$growthIncr)
-
-  # Set growth curve IDs to character
-  if (!is.character(cohortDT[[gc_id]]))   cohortDT[[gc_id]]   <- as.character(cohortDT[[gc_id]])
-  if (!is.character(growthIncr[[gc_id]])) growthIncr[[gc_id]] <- as.character(growthIncr[[gc_id]])
 
   # Set sw_hw to be integer
   if (is.character(cohortDT$sw_hw)) cohortDT$sw_hw <- as.integer(cohortDT$sw_hw == "sw")
 
   # Create cohort groups: groups of cohorts with the same attributes
-  cohortDT$pixelIndex <- cohortDT$cohortID
-  cohortGroupCols <- setdiff(reqCols$cohortDT, "cohortID")
+  ## Allow all cohortDT attributes to be considered in unique groupings
+  cohortGroupCols <- setdiff(names(cohortDT), c("cohortID", "pixelIndex"))
+  cohortDT$pixelIndex <- cohortDT$cohortID ## LandR expects 'pixelGroup' column
   cohortDT$cohortGroupID <- LandR::generatePixelGroups(cohortDT, maxPixelGroup = 0, columns = cohortGroupCols)
 
   # Isolate unique groups and join with spatial unit data
-  cohortGroups <- unique(cohortDT[, c("cohortGroupID", cohortGroupCols), with = FALSE])
+  cohortGroups <- unique(cohortDT[, .SD, .SDcols = c("cohortGroupID", setdiff(reqCols$cohortDT, "cohortID"))])
   cohortGroups <- merge(cohortGroups, spinupSQL, by.x = "spatial_unit_id", by.y = "id", all.x = TRUE)
   setkeyv(cohortGroups, "cohortGroupID")
+
+  ## Ensure gcIndex columns have matching data types
+  ## Drop growth increments age <= 0
+  isFactGC <- sapply(growthIncr[,   gcIndex, with = FALSE], is.factor)
+  isFactCH <- sapply(cohortGroups[, gcIndex, with = FALSE], is.factor)
+  for (gcIndexCol in names(isFactGC)[isFactGC & !isFactCH]){
+    cohortGroups[[gcIndexCol]] <- factor(cohortGroups[[gcIndexCol]], levels(growthIncr[[gcIndexCol]]))
+  }
 
   # Join growth increments with cohort group IDs
   ## Drop growth increments age <= 0
   growthIncrGroups <- merge(
-    cohortGroups[, c("cohortGroupID", gc_id), with = FALSE],
+    cohortGroups[, .SD, .SDcols = c("cohortGroupID", gcIndex)],
     subset(growthIncr, age > 0),
-    by = gc_id, allow.cartesian = TRUE)[, .(
-      row_idx = cohortGroupID, age, merch_inc, foliage_inc, other_inc, gcids
-    )]
+    by = gcIndex, allow.cartesian = TRUE)
+
+  growthIncrGroups <- data.table::data.table(
+    row_idx = growthIncrGroups$cohortGroupID,
+    growthIncrGroups[, -("cohortGroupID")])
   data.table::setkeyv(growthIncrGroups, c("row_idx", "age"))
 
 
@@ -82,7 +89,7 @@ cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gc_id = "gc_id"){
 #' Prepare cohort, stand, and growth curve data into a table ready for spinup.
 cbmExnSpinupCohorts <- function(
     cohortDT, standDT, gcMetaDT,
-    gc_id         = "gc_id",
+    gcIndex         = "gcIndex",
     default_area  = 1,
     default_delay = 0L,
     default_historical_disturbance_type = 1L,
@@ -91,28 +98,55 @@ cbmExnSpinupCohorts <- function(
   # Set required columns
   reqCols <- list(
     standDT  = c("pixelIndex", "spatial_unit_id"),
-    cohortDT = c("cohortID", "pixelIndex", "age", gc_id),
-    gcMetaDT = c(gc_id, "species_id", "sw_hw")
+    cohortDT = c("cohortID", "pixelIndex", "age", gcIndex),
+    gcMetaDT = c(gcIndex, "species_id", "sw_hw")
   )
   optCols <- list(
-    standDT  = c("area", "historical_disturbance_type", "last_pass_disturbance_type"),
-    cohortDT = c("delay")
+    standDT  = c("area", "historical_disturbance_type", "last_pass_disturbance_type")
   )
 
   ## Special case: rename "ages" column
-  if ("ages" %in% names(cohortDT) & !"age" %in% names(cohortDT)) cohortDT$age <- cohortDT$ages
+  if ("ages" %in% names(cohortDT) & !"age" %in% names(cohortDT)){
+    cohortDT <- data.table::copy(cohortDT)[, age := ages][, ages := NULL]
+    cpCH <- FALSE
+  }else cpCH <- TRUE
 
   # Read input tables
-  standDT  <- readDataTable(standDT,  "standDT",   colRequired = reqCols$standDT,  colKeep = optCols$standDT)
-  cohortDT <- readDataTable(cohortDT, "cohortDT",  colRequired = reqCols$cohortDT, colKeep = optCols$cohortDT)
-  gcMetaDT <- readDataTable(gcMetaDT, "gcMetaDT",  colRequired = reqCols$gcMetaDT) |> unique()
-
-  # Set gc_id as character
-  for (gc_id_col in gc_id) cohortDT[[gc_id_col]] <- as.character(cohortDT[[gc_id_col]])
-  for (gc_id_col in gc_id) gcMetaDT[[gc_id_col]] <- as.character(gcMetaDT[[gc_id_col]])
+  standDT  <- readDataTable(
+    standDT,  "standDT", copy = TRUE,
+    colRequired = reqCols$standDT,  colKeep = optCols$standDT)
+  cohortDT <- readDataTable(
+    cohortDT, "cohortDT", copy = cpCH,
+    colRequired = reqCols$cohortDT, colKeep = setdiff(names(cohortDT), names(standDT)))
+  gcMetaDT <- readDataTable(
+    gcMetaDT, "gcMetaDT", copy = TRUE,
+    colRequired = reqCols$gcMetaDT) |> unique()
 
   # Check table column matches
   if (!all(cohortDT$pixelIndex %in% standDT$pixelIndex)) stop("cohortDT has 'pixelIndex' not present in standDT")
+
+  # Remove cohorts that are missing key attributes
+  cohortDT_isNA <- is.na(cohortDT[, .SD, .SDcols = reqCols$cohortDT])
+  if (any(cohortDT_isNA)){
+
+    rmRow <- apply(cohortDT_isNA, 1, any)
+    rmCol <- apply(cohortDT_isNA, 2, any)
+
+    if (all(rmRow)) stop(
+      "All cohort(s) invalid due to NAs in one or more column(s): ",
+      paste(shQuote(names(rmCol)[rmCol]), collapse = ", "))
+
+    warning(
+      sum(rmRow), " / ", nrow(cohortDT),
+      " cohort(s) removed due to NAs in one or more column(s): ",
+      paste(shQuote(names(rmCol)[rmCol]), collapse = ", "))
+
+    cohortDT <- cohortDT[!rmRow,]
+
+    rm(rmRow)
+    rm(rmCol)
+  }
+  rm(cohortDT_isNA)
 
   # Set default values
   if (!"area" %in% names(standDT)){
@@ -137,38 +171,22 @@ cbmExnSpinupCohorts <- function(
     cohortDT[is.na(last_pass_disturbance_type), last_pass_disturbance_type := default_last_pass_disturbance_type]
   }
 
+  ## Ensure gcIndex columns have matching data types
+  isFactGC <- sapply(gcMetaDT[, gcIndex, with = FALSE], is.factor)
+  isFactCH <- sapply(cohortDT[, gcIndex, with = FALSE], is.factor)
+  for (gcIndexCol in names(isFactGC)[isFactGC & !isFactCH]){
+    cohortDT[[gcIndexCol]] <- factor(cohortDT[[gcIndexCol]], levels(gcMetaDT[[gcIndexCol]]))
+  }
+
   # Join all cohort data
   cohortFull <- cohortDT |>
     merge(standDT,  by = "pixelIndex", all.x = TRUE) |>
-    merge(gcMetaDT, by = gc_id,        all.x = TRUE)
-  cohortFull <- cohortFull[, unique(c(names(cohortDT), names(standDT), names(gcMetaDT))), with = FALSE]
-  data.table::setkeyv(cohortFull, "cohortID")
+    merge(gcMetaDT, by = gcIndex,      all.x = TRUE)
+  cohortFull <- cohortFull[, .SD, .SDcols = unique(c(names(cohortDT), names(standDT), names(gcMetaDT)))]
+  data.table::setkey(cohortFull, cohortID)
 
   # Rename columns
   data.table::setnames(cohortFull, "species_id", "species")
-
-  ## Remove cohorts that are missing key attributes
-  cohortFull_isNA <- is.na(cohortDT)
-  if (any(cohortFull_isNA)){
-
-    rmRow <- apply(cohortFull_isNA, 1, any)
-    rmCol <- apply(cohortFull_isNA, 2, any)
-
-    if (all(rmRow)){
-      stop("All cohort(s) invalid NAs in one or more column(s): ",
-           paste(shQuote(names(rmCol)[rmCol]), collapse = ", "))
-
-    }else warning(
-      sum(rmRow), " / ", nrow(cohortFull),
-      " cohort(s) removed due to NAs in one or more column(s): ",
-      paste(shQuote(names(rmCol)[rmCol]), collapse = ", "))
-
-    cohortFull <- cohortFull[!rmRow,]
-
-    rm(rmRow)
-    rm(rmCol)
-  }
-  rm(cohortFull_isNA)
 
   # Return
   return(cohortFull)
@@ -177,7 +195,7 @@ cbmExnSpinupCohorts <- function(
 
 
 # Helper function: read as data.table and check for required columns
-readDataTable <- function(table = NULL, tableName = NULL, colRequired = NULL, colKeep = NULL){
+readDataTable <- function(table = NULL, tableName = NULL, copy = FALSE, colRequired = NULL, colKeep = NULL){
 
   if (is.null(table)) stop(c(tableName, "table")[[1]], " not found")
 
@@ -196,8 +214,10 @@ readDataTable <- function(table = NULL, tableName = NULL, colRequired = NULL, co
       c(tableName, "table")[[1]], " missing column(s): ",
       paste(shQuote(setdiff(colRequired, names(table))), collapse = ", "))
 
-    table <- table[, c(colRequired, intersect(colKeep, names(table))), with = FALSE]
+    table <- table[, .SD, .SDcols = unique(c(colRequired, intersect(colKeep, names(table))))]
   }
+
+  if (copy) table <- data.table::copy(table)
 
   return(table)
 }

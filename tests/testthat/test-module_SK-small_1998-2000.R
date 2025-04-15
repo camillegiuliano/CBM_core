@@ -29,31 +29,7 @@ test_that("Module: SK-small 1998-2000", {
         outputPath  = file.path(projectPath, "outputs")
       ),
 
-      require = c("PredictiveEcology/CBMutils@development (>=2.0)", "reticulate", "terra"),
-
-      ret = {
-        reticulate::virtualenv_create(
-          "r-spadesCBM",
-          python = if (!reticulate::virtualenv_exists("r-spadesCBM")){
-            CBMutils::ReticulateFindPython(
-              version        = ">=3.9,<=3.12.7",
-              versionInstall = "3.10:latest"
-            )
-          },
-          packages = c(
-            "numpy<2",
-            "pandas>=1.1.5",
-            "scipy",
-            "numexpr>=2.8.7",
-            "numba",
-            "pyyaml",
-            "mock",
-            "openpyxl",
-            "libcbm"
-          )
-        )
-        reticulate::use_virtualenv("r-spadesCBM")
-      },
+      require = "terra",
 
       outputs = as.data.frame(expand.grid(
         objectName = c("cbmPools", "NPP"),
@@ -63,12 +39,10 @@ test_that("Module: SK-small 1998-2000", {
       masterRaster      = terra::rast(res = 30),
       spatialDT         = file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv")         |> data.table::fread(),
       level3DT          = file.path(spadesTestPaths$testdata, "SK-small/input", "level3DT.csv")          |> data.table::fread(),
-      speciesPixelGroup = file.path(spadesTestPaths$testdata, "SK-small/input", "speciesPixelGroup.csv") |> data.table::fread(),
-      realAges          = file.path(spadesTestPaths$testdata, "SK-small/input", "realAges.txt")          |> readLines() |> as.integer(),
+      gcMeta            = file.path(spadesTestPaths$testdata, "SK-small/input", "gcMeta.csv")            |> data.table::fread(),
       growth_increments = file.path(spadesTestPaths$testdata, "SK-small/input", "growth_increments.csv") |> data.table::fread(),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
       disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMeta.csv")   |> data.table::fread(),
-      disturbanceMatrix = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMatrix.csv") |> data.table::fread(),
       pooldef           = file.path(spadesTestPaths$testdata, "SK-small/input", "pooldef.txt")           |> readLines(),
       spinupSQL         = file.path(spadesTestPaths$testdata, "SK-small/input", "spinupSQL.csv")         |> data.table::fread()
     )
@@ -126,8 +100,6 @@ test_that("Module: SK-small 1998-2000", {
     data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "emissionsProducts.csv"))[
       , colnames(simTest$emissionsProducts), with = FALSE]
   )
-
-  expect_true(!is.null(simTest$gcid_is_sw_hw))
 
   expect_true(!is.null(simTest$spinup_input))
 

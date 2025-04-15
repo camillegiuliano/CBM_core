@@ -10,7 +10,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "terra",
+    "data.table", "terra", "reticulate",
     "PredictiveEcology/CBMutils@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)",
     "PredictiveEcology/libcbmr"
@@ -55,26 +55,22 @@ defineModule(sim, list(
         spatial_unit_id = "CBM-CFS3 spatial unit ID",
         gcids           = "Growth curve ID",
         ages            = "Stand age at the simulation start year",
+        ageSpinup       = "Optional. Alternative stand age at the simulation start year to use in the spinup",
         delay           = "Optional. Regeneration delay post disturbance in years. Defaults to the 'default_delay' parameter",
         historical_disturbance_type = "Historic CBM-CFS3 disturbance type ID. Defaults to the 'historical_disturbance_type' parameter",
         last_pass_disturbance_type  = "Last pass CBM-CFS3 disturbance type ID. Defaults to the 'last_pass_disturbance_type' parameter"
       )),
     expectsInput(
-      objectName = "speciesPixelGroup", objectClass = "data.table", sourceURL = NA,
-      desc = "CBM-CFS3 species IDs linked to legacy ID `level3DT$pixelGroup`",
+      objectName = "gcMeta", objectClass = "data.table", sourceURL = NA,
+      desc = "Growth curve metadata",
       columns = c(
-        pixelGroup = "legacy ID `level3DT$pixelGroup`",
-        species_id = "CBM-CFS3 species ID"
+        gcids      = "Growth curve ID",
+        species_id = "CBM-CFS3 species ID",
+        sw_hw      = "'sw' or 'hw'"
       )),
     expectsInput(
-      objectName = "realAges", objectClass = "integer", sourceURL = NA,
-      desc = paste(
-        "Optional vector of real cohort ages ordered by legacy ID `level3DT$pixelGroup`.",
-        "If the ages are altered for the spinup in the 'cohortDT' table,",
-        "use this input to set the real ages after the spinup.")),
-    expectsInput(
       objectName = "growth_increments", objectClass = "data.table", sourceURL = NA,
-      desc = "Table of growth increments.",
+      desc = "Growth curve increments",
       columns = c(
         gcids       = "Growth curve ID",
         age         = "Cohort age",
@@ -117,10 +113,7 @@ defineModule(sim, list(
         disturbance_matrix_id = "Disturbance matrix ID",
         name                  = "Disturbance name",
         description           = "Disturbance description"
-      )),
-    expectsInput(
-      objectName = "disturbanceMatrix", objectClass = "dataset", sourceURL = NA,
-      desc = NA)
+      ))
   ),
   outputObjects = bindrows(
     createsOutput(
@@ -129,9 +122,6 @@ defineModule(sim, list(
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
       desc = "Three parts: pixelGroup, Age, and Pools "),
-    createsOutput(
-      objectName = "gcid_is_sw_hw", objectClass = "data.table",
-      desc = "Table that flags each of the study area's gcids as softwood or hardwood"),
     createsOutput(
       objectName = "spinup_input", objectClass = "data.table",
       desc = "input parameters for the spinup functions"),
@@ -277,35 +267,28 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
 Init <- function(sim){
 
-  # Determine if growth curves are for SW or HW
-  sim$gcid_is_sw_hw <- unique(sim$growth_increments[, .(gcids, is_sw = forest_type_id == 1)])
+  # Set up Python virtual environment
+  reticulate::virtualenv_create(
+    "r-spadesCBM",
+    python = if (!reticulate::virtualenv_exists("r-spadesCBM")){
+      CBMutils::ReticulateFindPython(version = ">=3.9,<=3.12.7", versionInstall = "3.10:latest")
+    },
+    packages = c(
+      "numpy<2",
+      "pandas>=1.1.5",
+      "scipy",
+      "numexpr>=2.8.7",
+      "numba",
+      "pyyaml",
+      "mock",
+      "openpyxl",
+      "libcbm"
+    ))
 
-  ## Temporary:
-  ## match inputs sorted by sim$level3DT$pixelGroup with other keys
-  ## Remove sim$level3DT and sim$spatialDT$pixelGroup
-  if (is.null(sim$level3DT)) stop("sim$level3DT required to map ages to old pixel groups")
+  # Use Python virtual environment
+  reticulate::use_virtualenv("r-spadesCBM")
 
-  if (!is.null(sim$realAges)){
-
-    sim$realAges <- merge(
-      sim$spatialDT[, .(pixelIndex, pixelGroup)],
-      data.table::data.table(pixelGroup = sim$level3DT$pixelGroup, ages = sim$realAges),
-      by = "pixelGroup", all.x = TRUE
-    )[, .(pixelIndex, ages)]
-  }
-
-  gcidSpecies <- unique(
-    merge(sim$speciesPixelGroup,
-          sim$level3DT[, .(pixelGroup, gcids)],
-          by = "pixelGroup")[, .(gcids, species_id)])
-  if (is.numeric(sim$growth_increments$gcids)){
-    gcidSpecies$gcids <- as.numeric(as.character(gcidSpecies$gcids))
-  }
-  sim$growth_increments <- sim$growth_increments[gcidSpecies, on = "gcids"]
-
-  sim$spatialDT$pixelGroup <- NULL
-  sim$level3DT <- NULL
-
+  # Return simList
   return(invisible(sim))
 
 }
@@ -314,7 +297,14 @@ spinup <- function(sim) {
 
   # Prepare cohort and stand data into a table for spinup
   cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
-  if ("delay" %in% names(sim$spatialDT)) cohortDT$delay <- spatialDT$delay
+  if ("delay" %in% names(sim$spatialDT)) cohortDT[, delay := spatialDT$delay]
+
+  # Use alternative ages for spinup
+  ##TODO: confirm if still the case where CBM_vol2biomass won't translate <3 years old
+  if ("ageSpinup" %in% names(sim$spatialDT)){
+    cohortDT[, agesReal := ages]
+    cohortDT[, ages     := sim$spatialDT$ageSpinup]
+  }
 
   standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
   if ("historical_disturbance_type" %in% names(sim$spatialDT)){
@@ -323,8 +313,6 @@ spinup <- function(sim) {
   if ("last_pass_disturbance_type" %in% names(sim$spatialDT)){
     standDT$last_pass_disturbance_type <- spatialDT$last_pass_disturbance_type
   }
-
-  gcMetaDT <- unique(sim$growth_increments[, .(gcids, species_id, sw_hw = forest_type_id == 1)])
 
   if (!"delay" %in% names(cohortDT)) message(
     "Spinup using the default regeneration delay: ", P(sim)$default_delay)
@@ -338,8 +326,8 @@ spinup <- function(sim) {
   cohortSpinup <- cbmExnSpinupCohorts(
     cohortDT      = cohortDT,
     standDT       = standDT,
-    gcMetaDT      = gcMetaDT,
-    gc_id         = "gcids",
+    gcMetaDT      = sim$gcMeta,
+    gcIndex       = "gcids",
     default_area  = 1,
     default_delay = P(sim)$default_delay,
     default_historical_disturbance_type = P(sim)$default_historical_disturbance_type,
@@ -351,7 +339,7 @@ spinup <- function(sim) {
     cohortDT   = cohortSpinup,
     spinupSQL  = sim$spinupSQL[, mean_annual_temperature := historic_mean_temperature],
     growthIncr = sim$growth_increments,
-    gc_id      = "gcids"
+    gcIndex    = "gcids"
   ) |> Cache()
 
   sim$spinup_input <- spinupOut["increments"]
@@ -360,6 +348,7 @@ spinup <- function(sim) {
   sim$spinupResult <- spinupOut$output$pools
 
   # Save cohort group key as pixelGroup
+  sim$spatialDT$pixelGroup <- NULL
   pixelGroupKey <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
   sim$spatialDT <- merge(sim$spatialDT, pixelGroupKey, by = "pixelIndex", all.x = TRUE)
 
@@ -374,25 +363,13 @@ postSpinup <- function(sim) {
 
   #TODO: track this below! Do we need this seperate object now? This is a spot
   #where we could simplify. But currently it is needed throught annual event.
-
   # Initiate pixel group table
-  sim$level3DT <- unique(sim$spatialDT[, -("pixelIndex")])
-  data.table::setkeyv(sim$level3DT, "pixelGroup")
+  sim$level3DT <- unique(sim$spatialDT[, setdiff(names(sim$spatialDT), c("pixelIndex", "ageSpinup")), with = FALSE])
+  data.table::setkey(sim$level3DT, pixelGroup)
 
   ## Set sim$level3DT$gcids to be a factor
   set(sim$level3DT, j = "gcids",
       value = factor(CBMutils::gcidsCreate(sim$level3DT[, "gcids", with = FALSE])))
-
-  # Apply real ages
-  ##TODO: confirm if this is still the case where CBM_vol2biomass won't
-  ##translate <3 years old and we have to keep the "realAges" seperate for spinup.
-  if (!is.null(sim$realAges)){
-
-    sim$level3DT <- merge(
-      sim$level3DT[, -("ages")],
-      unique(merge(sim$spatialDT, sim$realAges, by = "pixelIndex")[, .(pixelGroup, ages = ages.y)]),
-      by = "pixelGroup", all.x = TRUE)
-  }
 
   #TODO: track this below! Do we need this seperate object now? This is a spot
   #where we could simplify. But currently it is needed throught annual event.
@@ -415,7 +392,6 @@ postSpinup <- function(sim) {
 }
 
 annual <- function(sim) {
-
   spatialDT <- sim$spatialDT[, .(pixelIndex, pixelGroup, spatial_unit_id, gcids, ages)]
   setkeyv(spatialDT, "pixelIndex")
 
@@ -490,23 +466,14 @@ annual <- function(sim) {
   # 4. Reset the ages for disturbed pixels in stand replacing disturbances.
   # libcbm resets ages to 0 internally but for transparency we are doing it here
   # to (and it gives an opportunity for a check)
+  if (nrow(distPixels) > 0){
 
-  # List possible disturbances for each growth curve ID
-  gcidDist <- merge(
-    copy(sim$gcid_is_sw_hw)[, .(gcids, is_sw, sw_hw = ifelse(is_sw, "sw", "hw"))],
-    distMeta,
-    by = "sw_hw", allow.cartesian = TRUE)
-  setkey(gcidDist, NULL)
-  if (is.numeric(distPixels$gcids)) gcidDist$gcids <- as.numeric(as.character(gcidDist$gcids))
+    distPixels <- merge(distPixels, sim$gcMeta[, .(gcids, sw_hw)], by = "gcids", all.x = TRUE)
+    distPixels <- merge(distPixels, distMeta, by = c("spatial_unit_id", "sw_hw", "events"), all.x = TRUE)
+    data.table::setkey(distPixels, pixelIndex)
 
-  # Set disturbed pixels to age = 0
-  ##TODO check if this works the way it is supposed to
-  # read-in the disturbanceMeta, make a vector of 0 and 1 or 2 the length of distPixels$events
-  distWhole <- merge(distPixels, gcidDist, by = c("spatial_unit_id", "gcids", "events"), all.x = TRUE)
-  setkey(distPixels, pixelIndex)
-  setkey(distWhole, pixelIndex)
-  distPixels$ages[which(distWhole$wholeStand == 1)] <- 0
-  setkey(distPixels, pixelGroup)
+    distPixels[wholeStand == 1, ages := 0]
+  }
 
   # 5. new pixelGroup----------------------------------------------------
   # make a column of new pixelGroup that includes events and carbon from
@@ -528,7 +495,7 @@ annual <- function(sim) {
                   "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
   cPoolsOnly <- pixelGroupC[, .SD, .SDcols = c("pixelGroup", cPoolNames)]
 
-  distPixelCpools <- cPoolsOnly[distPixels, on = c("pixelGroup")]
+  distPixelCpools <- cPoolsOnly[distPixels[, .SD, .SDcols = names(spatialDT)], on = "pixelGroup"]
 
 
   distPixelCpools$newGroup <- LandR::generatePixelGroups(
@@ -542,7 +509,7 @@ annual <- function(sim) {
   ##unnecessary cols from generatePixelGroups. Also this function changes the
   ##value of pixelGroup to the newGroup.
   distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
-    "newGroup", names(spatialDT), cPoolNames), "oldGroup"
+    names(spatialDT), cPoolNames, "newGroup", "oldGroup")
   ]
 
   cols <- c("pixelGroup", "newGroup")
@@ -595,16 +562,6 @@ annual <- function(sim) {
   setkeyv(pixelGroupForAnnual, "pixelGroup")
 
 
-  # 9. From the events column, create a vector of the disturbance matrix
-  # identification so it links back to the CBM default disturbance matrices.
-  DM <- merge(pixelGroupForAnnual, gcidDist,
-              by = c("spatial_unit_id", "gcids", "events"), all.x = TRUE)
-  DM$disturbance_matrix_id[is.na(DM$disturbance_matrix_id)] <- 0
-  setkeyv(DM, "pixelGroup")
-
-  ## this is the vector to be fed into the sim$opMatrixCBM[,"disturbance"]<-DMIDS
-  DMIDS <- as.vector(DM$disturbance_matrix_id)
-
   # END of dealing with disturbances and updating all relevant data tables.
   ################################### -----------------------------------
 
@@ -626,7 +583,6 @@ annual <- function(sim) {
   ## We are currently only working in spu 28
   if (dim(distPixels)[1] > 0) {
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
-    disturbanceMatrix <- sim$disturbanceMatrix
     oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
     newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
     newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
@@ -650,14 +606,26 @@ annual <- function(sim) {
     spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
     cbm_vars$parameters <- cbm_vars$parameters[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
   }
-  ## currently pixelGroupForAnnual tells us that events>0 means a disturbance.
+
+  # Set disturbance type IDs
   if (dim(distPixels)[1] > 0) {
-    distMatass <- as.data.table(disturbanceMatrix)
-    DMIDS[DMIDS > 0] <- distMatass[disturbance_matrix_id %in% DMIDS[DMIDS > 0],][spatial_unit_id %in% part2$spatial_unit_id, disturbance_type_id]
-    cbm_vars$parameters$disturbance_type <- DMIDS
-  } else {
+
+    newDTypeIDs <- unique(
+      merge(distPixels, sim$pixelKeep, by = "pixelIndex", all.x = TRUE)[
+        , c(paste0("pixelGroup", time(sim)), "disturbance_type_id"), with = FALSE])
+
+    cbm_vars$parameters <- merge(
+      cbm_vars$parameters, newDTypeIDs,
+      by.x = "row_idx", by.y = paste0("pixelGroup", time(sim)),
+      all.x = TRUE)
+    cbm_vars$parameters[, disturbance_type    := data.table::fcoalesce(disturbance_type_id, 0L)]
+    cbm_vars$parameters[, disturbance_type_id := NULL]
+
+    rm(newDTypeIDs)
+
+  }else{
     ##there might be a disturbance_type left over from the previous annual event
-    cbm_vars$parameters$disturbance_type <- rep(0, length(cbm_vars$parameters$disturbance_type))
+    cbm_vars$parameters$disturbance_type <- 0L
   }
 
   ##growth_increments
@@ -696,6 +664,21 @@ annual <- function(sim) {
     )
 
     growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
+
+    ## for RIA, growth curves are shorter than some of the ages coming out of the spinup, for this reason we are trailing the final value
+    ## of the curve by another 100 years here. This will trail the increments an extra 100 years if a pixel group's max age exceeds that of the growth curves.
+    if (!max(cbm_vars$state$age) == max(growth_increments$age)){
+    lastInc <- growth_increments[age == 299, .(row_idx, merch_inc, foliage_inc, other_inc, gcids)]
+    maxAge <- max(growth_increments$age)
+    extendAge <- (maxAge + 1):(maxAge + 100)
+    trailingCurves <- lastInc[, .( age = extendAge,
+                                   merch_inc = merch_inc,
+                                   foliage_inc = foliage_inc,
+                                   other_inc = other_inc,
+                                   gcids = gcids), by = row_idx]
+    growth_increments <- rbind(growth_increments, trailingCurves)
+    setkey(growth_increments, row_idx, age)
+    }
 
     ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
     ## when creating annual_increments.
@@ -972,7 +955,7 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   emissions <- emissions[, epCols, with = FALSE]
 
   emissionsProducts <- cbind(emissions, products)
-  emissionsProducts <- colSums(emissionsProducts * prod(res(sim$masterRaster)) / 10000 *
+  emissionsProducts <- colSums(emissionsProducts * prod(terra::res(sim$masterRaster)) / 10000 *
           pixelCount[["N"]])
   emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
   sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
