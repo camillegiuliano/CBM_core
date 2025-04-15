@@ -39,8 +39,9 @@ jobs:
       - uses: PredictiveEcology/actions/install-spatial-deps@v0.2
 
       # 2025-01-30: systemfonts R package failed to install due to these missing
+      # 2025-04-15: error also observed on release
       - name: Install extra Linux dependencies
-        if: runner.os == 'Linux' && matrix.config.r == 'devel'
+        if: runner.os == 'Linux'
         run: |
           sudo apt -y install libfontconfig1-dev
           sudo apt-get install libharfbuzz-dev libfribidi-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
