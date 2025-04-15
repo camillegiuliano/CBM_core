@@ -69,17 +69,17 @@ The amount of carbon transferred from the atmosphere to the above ground biomass
 Next, the transfers due to decay are performed. Applied decay rates ($a_k$) are calculated for each DOM pool($_k$) as per **Equation 1** (see @kurz2009). 
 
 **Equation 1.** 
-$a_k$ *=* $D_k$ *X TempMod X StandMod*
+$a_k = D_k X TempMod X StandMod$
 
 Where:
 
-$D_k$ is the base decay rate (yr−1) at a reference mean annual temperature (*RefTemp*).
+$D_k$ is the base decay rate (yr−1) at a reference mean annual temperature ($RefTemp$).
 
-*TempMod* is a temperature modifier, as per **Equation 2**,  and *StandMod* is a stand modifier as per **Equation 3** (@kurz1999).
+$TempMod$ is a temperature modifier, as per **Equation 2**,  and $StandMod$ is a stand modifier as per **Equation 3** (@kurz1999).
 
 **Equation 2,**
 
-*TempMod = *$e^((MAT_i -RefTemp) X ln(Q_10) X 0.1)$
+$TempMod = e^{((MAT_i -RefTemp)} * ln(Q_10) X 0.1)$
 
 Where:
 
@@ -92,7 +92,7 @@ $Q_10$ is a temperature coefficient.
 
 **Equation 3.**
 
-*StandMod = * $1+(max_r - 1)$* X *$e^(-b X TotBio/MaxBio)$
+$StandMod =  1+(max_r - 1) X e^{(-b X TotBio/MaxBio)}$
 
 Where:
 
@@ -110,7 +110,7 @@ The final carbon transfers represents the physical transfer rate from the above-
 
 Default parameters for simulations are available mainly from [default `.csv` files](libcbm/resources/cbm_exn) with a few pieces of information such as `mean_annual_temperature` used in decay rates calculates, `return_interval`, `min_rotations` and `max_rotations` used in the `spinup` or initialization process available in an [SQLight database](https://github.com/cat-cfs/libcbm_py/tree/main/libcbm/resources/cbm_defaults_db). Decay parameter values are linked through the explanation of decay calculations in the previous section. 
 
-The amount of carbon in the `CoarseRoots` and `FineRoots` pools depends on the carbon in the three above ground pools that absorb carbon from the atmosphere, `Merch`, `Other`, and `Foliage`. Each time these three above ground carbon pools receive an amount of carbon (determined by the growth curve), a portion goes to roots. The total root biomass is estimated using empirical equations, one for hardwood (**Equation 4.**) and one for softwood species (**Euation 5.).
+The amount of carbon in the `CoarseRoots` and `FineRoots` pools depends on the carbon in the three above ground pools that absorb carbon from the atmosphere, `Merch`, `Other`, and `Foliage`. Each time these three above ground carbon pools receive an amount of carbon (determined by the growth curve), a portion goes to roots. The total root biomass is estimated using empirical equations, one for hardwood (**Equation 4.**) and one for softwood species (**Equation 5**).
 
 
 (RBsw = rb _ sw _ a × ABsw) species
