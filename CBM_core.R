@@ -642,118 +642,57 @@ annual <- function(sim) {
   ## ASSUMPTION: the Merch matches so all tables are in the same sorting order
   ## which is pixelGroup. cbm_vars$pools has one less record for the moment.
 
-  ##TODO not sure if this is how we will proceed once things are cleaned up,
-  ##but the new pixelGroup needs a growth curve. Our new pixelGroup (42) will
-  ##for now inherit the growth curve from its previous pixelGroup (which was
-  ##pixelGroup 6 as we can see in distPixels). gcids for pixelGroup 6 (in
-  ##distPixel and sim$level3DT) is gcids 50
-  if (dim(distPixels)[1] > 0) {
-    ## these two above should have the same dim
-    ##TODO make this a check
-    dim(oldGCpixelGroup) == dim(newGCpixelGroup)
-    ## our current growth curves go from 0 - 250
-    ##TODO this will need to be more flexible. replace 250 by length of GC
+  # Set growth increments: join via spinup cohort group IDs and age
+  annualIncr <- data.table::as.data.table(cbm_vars$parameters)[, .(row_idx, age)]
+  growthIncr <- data.table::as.data.table(sim$spinup_input$increments)
+  data.table::setkeyv(growthIncr, c("row_idx", "age"))
 
-    growth_incForDist <- data.table(
-      row_idx = sort(rep(newGCpixelGroup$pixelGroup, 250)),
-      age = rep(1:250, dim(newGCpixelGroup)[1]),
-      merch_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), merch_inc],
-      foliage_inc = sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), foliage_inc],
-      other_inc =  sim$spinup_input$increments[match(sort(rep(newGCpixelGroup$oldGroup, 250)), row_idx), other_inc],
-      gcids = factor(newGCpixelGroup$gcids, levels(sim$level3DT$gcids))
-    )
+  ## JAN 2025: This sets any ages <= 0 to 1. Without this fix we lose pixel groups
+  annualIncr$age <- replace(annualIncr$age, annualIncr$age <= 0, 1)
 
-    growth_increments <- rbind(sim$spinup_input$increments, growth_incForDist)
+  ## Extend increments to maximum age found in parameters
+  ## This handles cases where the cohort ages exceed what is available in the increments
+  maxIncr <- growthIncr[growthIncr[, .I[which.max(age)], by = c("gcids", "row_idx")]$V1,]
+  if (any(maxIncr$age < max(cbm_vars$parameters$age))){
 
-    ## for RIA, growth curves are shorter than some of the ages coming out of the spinup, for this reason we are trailing the final value
-    ## of the curve by another 100 years here. This will trail the increments an extra 100 years if a pixel group's max age exceeds that of the growth curves.
-    if (!max(cbm_vars$state$age) == max(growth_increments$age)){
-    lastInc <- growth_increments[age == 299, .(row_idx, merch_inc, foliage_inc, other_inc, gcids)]
-    maxAge <- max(growth_increments$age)
-    extendAge <- (maxAge + 1):(maxAge + 100)
-    trailingCurves <- lastInc[, .( age = extendAge,
-                                   merch_inc = merch_inc,
-                                   foliage_inc = foliage_inc,
-                                   other_inc = other_inc,
-                                   gcids = gcids), by = row_idx]
-    growth_increments <- rbind(growth_increments, trailingCurves)
-    setkey(growth_increments, row_idx, age)
-    }
+    warning("Cohort ages exceed growth increment ages. ",
+            "Increments for the greatest available age have been applied to older cohorts.")
 
-    ## JAN 2025: This sets any ages = 0 to 1. Without this fix we lose pixel groups
-    ## when creating annual_increments.
-    cbm_vars$parameters$age <- replace(cbm_vars$parameters$age, cbm_vars$parameters$age == 0 , 1)
-    annual_increments <- merge(
-      cbm_vars$parameters,
-      growth_increments,
-      by = c("row_idx", "age")
-    )
+    growthIncr <- rbind(
+      growthIncr, data.table::rbindlist(
+        lapply(which(maxIncr$age < max(cbm_vars$parameters$age)), function(i){
+          cbind(age = (maxIncr[i,]$age + 1):(max(cbm_vars$parameters$age) + 250),
+                maxIncr[i,][, -("age")])
+        }), use.names = TRUE))
+    data.table::setkeyv(growthIncr, c("row_idx", "age"))
 
-    annual_increments <- as.data.table(annual_increments)
-    names(annual_increments)
-    ##TODO this seems precarious...but it will be fixed once the growth info comes
-    ##from another module (either CBM_vol2biomass, or LandCBM).
-    annual_increments[,names(annual_increments)[5:7] := NULL]
-    annual_increments[, age := NULL]
-    setkeyv(annual_increments, "row_idx")
-    ##NOTES: don't change the data.frames to data.tables. There seems to be a
-    ##problem for passing a data.table (as opposed to a data.frame with -
-    ##attr(*, "pandas.index")=RangeIndex(start=0, stop=41, step=1) to the Python
-    ##functions). In run_spatial_test.R, Scott remakes the data frames, taking
-    ##away the row names, and remaking the state$record_idx (lines 274) before
-    ##passing them back to cbm_vars. This needs to be confirmed.
-
-
-    ##TODO ##cbm_vars$parameters is already sorted by row_idx (which are
-    ##pixelGroups). Need a check for that if we have a lot of disturbed pixels.
-
-    ## replace the NaN with the increments for that pixelGroup and age and add the
-    ## new pixelGroup
-  } else {
-    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
-    ## in the Python functions so we are keeping it.
-    if (is.null(cbm_vars$parameters$row_idx)) {
-      cbm_vars$parameters$row_idx <- sim$level3DT$pixelGroup
-    } else {
-      cbm_vars$parameters$row_idx <- cbm_vars$parameters$row_idx
-    }
-
-    if (is.na(cbm_vars$parameters$mean_annual_temperature[1])) {
-      spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
-      cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
-    }
-
-    #add age: ages needs to be update with the ages in cbm_vars$state$age
-    cbm_vars$parameters$age <- cbm_vars$state$age
-    #make annual_increments
-    annual_increments <- merge(
-      cbm_vars$parameters,
-      sim$spinup_input$increments,
-      by = c("row_idx", "age")
-    )
-    annual_increments <- as.data.table(annual_increments)
-    names(annual_increments)
-    ##TODO this seems precarious...but it will be fixed once the growth info comes
-    ##from another module (either CBM_vol2biomass, or LandCBM).
-    annual_increments[,names(annual_increments)[5:7] := NULL]
-    annual_increments[, age := NULL]
-    setkeyv(annual_increments, "row_idx")
+    sim$spinup_input$increments <- growthIncr
   }
 
-  cbm_vars$parameters$merch_inc <- annual_increments$merch_inc.y
-  cbm_vars$parameters$foliage_inc <- annual_increments$foliage_inc.y
-  cbm_vars$parameters$other_inc <- annual_increments$other_inc.y
+  annualIncr <- merge(
+    annualIncr,
+    unique(sim$pixelKeep[, .SD, .SDcols = c(paste0("pixelGroup", time(sim)), "pixelGroup0")]),
+    by.x = "row_idx", by.y = paste0("pixelGroup", time(sim)),
+    all.x = TRUE)
+  annualIncr <- merge(
+    annualIncr, growthIncr,
+    by.x = c("pixelGroup0", "age"), by.y = c("row_idx", "age"),
+    all.x = TRUE)
 
-  # set increments to 0 if the age ended up not being defined in the increments
-  # due to the age being out-of-range
-  cbm_vars$parameters$merch_inc[is.na(cbm_vars$parameters$merch_inc)] <- 0.0
-  cbm_vars$parameters$foliage_inc[is.na(cbm_vars$parameters$foliage_inc)] <- 0.0
-  cbm_vars$parameters$other_inc[is.na(cbm_vars$parameters$other_inc)] <- 0.0
+  if (any(is.na(annualIncr[, .(merch_inc, foliage_inc, other_inc)]))) stop(
+    "Growth increments not found for ID(s): ", paste(shQuote(as.character(
+      unique(subset(annualIncr, is.na(merch_inc) | is.na(foliage_inc) | is.na(other_inc))$gcids)
+    )), collapse = ", "))
 
-  # need to keep the growth increments that we added for the next annual event
-  if (dim(distPixels)[1] > 0) {
-      sim$spinup_input$increments <- growth_increments
-      }
+  cbm_vars$parameters <- merge(
+    data.table::as.data.table(cbm_vars$parameters)[
+      , .SD, .SDcols = -c("merch_inc", "foliage_inc", "other_inc")],
+    annualIncr[, .(row_idx, merch_inc, foliage_inc, other_inc)],
+    by = "row_idx", all.x = TRUE)
+  data.table::setkey(cbm_vars$parameters, row_idx)
+
+  rm(annualIncr)
+  rm(growthIncr)
 
   ###################### END cbm_vars$parameters
 
