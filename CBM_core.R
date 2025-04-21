@@ -348,7 +348,7 @@ spinup <- function(sim) {
   sim$spinupResult <- spinupOut$output$pools
 
   # Save cohort group key as pixelGroup
-  sim$spatialDT$pixelGroup <- NULL
+  if ("pixelGroup" %in% names(sim$spatialDT$pixelGroup)) sim$spatialDT$pixelGroup <- NULL
   pixelGroupKey <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
   sim$spatialDT <- merge(sim$spatialDT, pixelGroupKey, by = "pixelIndex", all.x = TRUE)
 
