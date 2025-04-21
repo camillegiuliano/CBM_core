@@ -37,11 +37,11 @@ defineModule(sim, list(
     defineParameter(
       "poolsToPlot", "character", default = "totalCarbon", NA, NA,
       desc = "which carbon pools to plot, if any. Defaults to total carbon"),
-    defineParameter(".plotInitialTime", "numeric", NA, NA, NA, "This describes the simulation time at which the first plot event should occur"),
-    defineParameter(".plotInterval", "numeric", end(sim) - start(sim), NA, NA, "This describes the simulation time interval between plot events"),
-    defineParameter(".saveInitialTime", "numeric", NA, NA, NA, "This describes the simulation time at which the first save event should occur"),
-    defineParameter(".saveInterval", "numeric", NA, NA, NA, "This describes the simulation time interval between save events"),
-    defineParameter(".useCache", "logical", FALSE, NA, NA, "Should this entire module be run with caching activated? This is generally intended for data-type modules, where stochasticity and time are not relevant")
+    defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA, "Simulation time when the first plot event should occur"),
+    defineParameter(".plotInterval",    "numeric", 1L,         NA, NA, "Time interval between plot events"),
+    defineParameter(".saveInitialTime", "numeric", NA,         NA, NA, "Simulation time when the first save event should occur"),
+    defineParameter(".saveInterval",    "numeric", NA,         NA, NA, "Time interval between save events"),
+    defineParameter(".useCache", "logical", FALSE, NA, NA, "Use module caching")
   ),
   inputObjects = bindrows(
     expectsInput(
@@ -909,113 +909,9 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   return(invisible(sim))
 }
 
-# creating a .inputObject for CBM_core so it can run independently
-
-##TODO add cache calls
-## give the data folder to Scott
-
-
-.inputObjects<- function(sim) {
-
-  P(sim)$poolsToPlot <- "totalCarbon"
-  P(sim)$.plotInitialTime <- 1990
-  P(sim)$.plotInterval <- 1
-
-  ##TODO add qs to required packages
-  # library(qs)
-  # qsave(db, file.path(getwd(), "modules", "CBM_core", "data", "cbmData.qs"))
-
-  # # These could be supplied in the CBM_defaults module
-  # if we want this module to run alone (I don't think we do), we need $poodef
-
-  # These could be supplied in the CBM_dataPrep_XXX modules
-  # The below examples come from CBM_dataPrep_SK for the whole managed forests
-  # (like in Boisvenue et al 2016 a and b)
-  # if (!suppliedElsewhere("ages", sim))  {
-  #   sim$PoolCount <- length(sim$pooldef)
-  #   sim$pools <- matrix(ncol = sim$PoolCount, nrow = 739, data = 0)
-  #   sim$ages <- SKages
-  #
-  #   sim$realAges <- SKrealAges
-  #
-  #   if (!suppliedElsewhere("gcids", sim)) {
-  #     ## this is where the pixelGroups and their spu eco etc.
-  #     message("No spatial information was provided for the growth curves.
-  #           The default values (SK simulations) will be used to limit the number of growth curves used.")
-  #     sim$gcids <- SKgcids
-  #   }
-  #
-  #   if (!suppliedElsewhere("ecozones", sim)) {
-  #     message("No spatial information was provided for the growth curves.
-  #           The default values (SK simulations) will be used to determine which ecozones these curves are in.")
-  #     sim$ecozones <- SKecozones
-  #   }
-  #   if (!suppliedElsewhere("spatialUnits", sim)) {
-  #     message("No spatial information was provided for the growth curves.
-  #           The default values (SK simulations) will be used to determine which CBM-spatial units these curves are in.")
-  #     sim$spatialUnits <- SKspatialUnits
-  #   }
-    # sim$historicDMIDs <- c(rep(378, 321), rep(371, 418))
-    # sim$lastPassDMIDS <- sim$historicDMIDs
-    #
-    # sim$minRotations <- rep(10, 739)
-    # sim$maxRotations <- rep(30, 739)
-    #
-    # sim$returnIntervals <- read.csv(file.path(getwd(), "modules","CBM_core",
-    #                                           "data", "returnInt.csv"))
-
-
-  ##All these are provided in the out$ for now
-
-    # dPath <- asPath(getOption("reproducible.destinationPath", dataPath(sim)), 1)
-    # sim$disturbanceRasters <- list.files(
-    #   file.path(dPath, "disturbance_testArea"),
-    #   pattern = "[.]grd$",
-    #   full.names = TRUE
-    # )
-    #
-    # sim$userDist <- read.csv(file.path(dataPath(sim), "userDist.csv"))
-    #
-    #
-
-    # # if (!suppliedElsewhere(sim$dbPath)) {
-    # #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
-    # # }
-    # ##TODO these two will come from CBM_dataPrep_XX
-    # sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
-    #
-    # # sim$spatialDT <- read.csv(file.path(dataPath(sim),
-    # #                                     "spatialDT.csv"))
-    #
-    # #sim$curveID <- "gcids" # not needed in the Python
-    #
-    # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
-    #                                       "mySpuDmids.csv"))
-    #
-    # if (!suppliedElsewhere("masterRaster", sim)) {
-    #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
-    # }
-    #
-
-    # if (!suppliedElsewhere(sim$dbPath)) {
-    #   sim$dbPath <- file.path(dPath, "cbm_defaults", "cbm_defaults.db")
-    # }
-    ##TODO these two will come from CBM_dataPrep_XX
-    #sim$level3DT <- read.csv(file.path(dataPath(sim), "leve3DT.csv"))
-
-    # sim$spatialDT <- read.csv(file.path(dataPath(sim),
-    #                                     "spatialDT.csv"))
-
-    #sim$curveID <- "gcids" # not needed in the Python
-
-    # sim$mySpuDmids <-  read.csv(file.path(dataPath(sim),
-    #                                       "mySpuDmids.csv"))
-    #
-    # if (!suppliedElsewhere("masterRaster", sim)) {
-    #   sim$masterRaster <- prepInputs(url = extractURL("masterRaster", sim))
-    # }
-
-
+.inputObjects <- function(sim){
 
   return(sim)
 }
+
+
