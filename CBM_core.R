@@ -348,7 +348,7 @@ spinup <- function(sim) {
   sim$spinupResult <- spinupOut$output$pools
 
   # Save cohort group key as pixelGroup
-  if ("pixelGroup" %in% names(sim$spatialDT$pixelGroup)) sim$spatialDT$pixelGroup <- NULL
+  if ("pixelGroup" %in% names(sim$spatialDT)) sim$spatialDT$pixelGroup <- NULL
   pixelGroupKey <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
   sim$spatialDT <- merge(sim$spatialDT, pixelGroupKey, by = "pixelIndex", all.x = TRUE)
 
@@ -678,8 +678,9 @@ annual <- function(sim) {
     annualIncr, growthIncr,
     by.x = c("pixelGroup0", "age"), by.y = c("row_idx", "age"),
     all.x = TRUE)
+  annualIncr <- unique(annualIncr[, .(row_idx, merch_inc, foliage_inc, other_inc)])
 
-  if (any(is.na(annualIncr[, .(merch_inc, foliage_inc, other_inc)]))) stop(
+  if (any(is.na(annualIncr))) stop(
     "Growth increments not found for ID(s): ", paste(shQuote(as.character(
       unique(subset(annualIncr, is.na(merch_inc) | is.na(foliage_inc) | is.na(other_inc))$gcids)
     )), collapse = ", "))
