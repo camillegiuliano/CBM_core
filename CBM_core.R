@@ -559,7 +559,8 @@ annual <- function(sim) {
   }
 
   # table for this annual event processing
-  setkeyv(pixelGroupForAnnual, "pixelGroup")
+  setkey(part2, pixelGroup)
+  setkey(pixelGroupForAnnual, pixelGroup)
 
 
   # END of dealing with disturbances and updating all relevant data tables.
@@ -582,10 +583,12 @@ annual <- function(sim) {
   ## spinupSQL table, and I am assuming that the id column is the spatial unit.
   ## We are currently only working in spu 28
   if (dim(distPixels)[1] > 0) {
+
     cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
-    oldGCpixelGroup <- unique(distPixels[, c('pixelGroup', 'gcids')])
+
     newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
     newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
+    data.table::setkey(newGCpixelGroup, pixelGroup)
 
     ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
     ## in the Python functions so we are keeping it.
