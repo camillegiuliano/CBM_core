@@ -81,7 +81,7 @@ test_that("Module: SK-small 1998-2000", {
   expect_equal(
     simTest$cbmPools[,-("pixelGroup")][, lapply(.SD, sum), by = simYear],
     data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "cbmPools.csv"))[
-      ,-("pixelGroup")][, lapply(.SD, sum), by = simYear]
+      , .SD, .SDcols = names(simTest$cbmPools)][,-("pixelGroup")][, lapply(.SD, sum), by = simYear]
   )
 
   # NPP
@@ -89,7 +89,7 @@ test_that("Module: SK-small 1998-2000", {
   expect_equal(
     simTest$NPP[,-("pixelGroup")][, lapply(.SD, sum), by = simYear],
     data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "NPP.csv"))[
-      ,-("pixelGroup")][, lapply(.SD, sum), by = simYear]
+      , .SD, .SDcols = names(simTest$NPP)][,-("pixelGroup")][, lapply(.SD, sum), by = simYear]
   )
 
   # emissionsProducts
@@ -97,10 +97,10 @@ test_that("Module: SK-small 1998-2000", {
   expect_equal(
     data.table::as.data.table(simTest$emissionsProducts),
     data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "emissionsProducts.csv"))[
-      , colnames(simTest$emissionsProducts), with = FALSE]
+      , .SD, .SDcols = colnames(simTest$emissionsProducts)]
   )
 
-  expect_true(!is.null(simTest$spinup_input))
+  expect_true(!is.null(simTest$spinupInput))
 
   expect_true(!is.null(simTest$cbm_vars))
 
