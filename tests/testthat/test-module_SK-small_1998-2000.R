@@ -38,13 +38,12 @@ test_that("Module: SK-small 1998-2000", {
 
       masterRaster      = terra::rast(res = 30),
       spatialDT         = file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv")         |> data.table::fread(),
-      level3DT          = file.path(spadesTestPaths$testdata, "SK-small/input", "level3DT.csv")          |> data.table::fread(),
-      gcMeta            = file.path(spadesTestPaths$testdata, "SK-small/input", "gcMeta.csv")            |> data.table::fread(),
-      growth_increments = file.path(spadesTestPaths$testdata, "SK-small/input", "growth_increments.csv") |> data.table::fread(),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
-      disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceMeta.csv")   |> data.table::fread(),
-      pooldef           = file.path(spadesTestPaths$testdata, "SK-small/input", "pooldef.txt")           |> readLines(),
-      spinupSQL         = file.path(spadesTestPaths$testdata, "SK-small/input", "spinupSQL.csv")         |> data.table::fread()
+      gcMeta            = file.path(spadesTestPaths$testdata, "SK/input", "gcMeta.csv")            |> data.table::fread(),
+      growth_increments = file.path(spadesTestPaths$testdata, "SK/input", "growth_increments.csv") |> data.table::fread(),
+      disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK/input", "disturbanceMeta.csv")   |> data.table::fread(),
+      pooldef           = file.path(spadesTestPaths$testdata, "SK/input", "pooldef.txt")           |> readLines(),
+      spinupSQL         = file.path(spadesTestPaths$testdata, "SK/input", "spinupSQL.csv")         |> data.table::fread()
     )
   )
 
@@ -66,7 +65,7 @@ test_that("Module: SK-small 1998-2000", {
   ## Check outputs ----
 
   # spinupResult
-  ## There should be the same number of initial pixel groups.
+  ## There should always be the same number of initial pixel groups.
   expect_true(!is.null(simTest$spinupResult))
 
   spinupResultValid <- data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "spinupResult.csv"))
