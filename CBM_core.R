@@ -10,7 +10,7 @@ defineModule(sim, list(
   citation = list("citation.bib"),
   documentation = list("README.txt", "CBM_core.Rmd"),
   reqdPkgs = list(
-    "data.table", "terra", "reticulate",
+    "data.table", "reticulate",
     "PredictiveEcology/CBMutils@development",
     "PredictiveEcology/LandR@development (>= 1.1.1)",
     "PredictiveEcology/libcbmr"
