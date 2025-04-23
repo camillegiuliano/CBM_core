@@ -48,24 +48,22 @@ In [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), the approach d
 ### Events
 There are 5 events in CBM_core. Each are run once, except for the `annual` event, which is run for each simulation year. 
 
-#### init
+#### `init`
 In this short event, the Python virtual environment is set up. If a suitable version of python is not available, it will be installed using the `reticulate` package. 
 If you are using a Windows computer with Git installed, the [pyenv-win](https://github.com/pyenv-win/pyenv-win) tool will be acquired and managed directly by [`reticulate`](https://rstudio.github.io/reticulate/). If you are using a Windows computer without Git installed, you will be prompted to allow the [pyenv-win](https://github.com/pyenv-win/pyenv-win) tool to be downloaded directly from Github to your local user application data directory (`tools::R_user_dir("CBMutils")`).
 
-#### spinup
+#### `spinup`
 The main goal of this event is to initialize the lanscape by performing the [spinup function](https://predictiveecology.github.io/spadesCBM/#the-spinup-function). 
 
 Cohort and stand data is prepared and passed to the [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function alongside growth curve data (from CBM_vol2biomass) and spinup default data (from CBM_defaults). The [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function sets up inputs, calls the [`cbm_exn_get_default_parameters`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters) python function that defines the model structure, and runs the carbon transfers necessary for the growth and burn cycle using [`cbm_exn_spinup`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters).
 
-Once complete, outputs of the spinup are saved to the simlist. 
-
-#### postSpinup
+#### `postSpinup`
 This short event does some basic data preparation to some of the spinup outputs to allow for use in this model. It also creates the simulation's initial [pixel groups](https://predictiveecology.github.io/spadesCBM/lexicon.html#pixel-groups). 
 
-#### annual
+#### `annual`
 This event is where are the carbon transfers are applied for each simulation year. Disturbances are matched to the correct records, and the transfers listed [here](https://predictiveecology.github.io/spadesCBM/index.html#order-of-operations) are applied. Details on transfer rates are found in the [following section](https://predictiveecology.github.io/spadesCBM/cbm_core.html#carbon-transfers).
 
-#### accumulateResults
+#### `accumulateResults`
 This final event is where outputs are saved. In the case of our example in Saskatchewan, we output and save cbmPools and Net Primary Production (NPP MAKE AND LINK TO LEXICON) for each simulation year. If paths are kept at default when running the global script, these outputs should be found here: `~/GitHub/spadesCBM/outputs`. 
 
 ### Carbon Transfers
@@ -112,11 +110,9 @@ $TotBio$ is the total aboveground biomass, $MaxBio$ is the maximum aboveground b
 
 $b$ is a reduction factor calculated such that at 10% of maximum biomass, decomposition rates are reduce by 50% (set at 6.93 see @kurz1999).
 
-The default values for base decay rate ($D_k$), $RefTemp$, $Q_10$ and $max_r$ for [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git) simulations are found [here](libcbm/resources/cbm_exn/decay_parameters.csv). 
+The default values for base decay rate ($D_k$), $RefTemp$, $Q_10$ and $max_r$ for [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git) simulations are found [here](https://github.com/cat-cfs/libcbm_py/blob/main/libcbm/resources/cbm_exn/decay_parameters.csv). 
 
-The final carbon transfers represents the physical transfer rate from the above- to belowground slow pool and is set at of 0.006 yr−1 ([`slowmixing`](libcbm/resources/cbm_exn/slow_mixing_rate.csv)) is based on the transfer rate for dissolved organic C reported in the literature for some Canadian forest soils @moore2003.
-
-**Camille: since I don't think the links to the `.csv` files will work, maybe we should insert the decay_parameters.csv here as a table**
+The final carbon transfers represents the physical transfer rate from the above- to belowground slow pool and is set at of 0.006 yr−1 ([`slowmixing`](https://github.com/cat-cfs/libcbm_py/blob/main/libcbm/resources/cbm_exn/slow_mixing_rate.csv)) is based on the transfer rate for dissolved organic C reported in the literature for some Canadian forest soils @moore2003.
 
 The amount of carbon in the `CoarseRoots` and `FineRoots` pools depends on the carbon in the three above ground pools that absorb carbon from the atmosphere, `Merch`, `Other`, and `Foliage`. The total root biomass is estimated using empirical equations, one set of equations for hardwood (**Equation 4, 6, 7, 9**) and one for softwood species (**Equation 5, 6, 8, 10**) (@kurz2009, @li2003).
 
