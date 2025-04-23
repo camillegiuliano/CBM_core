@@ -45,13 +45,11 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     expectsInput(
-      objectName = "masterRaster", objectClass = "raster",
-      desc = "Raster has NAs where there are no species and the pixel `groupID` where the pixels were simulated. It is used to map results"),
-    expectsInput(
       objectName = "spatialDT", objectClass = "data.table", sourceURL = NA,
       desc = "Table of pixel attributes",
       columns = c(
         pixelIndex      = "Stand ID",
+        area            = "Stand area in meters",
         spatial_unit_id = "CBM-CFS3 spatial unit ID",
         gcids           = "Growth curve ID",
         ages            = "Stand age at the simulation start year",
@@ -113,7 +111,10 @@ defineModule(sim, list(
         disturbance_matrix_id = "Disturbance matrix ID",
         name                  = "Disturbance name",
         description           = "Disturbance description"
-      ))
+      )),
+    expectsInput(
+      objectName = "masterRaster", objectClass = "raster",
+      desc = "Raster template for stand pixels. If provided, it is used to map results")
   ),
   outputObjects = bindrows(
     createsOutput(
@@ -222,22 +223,26 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
                            ggsaveArgs = list(width = 7, height = 5, units = "in", dpi = 300),
                            types = "png")
 
-        nPlot <- NPPplot(
-          spatialDT = sim$spatialDT,
-          NPP = sim$NPP,
-          masterRaster = sim$masterRaster)
-        SpaDES.core::Plots(nPlot,
-                           filename = "NPPTest",
-                           path = figPath,
-                           types = "png")
+        if (!is.null(sim$masterRaster)){
+          nPlot <- NPPplot(
+            spatialDT = sim$spatialDT,
+            NPP = sim$NPP,
+            masterRaster = sim$masterRaster)
+          SpaDES.core::Plots(nPlot,
+                             filename = "NPPTest",
+                             path = figPath,
+                             types = "png")
+        }
       }
 
-      spatialPlot(
-        cbmPools = sim$cbmPools,
-        years = time(sim),
-        masterRaster = sim$masterRaster,
-        spatialDT = sim$spatialDT
-      )
+      if (!is.null(sim$masterRaster)){
+        spatialPlot(
+          cbmPools = sim$cbmPools,
+          years = time(sim),
+          masterRaster = sim$masterRaster,
+          spatialDT = sim$spatialDT
+        )
+      }
 
       sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 12)
     },
@@ -660,19 +665,18 @@ annual <- function(sim) {
   #https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html
   ##TODO double-check with Scott Morken that the cbm_vars$flux are in metric
   ##tonnes of carbon per ha like the rest of the values produced.
-  products <- sim$cbm_vars$pools[, c("Products")]
 
-  emissions <- sim$cbm_vars$flux[, c("DisturbanceBioCO2Emission",
-                                     "DisturbanceBioCH4Emission",
-                                     "DisturbanceBioCOEmission",
-                                     "DecayDOMCO2Emission",
-                                     "DisturbanceDOMCO2Emission",
-                                     "DisturbanceDOMCH4Emission",
-                                     "DisturbanceDOMCOEmission")]
+  # Summarize emissions
+  emissions <- sim$cbm_vars$flux[, .(
+    row_idx,
+    DisturbanceBioCO2Emission, DisturbanceBioCH4Emission,DisturbanceBioCOEmission,
+    DecayDOMCO2Emission,
+    DisturbanceDOMCO2Emission, DisturbanceDOMCH4Emission,DisturbanceDOMCOEmission)]
+
   emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
-                                 DisturbanceBioCOEmission + DecayDOMCO2Emission +
-                                 DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
-                                 DisturbanceDOMCOEmission))]
+                               DisturbanceBioCOEmission + DecayDOMCO2Emission +
+                               DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
+                               DisturbanceDOMCOEmission))]
   ##TODO: this combined emissions column might not be needed.
 
   ##NOTE: SK: CH4 and CO are 0 in 1999 and 2000
@@ -680,17 +684,28 @@ annual <- function(sim) {
   emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
   emissions[, `:=`(CO,  (DisturbanceBioCOEmission  + DisturbanceDOMCOEmission))]
 
+  ## Choose emissions columns
   reqCols <- c("CO2", "CH4", "CO", "Emissions")
   epCols  <- intersect(names(emissions), c(P(sim)$emissionsProductsCols, reqCols))
   if (!identical(sort(P(sim)$emissionsProductsCols), sort(epCols))) warning(
     "'emissionsProducts' including required columns: ", paste(shQuote(reqCols), collapse = ", "))
-  emissions <- emissions[, epCols, with = FALSE]
+  emissions <- emissions[, .SD, .SDcols = c("row_idx", epCols)]
 
-  emissionsProducts <- cbind(emissions, products)
-  emissionsProducts <- colSums(emissionsProducts * prod(terra::res(sim$masterRaster)) / 10000 *
-          pixelCount[["N"]])
-  emissionsProducts <-  c(simYear = time(sim)[1], emissionsProducts)
-  sim$emissionsProducts <- rbind(sim$emissionsProducts, emissionsProducts)
+  # Merge with products
+  emissionsProducts <- merge(sim$cbm_vars$pools[, .(row_idx, Products)], emissions, by = "row_idx")
+
+  # Multiply by group areas
+  groupAreas <- unique(merge(
+    sim$pixelKeep[, .(pixelIndex, row_idx = pixelGroup)],
+    sim$spatialDT[, .(pixelIndex, area)],
+    by = "pixelIndex", all.x = TRUE)[, pixelIndex := NULL][
+      , area := sum(area), by = row_idx])
+
+  emissionsProducts <- colSums(
+    emissionsProducts[, .SD, .SDcols = !"row_idx"] *
+      (groupAreas$area[match(emissionsProducts$row_idx, groupAreas$row_idx)] / 10000))
+
+  sim$emissionsProducts <- rbind(sim$emissionsProducts, c(simYear = time(sim), emissionsProducts))
 
   ##TODO Check if fluxes are per year Emissions should not define the
   #pixelGroups, they should be re-zeros every year. Both these values are most
