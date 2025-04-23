@@ -117,23 +117,14 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput(
-      objectName = "level3DT", objectClass = "data.frame",
-      desc = "Table of pixel groups"),
+      objectName = "spinupInput", objectClass = "data.table",
+      desc = "Spinup inputs"),
+    createsOutput(
+      objectName = "spinupResult", objectClass = "data.frame",
+      desc = "Spinup results"),
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
       desc = "Three parts: pixelGroup, Age, and Pools "),
-    createsOutput(
-      objectName = "spinup_input", objectClass = "data.table",
-      desc = "input parameters for the spinup functions"),
-    createsOutput(
-      objectName = "spinupResult", objectClass = "data.frame",
-      desc = "Results from the spinup functions"),
-    createsOutput(
-      objectName = "cbm_vars", objectClass = "list",
-      desc = "List of 4 data tables: parameters, pools, flux, and state"),
-    createsOutput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "This is the data table that has all the vectors to create the inputs for the annual processes"),
     createsOutput(
       objectName = "NPP", objectClass = "data.table",
       desc = "NPP for each `pixelGroup`"),
@@ -143,9 +134,18 @@ defineModule(sim, list(
         "Emissions and product totals for each simulation year.",
         "Choose which columns to return with the 'emissionsProductsCols' parameter.")),
     createsOutput(
+      objectName = "cbm_vars", objectClass = "list",
+      desc = paste(
+        "List of 4 data tables: parameters, pools, flux, and state.",
+        "This is created initially during the spinup and updated each year.")),
+    createsOutput(
       objectName = "pixelKeep", objectClass = "data.table",
-      desc = paste("Keeps the pixelIndex from spatialDT with each year's `PixelGroupID` as a column.",
-                   "This is to enable making maps of yearly output."))
+      desc = paste(
+        "Key connecting `pixelIndex` with current and previous `pixelGroup`",
+        "associations for each year of the simulation")),
+    createsOutput(
+      objectName = "pixelGroupC", objectClass = "data.table",
+      desc = "Table of shared attributes for each pixel group")
   )
 ))
 
@@ -159,7 +159,6 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
       # Schedule spinup
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "spinup")
-      sim <- scheduleEvent(sim, start(sim), "CBM_core", "postSpinup")
 
       # Schedule annual event
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual")
@@ -188,17 +187,6 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
       sim <- annual(sim)
       sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual")
-    },
-
-    postSpinup = {
-
-      sim <- postSpinup(sim)
-
-      ## These turnover rates are now in
-      # sim$turnoverRates <- calcTurnoverRates(
-      #   turnoverRates = sim$cbmData@turnoverRates,
-      #   spatialUnitIds = sim$cbmData@spatialUnitIds, spatialUnits = sim$spatialUnits
-      #)
     },
 
     accumulateResults = {
@@ -342,60 +330,37 @@ spinup <- function(sim) {
     gcIndex    = "gcids"
   ) |> Cache()
 
-  sim$spinup_input <- spinupOut["increments"]
-
-  sim$cbm_vars     <- spinupOut$output
+  # Save spinup input and output
+  sim$spinupInput  <- spinupOut["increments"]
   sim$spinupResult <- spinupOut$output$pools
 
-  # Save cohort group key as pixelGroup
-  if ("pixelGroup" %in% names(sim$spatialDT)) sim$spatialDT$pixelGroup <- NULL
-  pixelGroupKey <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
-  sim$spatialDT <- merge(sim$spatialDT, pixelGroupKey, by = "pixelIndex", all.x = TRUE)
+  # Save cohort group key
+  sim$pixelKeep <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
+  sim$pixelKeep[, pixelGroupPrev := NA_integer_]
+  sim$pixelKeep[, spinup         := pixelGroup]
+  data.table::setkey(sim$pixelKeep, pixelIndex)
 
-  return(invisible(sim))
-}
+  # Prepare spinup output data for annual event
+  ## data.table with row_idx to match pixelGroup
+  sim$cbm_vars <- lapply(spinupOut$output, function(tbl){
+    tbl <- data.table::data.table(row_idx = unique(spinupOut[["increments"]]$row_idx), tbl)
+    data.table::setkey(tbl, row_idx)
+    tbl
+  })
 
-postSpinup <- function(sim) {
+  # Prepare cohort group attributes for annual event
+  sim$pixelGroupC <- unique(
+    merge(sim$pixelKeep[, .(pixelIndex, pixelGroup)],
+          sim$spatialDT, by = "pixelIndex")[, -("pixelIndex")])
+  data.table::setkey(sim$pixelGroupC, pixelGroup)
 
-  ##TODO need to track emissions and products. First check that cbm_vars$fluxes
-  ##are yearly (question for Scott or we found out by mapping the Python
-  ##functions ourselves)
-
-  #TODO: track this below! Do we need this seperate object now? This is a spot
-  #where we could simplify. But currently it is needed throught annual event.
-  # Initiate pixel group table
-  sim$level3DT <- unique(sim$spatialDT[, setdiff(names(sim$spatialDT), c("pixelIndex", "ageSpinup")), with = FALSE])
-  data.table::setkey(sim$level3DT, pixelGroup)
-
-  ## Set sim$level3DT$gcids to be a factor
-  set(sim$level3DT, j = "gcids",
-      value = factor(CBMutils::gcidsCreate(sim$level3DT[, "gcids", with = FALSE])))
-
-  #TODO: track this below! Do we need this seperate object now? This is a spot
-  #where we could simplify. But currently it is needed throught annual event.
-  sim$pixelGroupC <- cbind(sim$level3DT, sim$cbm_vars$pools)
-
-  ##TODO the Python scripts track this differently via cbm_vars. Again, we could
-  ##simplify, but it will take time and careful attention.
-  sim$cbmPools <- NULL
-  sim$NPP <- NULL
-  sim$emissionsProducts <- NULL
-
-  # Keep the pixels from each simulation year (in the postSpinup event)
-  # at the end of each sim, this should be the same length at this vector
-  ## got place for a vector length check!!
-  sim$pixelKeep <- sim$spatialDT[, .(pixelIndex, pixelGroup)]
-  setnames(sim$pixelKeep, c("pixelIndex", "pixelGroup0"))
-
-  # ! ----- STOP EDITING ----- ! #
+  # Return simList
   return(invisible(sim))
 }
 
 annual <- function(sim) {
-  spatialDT <- sim$spatialDT[, .(pixelIndex, pixelGroup, spatial_unit_id, gcids, ages)]
-  setkeyv(spatialDT, "pixelIndex")
 
-  # 1. Read disturbances for the year
+  ## READ DISTURBANCES ----
 
   # Read disturbance metadata
   if (is.null(sim$disturbanceMeta)) stop("'disturbanceMeta' input not found")
@@ -416,16 +381,15 @@ annual <- function(sim) {
   if (!all(c("pixelIndex", "year", "eventID") %in% names(sim$disturbanceEvents))) stop(
     "'disturbanceEvents' table requires columns: 'pixelIndex', year', 'eventID'")
 
-  # 2. Join disturbances with spatialDT
-  annualDist <- subset(
+  distPixels <- subset(
     sim$disturbanceEvents,
-    year == time(sim) & pixelIndex %in% spatialDT$pixelIndex
+    year == time(sim) & pixelIndex %in% sim$pixelKeep$pixelIndex
   )
 
-  if (nrow(annualDist) > 0){
+  if (nrow(distPixels) > 0){
 
-    if (!inherits(annualDist, "data.table")){
-      annualDist <- data.table::as.data.table(annualDist)
+    if (!inherits(distPixels, "data.table")){
+      distPixels <- data.table::as.data.table(distPixels)
     }
 
     # Choose events for each pixel based on priority
@@ -436,218 +400,151 @@ annual <- function(sim) {
         stop("'disturbanceMeta' event \"priority\" must be the same for all spatial_unit_id")
       }
 
-      annualDist <- annualDist[eventPriority, on = "eventID"]
-      annualDist[order(pixelIndex, priority)]
+      distPixels <- distPixels[eventPriority, on = "eventID"]
+      distPixels[order(pixelIndex, priority)]
 
-    }else if (any(duplicated(annualDist$pixelIndex))) warning(
+    }else if (any(duplicated(distPixels$pixelIndex))) warning(
       "Multiple disturbance events found in one or more pixels for year ", time(sim), ". ",
       "Use the 'disturbanceMeta' \"priority\" field to control event precendence.")
 
-    annualDist <- annualDist[, events := as.integer(first(eventID)), by = "pixelIndex"][
+    distPixels <- distPixels[, events := as.integer(first(eventID)), by = "pixelIndex"][
       , .(pixelIndex, events)]
-
-    if ("events" %in% names(spatialDT)) spatialDT[, events := NULL]
-    spatialDT <- merge(spatialDT, annualDist, by = "pixelIndex", all.x = TRUE)
-    spatialDT[is.na(events), events := 0L]
-    spatialDT[events < 0,    events := 0L]
-
-    rm(annualDist)
 
   }else{
 
     message("No disturbance events for year ", time(sim))
-
-    spatialDT$events <- 0L
   }
 
-  # 3. Isolate disturbed pixels
-  distPixels <- spatialDT[events > 0,]
 
-  # 4. Reset the ages for disturbed pixels in stand replacing disturbances.
-  # libcbm resets ages to 0 internally but for transparency we are doing it here
-  # to (and it gives an opportunity for a check)
+  ## SET COHORT GROUPS ----
+
+  # Set previous group IDs
+  ## Groups only change if disturbance(s) occur
+  sim$pixelKeep[, pixelGroupPrev := pixelGroup]
+
   if (nrow(distPixels) > 0){
 
+    # Get attributes and disturbance information about disturbed pixels
+    distPixels <- merge(distPixels, sim$pixelKeep[, .(pixelIndex, pixelGroupPrev)], by = "pixelIndex")
+    distPixels <- merge(distPixels, sim$pixelGroupC, by.x = "pixelGroupPrev", by.y = "pixelGroup", all.x = TRUE)
     distPixels <- merge(distPixels, sim$gcMeta[, .(gcids, sw_hw)], by = "gcids", all.x = TRUE)
     distPixels <- merge(distPixels, distMeta, by = c("spatial_unit_id", "sw_hw", "events"), all.x = TRUE)
+    distPixels <- distPixels[, .SD, .SDcols = unique(c("pixelIndex", "pixelGroupPrev", names(distPixels)))]
     data.table::setkey(distPixels, pixelIndex)
 
-    distPixels[wholeStand == 1, ages := 0]
+    # Create new pixelGroups that includes events and carbon from
+    # previous pixel group since that changes the amount and destination of the
+    # carbon being moved.
+    cPoolNames <- c("Input", "Merch", "Foliage", "Other", "CoarseRoots", "FineRoots",
+                    "AboveGroundVeryFastSoil", "BelowGroundVeryFastSoil",
+                    "AboveGroundFastSoil", "BelowGroundFastSoil",
+                    "MediumSoil", "AboveGroundSlowSoil", "BelowGroundSlowSoil",
+                    "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
+    cohortGroupCols <- c(setdiff(names(sim$pixelGroupC), "pixelGroup"), "events", cPoolNames)
+
+    distPixelCpools <- merge(
+      distPixels, sim$cbm_vars$pools,
+      by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)
+    data.table::setkey(distPixelCpools, pixelIndex)
+
+    ##TODO: Check why a bunch of extra columns are being created. remove
+    ##unnecessary cols from generatePixelGroups. Also this function changes the
+    ##value of pixelGroup to the newGroup.
+    distPixelCpools$pixelGroup <- LandR::generatePixelGroups(
+      distPixelCpools, maxPixelGroup = max(sim$pixelKeep$pixelGroupPrev),
+      columns = cohortGroupCols
+    )
+
+    # Update pixelKeep
+    sim$pixelKeep <- merge(
+      sim$pixelKeep, distPixelCpools[, .(pixelIndex, pixelGroupNew = pixelGroup)],
+      by = "pixelIndex", all.x = TRUE)
+    sim$pixelKeep[, pixelGroup    := data.table::fcoalesce(pixelGroupNew, pixelGroupPrev)]
+    sim$pixelKeep[, pixelGroupNew := pixelGroup]
+    data.table::setnames(sim$pixelKeep, "pixelGroupNew", as.character(time(sim)))
+    setkey(sim$pixelKeep, pixelIndex)
+
+    # Update pixelGroupC
+    ## Remove groups that no longer have any pixels
+    sim$pixelGroupC <- rbind(
+      subset(sim$pixelGroupC, pixelGroup %in% sim$pixelKeep$pixelGroup),
+      unique(distPixelCpools[, .SD, .SDcols = names(sim$pixelGroupC)]))
+    data.table::setkey(sim$pixelGroupC, pixelGroup)
+
+    rm(distPixelCpools)
+
   }
 
-  # 5. new pixelGroup----------------------------------------------------
-  # make a column of new pixelGroup that includes events and carbon from
-  # previous pixel group since that changes the amount and destination of the
-  # carbon being moved.
-  maxPixelGroup <- max(spatialDT$pixelGroup)
 
-  # Get the carbon info from the pools in from previous year. The
-  # sim$pixelGroupC is created in the postspinup event, and then updated at
-  # the end of each annual event (in this script).
-  ###CELINE NOTE: currently, pixelGroupC comes from postSpinup
-  pixelGroupC <- sim$pixelGroupC
-  setkey(pixelGroupC, pixelGroup)
+  ## PREPARE PYTHON INPUTS ----
 
-  cPoolNames <- c("Input", "Merch", "Foliage", "Other", "CoarseRoots", "FineRoots",
-                  "AboveGroundVeryFastSoil", "BelowGroundVeryFastSoil",
-                  "AboveGroundFastSoil", "BelowGroundFastSoil",
-                  "MediumSoil", "AboveGroundSlowSoil", "BelowGroundSlowSoil",
-                  "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
-  cPoolsOnly <- pixelGroupC[, .SD, .SDcols = c("pixelGroup", cPoolNames)]
+  # Get data for existing groups
+  cbm_vars <- lapply(sim$cbm_vars, function(tbl) subset(tbl, row_idx %in% sim$pixelGroupC$pixelGroup))
 
-  distPixelCpools <- cPoolsOnly[distPixels[, .SD, .SDcols = names(spatialDT)], on = "pixelGroup"]
+  # Set groups as undisturbed in current year
+  ## This may contain the disturbance type from the previous year
+  cbm_vars$parameters$disturbance_type <- 0L
 
+  # Set ages from state
+  cbm_vars$parameters$age <- cbm_vars$state$age
 
-  distPixelCpools$newGroup <- LandR::generatePixelGroups(
-    distPixelCpools, maxPixelGroup,
-    columns = setdiff(colnames(distPixelCpools),
-                               c("pixelGroup", "pixelIndex"))
-  )
-  distPixelOld <- cPoolsOnly[distPixels, on = c("pixelGroup")]
-  distPixelCpools$oldGroup <- distPixelOld$pixelGroup
-  ##TODO: Check why a bunch of extra columns are being created. remove
-  ##unnecessary cols from generatePixelGroups. Also this function changes the
-  ##value of pixelGroup to the newGroup.
-  distPixelCpools <- distPixelCpools[, .SD, .SDcols = c(
-    names(spatialDT), cPoolNames, "newGroup", "oldGroup")
-  ]
+  # Prepare data for new groups
+  if (nrow(distPixels) > 0){
 
-  cols <- c("pixelGroup", "newGroup")
-  distPixelCpools[, (cols) := list((newGroup), NULL)]
+    cbm_vars_new <- list()
 
-  # 6. Update long form pixel index all pixelGroups (old ones plus new ones for
-  # disturbed pixels)
+    newRowIDs <- unique(
+      subset(sim$pixelKeep, pixelGroup != pixelGroupPrev)[, .(row_idx = pixelGroup, pixelGroupPrev)]
+    )
+    data.table::setkey(newRowIDs, row_idx)
 
-  updateSpatialDT <- rbind(spatialDT[!(pixelIndex %in% distPixelCpools$pixelIndex),],
-                           distPixelCpools[, .SD, .SDcols = colnames(spatialDT)])
-  setkeyv(updateSpatialDT, "pixelIndex")
+    # Set disturbed group parameters
+    ## Set age = 1
+    cbm_vars_new[["parameters"]] <- merge(
+      newRowIDs[, .(row_idx)],
+      unique(merge(distPixels, sim$pixelKeep, by = "pixelIndex", all.x = TRUE)[
+        , .(row_idx = pixelGroup, age = 1L, disturbance_type = disturbance_type_id)]),
+      by = "row_idx", all.x = TRUE)
 
-  # Set pixel count
-  pixelCount <- updateSpatialDT[, .N, by = pixelGroup]
-  data.table::setkey(pixelCount, pixelGroup)
+    # Set disturbed group pools from data of previous group
+    ## Set Input = 1
+    cbm_vars_new[["pools"]] <- merge(
+      newRowIDs, sim$cbm_vars[["pools"]], by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)[
+        , .SD, .SDcols = names(cbm_vars[["pools"]])]
+    cbm_vars_new[["pools"]]$Input <- 1L
 
-  # adding the new pixelGroup to the pixelKeep. pixelKeep is 1st created in the
-  # postspinup event and update in each annual event (in this script).
-  setkeyv(sim$pixelKeep, "pixelIndex")
-  sim$pixelKeep <- merge.data.table(updateSpatialDT[,.(pixelIndex, pixelGroup)],sim$pixelKeep)
-  setnames(sim$pixelKeep, "pixelGroup", paste0("pixelGroup", time(sim)[1]))
+    # Set disturbed group flux from data of previous group
+    cbm_vars_new[["flux"]]  <- merge(
+      newRowIDs, sim$cbm_vars[["flux"]], by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)[
+        , .SD, .SDcols = names(cbm_vars[["flux"]])]
 
-  # 7. Update the meta data for the pixelGroups. The first meta data is the
-  # create the meta data gets updated here.
+    # Set disturbed group state from data of previous group
+    ## Clear information about previous disturbances
+    cbm_vars_new[["state"]] <- merge(
+      newRowIDs, sim$cbm_vars[["state"]], by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)[
+        , .SD, .SDcols = names(cbm_vars[["state"]])]
+    cbm_vars_new[["state"]][, time_since_last_disturbance := NA_real_]
+    cbm_vars_new[["state"]][, time_since_land_use_change  := NA_real_]
+    cbm_vars_new[["state"]][, last_disturbance_type       := NA_real_]
 
-  # only the column pixelIndex is different between distPixelCpools and pixelGroupC
-  metaDT <- unique(updateSpatialDT[, -("pixelIndex")]) # |> .[order(pixelGroup), ]
-  setkey(metaDT, pixelGroup)
-
-  # 8. link the meta data (metaDT) with the appropriate carbon pools
-  # add c pools and event column for old groups
-  part1 <- merge(metaDT, cPoolsOnly)
-  # add c pools and event column from the new groups
-  distGroupCpoolsOld <- unique(distPixelCpools[, c("pixelIndex"):=NULL])
-  distGroupCpools <- unique(distGroupCpoolsOld[, c("oldGroup"):=NULL])
-  setkey(distGroupCpools, pixelGroup)
-  cols <- c(
-    "pixelGroup", "ages", "spatial_unit_id", "gcids", "events"
-  )
-
-  ## year 2000 has no disturbance
-    part2 <- merge(metaDT, distGroupCpools, by = cols)
-  if(dim(distPixels)[1] > 0){
-    pixelGroupForAnnual <- rbind(part1, part2)
-  } else {
-    pixelGroupForAnnual <- part1
-  }
-
-  # table for this annual event processing
-  setkey(part2, pixelGroup)
-  setkey(pixelGroupForAnnual, pixelGroup)
-
-
-  # END of dealing with disturbances and updating all relevant data tables.
-  ################################### -----------------------------------
-
-
-  #########################################################################
-  #-----------------------------------------------------------------------
-  # RUN ALL PROCESSES FOR ALL NEW PIXEL GROUPS#############################
-  #########################################################################
-
-  cbm_vars <- sim$cbm_vars
-
-  ###### Working on getting cbm_vars$parameters (which are the increments + dist)
-  ######################
-  ## cbm_vars$parameters:
-  ## Making cbm_vars$parameters the same length as the pixelGroupForAnnual (has
-  ## new pixelGroups)
-  ## for now mean_annual_temperature is taken from the
-  ## spinupSQL table, and I am assuming that the id column is the spatial unit.
-  ## We are currently only working in spu 28
-  if (dim(distPixels)[1] > 0) {
-
-    cbm_vars$parameters[nrow(cbm_vars$parameters) + dim(part2)[1], ] <- NA
-
-    newGCpixelGroup <- unique(distPixelCpools[, c('pixelGroup', 'gcids', 'oldGroup')])
-    newGCpixelGroup <- newGCpixelGroup[!duplicated(newGCpixelGroup[, c("pixelGroup", "gcids")]), ]
-    data.table::setkey(newGCpixelGroup, pixelGroup)
-
-    ## Adding the row_idx that is really the pixelGroup, but row_idx is the name
-    ## in the Python functions so we are keeping it.
-    if (is.null(cbm_vars$parameters$row_idx)) {
-      cbm_vars$parameters$row_idx <- c(sim$level3DT$pixelGroup, newGCpixelGroup$pixelGroup)
-    } else {
-      cbm_vars$parameters$row_idx <- c(na.omit(cbm_vars$parameters$row_idx), newGCpixelGroup$pixelGroup)
+    # Merge new group data
+    for (tableName in names(cbm_vars)){
+      cbm_vars[[tableName]] <- data.table::rbindlist(
+        list(cbm_vars[[tableName]], unique(cbm_vars_new[[tableName]])), fill = TRUE)
+      data.table::setkey(cbm_vars[[tableName]], row_idx)
     }
-
-    # Adding ages
-    if (is.null(cbm_vars$parameters$age)) {
-      cbm_vars$parameters$age <- c(cbm_vars$state$age, rep(1, length(unique(newGCpixelGroup$pixelGroup))))
-    } else {
-      cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[, age := ifelse(is.na(age), 1, age)]
-    }
-
-    cbm_vars$parameters <- as.data.table(cbm_vars$parameters)[row_idx %in% pixelCount$pixelGroup]
-    spatialIDTemperature <- sim$spinupSQL[pixelGroupForAnnual, on = .(id = spatial_unit_id)]
-    cbm_vars$parameters <- cbm_vars$parameters[, mean_annual_temperature := spatialIDTemperature$mean_annual_temperature]
   }
 
-  # Set disturbance type IDs
-  if (dim(distPixels)[1] > 0) {
-
-    newDTypeIDs <- unique(
-      merge(distPixels, sim$pixelKeep, by = "pixelIndex", all.x = TRUE)[
-        , c(paste0("pixelGroup", time(sim)), "disturbance_type_id"), with = FALSE])
-
-    cbm_vars$parameters <- merge(
-      cbm_vars$parameters, newDTypeIDs,
-      by.x = "row_idx", by.y = paste0("pixelGroup", time(sim)),
-      all.x = TRUE)
-    cbm_vars$parameters[, disturbance_type    := data.table::fcoalesce(disturbance_type_id, 0L)]
-    cbm_vars$parameters[, disturbance_type_id := NULL]
-
-    rm(newDTypeIDs)
-
-  }else{
-    ##there might be a disturbance_type left over from the previous annual event
-    cbm_vars$parameters$disturbance_type <- 0L
-  }
-
-  ##growth_increments
-  ## Need to match the growth info by pixelGroups and gcids while tracking age.
-  ## The above "growth_increments will come from CBM_vol2biomass
-
-  #age is in cbm_vars$state but there is no pixelGroup in that table nor is
-  #there in $flux or $pools. Checking that the tables are in the same pixelGroup
-  #order.
-  ##TODO Good place for some checks??
-  which(cbm_vars$pools$Merch == pixelGroupForAnnual$Merch[1:length(cbm_vars$pools$Merch)])
-  # [1]  1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39
-  # [40] 40 41
-  ## ASSUMPTION: the Merch matches so all tables are in the same sorting order
-  ## which is pixelGroup. cbm_vars$pools has one less record for the moment.
+  # Set mean annual temperature
+  cbm_vars$parameters <- merge(
+    cbm_vars$parameters[, .SD, .SDcols = !"mean_annual_temperature"],
+    merge(sim$pixelGroupC, sim$spinupSQL, by.x = "spatial_unit_id", by.y = "id")[
+      , .(row_idx = pixelGroup, mean_annual_temperature)],
+    by = "row_idx", all.x = TRUE)
 
   # Set growth increments: join via spinup cohort group IDs and age
-  annualIncr <- data.table::as.data.table(cbm_vars$parameters)[, .(row_idx, age)]
-  growthIncr <- data.table::as.data.table(sim$spinup_input$increments)
+  annualIncr <- cbm_vars$parameters[, .(row_idx, age)]
+  growthIncr <- sim$spinupInput$increments
   data.table::setkeyv(growthIncr, c("row_idx", "age"))
 
   ## JAN 2025: This sets any ages <= 0 to 1. Without this fix we lose pixel groups
@@ -669,17 +566,17 @@ annual <- function(sim) {
         }), use.names = TRUE))
     data.table::setkeyv(growthIncr, c("row_idx", "age"))
 
-    sim$spinup_input$increments <- growthIncr
+    sim$spinupInput$increments <- growthIncr
   }
 
   annualIncr <- merge(
     annualIncr,
-    unique(sim$pixelKeep[, .SD, .SDcols = c(paste0("pixelGroup", time(sim)), "pixelGroup0")]),
-    by.x = "row_idx", by.y = paste0("pixelGroup", time(sim)),
+    sim$pixelKeep[, .(pixelGroup, spinup)],
+    by.x = "row_idx", by.y = "pixelGroup",
     all.x = TRUE)
   annualIncr <- merge(
     annualIncr, growthIncr,
-    by.x = c("pixelGroup0", "age"), by.y = c("row_idx", "age"),
+    by.x = c("spinup", "age"), by.y = c("row_idx", "age"),
     all.x = TRUE)
   annualIncr <- unique(annualIncr[, .(row_idx, merch_inc, foliage_inc, other_inc)])
 
@@ -689,99 +586,22 @@ annual <- function(sim) {
     )), collapse = ", "))
 
   cbm_vars$parameters <- merge(
-    data.table::as.data.table(cbm_vars$parameters)[
-      , .SD, .SDcols = -c("merch_inc", "foliage_inc", "other_inc")],
-    annualIncr[, .(row_idx, merch_inc, foliage_inc, other_inc)],
-    by = "row_idx", all.x = TRUE)
+    cbm_vars$parameters[, .SD, .SDcols = -c("merch_inc", "foliage_inc", "other_inc")],
+    annualIncr, by = "row_idx", all.x = TRUE)
   data.table::setkey(cbm_vars$parameters, row_idx)
 
   rm(annualIncr)
   rm(growthIncr)
 
-  ###################### END cbm_vars$parameters
 
-  ###################### Working on cbm_vars$pools
-  ######################################################
-  # the order of cbm_vars$pools was already by pixelGroup
-  setkeyv(pixelGroupForAnnual, "pixelGroup")
-  if (dim(distPixels)[1] > 0) {
-    # if there are disturbed pixels, adding lines for the new pixelGroups (just
-    # one here)
-  cbm_vars$pools[nrow(cbm_vars$pools) + dim(newGCpixelGroup)[1],] <- NA
-  cbm_vars$pools <- as.data.table(cbm_vars$pools)
-  # this line below do not change the - attr(*,
-  # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
-  if (is.null(cbm_vars$pools$row_idx)) {
-    cbm_vars$pools$row_idx <- 1:nrow(cbm_vars$pools)
-  } else {
-    cbm_vars$pools[is.na(cbm_vars$pools$row_idx), "row_idx" := part2[, pixelGroup]]
-  }
+  ## RUN PYTHON -----
 
-  cbm_vars$pools$Input <- rep(1, length(cbm_vars$pools$Input))
-  cbm_vars$pools[which(is.na(cbm_vars$pools$Merch)), 2:(length(cbm_vars$pools)-1)] <- part2[, Merch:Products]
-  } else {
-    cbm_vars$pools <- as.data.table(cbm_vars$pools)
-    if (is.null(cbm_vars$pools$row_idx)) {
-      cbm_vars$pools$row_idx <- 1:nrow(cbm_vars$pools)
-    }
-  }
-
-cbm_vars$pools <- cbm_vars$pools[(cbm_vars$pools$row_idx %in% pixelCount$pixelGroup),]
-  ###################### Working on cbm_vars$flux
-  ######################################################
-  # we are ASSUMING that these are sorted by pixelGroup like all other tables in
-  # cbm_vars
-  # just need to add a row
-  # this line below does not change the - attr(*,
-  # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
-cbm_vars$flux <- as.data.table(cbm_vars$flux)
-  if (dim(distPixels)[1] > 0) {
-      if (is.null(cbm_vars$flux$row_idx)) {
-        cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[newGCpixelGroup$oldGroup,])
-        cbm_vars$flux$row_idx <- 1:nrow(cbm_vars$flux)
-      } else {
-        cbm_vars$flux <- rbind(cbm_vars$flux, cbm_vars$flux[match(newGCpixelGroup$oldGroup, cbm_vars$flux$row_idx),])
-        cbm_vars$flux[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
-      }
-      cbm_vars$flux <- cbm_vars$flux[(cbm_vars$flux$row_idx %in% pixelCount$pixelGroup),]
-  }
-
-  ###################### Working on cbm_vars$state
-  ######################################################
-  # we are ASSUMING that these are sorted by pixelGroup like all other tables in
-  # cbm_vars
-  # NOTE JAN 2025: THIS IS NOT THE CASE I don't know if this is also true for
-  # cbm_vars$flux, but $state is not in pixelGroup order. I do not know what order it is in.
-  # just need to add a row
-  # this line below does not change the - attr(*,
-  # "pandas.index")=RangeIndex(start=0, stop=41, step=1)
-cbm_vars$state <- as.data.table(cbm_vars$state)
-  if (dim(distPixels)[1] > 0) {
-    if (is.null(cbm_vars$state$row_idx)) {
-      cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[newGCpixelGroup$oldGroup,])
-      cbm_vars$state$row_idx <- 1:nrow(cbm_vars$state)
-    } else {
-      cbm_vars$state <- rbind(cbm_vars$state, cbm_vars$state[match(newGCpixelGroup$oldGroup, cbm_vars$state$row_idx),])
-      cbm_vars$state[(.N-((length(part2$pixelGroup))-1)): .N, "row_idx" := part2[, pixelGroup]]
-    }
-    cbm_vars$state <- cbm_vars$state[(cbm_vars$state$row_idx %in% pixelCount$pixelGroup),]
-  }
-
-  ## setting up the operations order in Python
-  ## ASSUMING that the order is the same as we had it before c(
-  ##"disturbance", "growth 1", "domturnover",
-  ##"bioturnover", "overmature", "growth 2",
-  ##"domDecay", "slow decay", "slow mixing"
-  ##)
-
-  ############## Running Python functions for annual
-  #####################################################################
-  #remove the extra row_idx columns
+  # Temporarily remove row_idx column
   row_idx <- cbm_vars$pools$row_idx
-  cbm_vars$pools[, row_idx := NULL]
-  cbm_vars$flux[, row_idx := NULL]
-  cbm_vars$state[, row_idx := NULL]
+  cbm_vars <- lapply(cbm_vars, function(tbl) tbl[, -("row_idx")])
 
+  # Call Python
+  mod$libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
   step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, mod$libcbm_default_model_config)
 
   cbm_vars <- libcbmr::cbm_exn_step(
@@ -792,94 +612,63 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
     mod$libcbm_default_model_config
   )
 
-  #add the extra row_idx columns back in
-  cbm_vars$pools$row_idx <- row_idx
-  cbm_vars$flux$row_idx <- row_idx
-  cbm_vars$state$row_idx <- row_idx
-  # update cbm_vars$parameters$age to match with cbm_vars$state$age
-  cbm_vars$parameters$age <- cbm_vars$state$age
-
-  sim$cbm_vars <- cbm_vars
+  # Prepare output data for next annual event
+  sim$cbm_vars <- lapply(cbm_vars, function(tbl){
+    tbl <- data.table::data.table(row_idx = row_idx, tbl)
+    data.table::setkey(tbl, row_idx)
+    tbl
+  })
 
 
-  #-------------------------------------------------------------------------------
-  #### UPDATING ALL THE FINAL VECTORS FOR NEXT SIM YEAR ###################################
-  #-----------------------------------
-  # 1.
-  ##TODO this will have to change once we stream line the creation of
-  ##pixelGroupForAnnual earlier in this event.
+  ## ASSEMBLE OUTPUTS -----
 
-  sim$pixelGroupC <- data.table(pixelGroupForAnnual[, !(Input:Products)], cbm_vars$pools)
+  # Set new cohort group ages
+  sim$pixelGroupC$ages <- sim$cbm_vars$state$age[
+    match(sim$pixelGroupC$pixelGroup, sim$cbm_vars$state$row_idx)
+  ]
 
-  ##CELINE NOTES Ages are update in cbm_vars$state internally in the
-  ##libcbmr::cbm_exn_step function
-  # 2. increment ages
-  sim$pixelGroupC$ages <- cbm_vars$state$age
+  # Set pixel count
+  pixelCount <- sim$pixelKeep[, .(pixelGroup)][, .N, by = pixelGroup]
+  data.table::setkey(pixelCount, pixelGroup)
 
-  # 2. Update long form (pixelIndex) and short form (pixelGroup) tables.
-  if (!identical(sim$spatialDT$pixelIndex, updateSpatialDT$pixelIndex))
-    stop("Some pixelIndices were lost; sim$spatialDT and updateSpatialDT should be the same NROW; they are not")
-  agesUp <- merge.data.table(updateSpatialDT, sim$pixelGroupC[,.(pixelGroup, ages)], by = "pixelGroup")
-  agesUp[, ages.x := NULL]
-  setnames(agesUp, old = "ages.y", new = "ages")
-  sim$spatialDT <- agesUp
-  setkeyv(sim$spatialDT, "pixelIndex")
-
-  # 3. Update the final simluation horizon table with all the pools/year/pixelGroup
-  # names(distPixOut) <- c( c("simYear","pixelCount","pixelGroup", "ages"), sim$pooldef)
-  # pooldef <- names(cbm_vars$pools)[2:length(names(cbm_vars$pools))]#sim$pooldef
-  updatePools <- cbind(
-    simYear    = rep(time(sim)[1], nrow(sim$pixelGroupC)),
-    pixelCount = pixelCount[["N"]],
-    sim$pixelGroupC[, c("pixelGroup", "ages", sim$pooldef), with = FALSE]
+  # Update the final simulation horizon table with all the pools/year/pixelGroup
+  sim$cbmPools <- cbind(
+    simYear = rep(as.integer(time(sim)), nrow(sim$pixelGroupC)), pixelCount,
+    age = sim$pixelGroupC$ages,
+    sim$cbm_vars$pools[, .SD, .SDcols = sim$pooldef]
   )
 
-  sim$cbmPools <- updatePools #rbind(sim$cbmPools, updatePools)
-
-  ######## END OF UPDATING VECTORS FOR NEXT SIM YEAR #######################################
-  #-----------------------------------
-  #-----------------------------------------------------------------------------------
-  ############ NPP ####################################################################
-  # ############## NPP used in building sim$NPP and for plotting ####################################
-
+  # NPP
+  ## NPP used in building sim$NPP and for plotting
   NPP <- (
-    cbm_vars$flux$DeltaBiomass_AG
-    + cbm_vars$flux$DeltaBiomass_BG
-    + cbm_vars$flux$TurnoverMerchLitterInput
-    + cbm_vars$flux$TurnoverFolLitterInput
-    + cbm_vars$flux$TurnoverOthLitterInput
-    + cbm_vars$flux$TurnoverCoarseLitterInput
-    + cbm_vars$flux$TurnoverFineLitterInput
+    sim$cbm_vars$flux$DeltaBiomass_AG
+    + sim$cbm_vars$flux$DeltaBiomass_BG
+    + sim$cbm_vars$flux$TurnoverMerchLitterInput
+    + sim$cbm_vars$flux$TurnoverFolLitterInput
+    + sim$cbm_vars$flux$TurnoverOthLitterInput
+    + sim$cbm_vars$flux$TurnoverCoarseLitterInput
+    + sim$cbm_vars$flux$TurnoverFineLitterInput
   )
-  updateNPP <- data.table(
-    simYear = rep(time(sim)[1], length(sim$pixelGroupC$ages)),
-    pixelCount = pixelCount[["N"]],
-    pixelGroup = sim$pixelGroupC$pixelGroup,
+  sim$NPP <- data.table(
+    simYear = rep(as.integer(time(sim)), nrow(sim$pixelGroupC)), pixelCount,
     NPP = NPP
   )
 
-  sim$NPP <- updateNPP
-  ######### NPP END HERE ###################################
-  #-----------------------------------------------------------------------------------
-
-  ############# Update emissions and products -------------------------------------------
+  ############# Update emissions and products
   #Note: details of which source and sink pools goes into each of the columns in
   #cbm_vars$flux can be found here:
   #https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html
   ##TODO double-check with Scott Morken that the cbm_vars$flux are in metric
   ##tonnes of carbon per ha like the rest of the values produced.
-  pools <- as.data.table(cbm_vars$pools)
-  products <- pools[, c("Products")]
-  products <- as.data.table(c(products))
+  products <- sim$cbm_vars$pools[, c("Products")]
 
-  flux <- as.data.table(cbm_vars$flux)
-  emissions <- flux[, c("DisturbanceBioCO2Emission",
-                        "DisturbanceBioCH4Emission",
-                        "DisturbanceBioCOEmission",
-                        "DecayDOMCO2Emission",
-                        "DisturbanceDOMCO2Emission",
-                        "DisturbanceDOMCH4Emission",
-                        "DisturbanceDOMCOEmission")]
+  emissions <- sim$cbm_vars$flux[, c("DisturbanceBioCO2Emission",
+                                     "DisturbanceBioCH4Emission",
+                                     "DisturbanceBioCOEmission",
+                                     "DecayDOMCO2Emission",
+                                     "DisturbanceDOMCO2Emission",
+                                     "DisturbanceDOMCH4Emission",
+                                     "DisturbanceDOMCOEmission")]
   emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
                                  DisturbanceBioCOEmission + DecayDOMCO2Emission +
                                  DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
@@ -907,10 +696,15 @@ cbm_vars$state <- as.data.table(cbm_vars$state)
   #pixelGroups, they should be re-zeros every year. Both these values are most
   #commonly required on a yearly basis.
 
-  ############# End of update emissions and products ------------------------------------
+  ##TODO need to track emissions and products. First check that cbm_vars$fluxes
+  ##are yearly (question for Scott or we found out by mapping the Python
+  ##functions ourselves)
 
+
+  ## RETURN SIMLIST -----
 
   return(invisible(sim))
+
 }
 
 .inputObjects <- function(sim){

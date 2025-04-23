@@ -79,7 +79,7 @@ test_that("Module: SK 1985-2011", {
   # NPP
   expect_true(!is.null(simTest$NPP))
   expect_equal(
-    simTest$NPP[, (list(NPP = sum(NPP * pixelCount))), by = "simYear"],
+    simTest$NPP[, (list(NPP = sum(NPP * N))), by = "simYear"],
     data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "NPP_sumByYear.csv"))
   )
 
@@ -93,7 +93,7 @@ test_that("Module: SK 1985-2011", {
 
   expect_true(!is.null(simTest$cbmPools))
 
-  expect_true(!is.null(simTest$spinup_input))
+  expect_true(!is.null(simTest$spinupInput))
 
   expect_true(!is.null(simTest$cbm_vars))
 
