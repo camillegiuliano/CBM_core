@@ -695,6 +695,9 @@ annual <- function(sim) {
   emissionsProducts <- merge(sim$cbm_vars$pools[, .(row_idx, Products)], emissions, by = "row_idx")
 
   # Multiply by group areas
+  if (!"area" %in% names(sim$spatialDT)) stop(
+    "spatialDT requires the \"area\" column to calculate emissions and product totals.")
+
   groupAreas <- unique(merge(
     sim$pixelKeep[, .(pixelIndex, row_idx = pixelGroup)],
     sim$spatialDT[, .(pixelIndex, area)],
