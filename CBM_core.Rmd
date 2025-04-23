@@ -46,17 +46,27 @@ In [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), the approach d
 ## Module functioning
 
 ### Events
+There are 5 events in CBM_core. Each are run once, except for the `annual` event, which is run for each simulation year. 
 
-**Camille: can you make this a paragraph?**
-Describe events - what does init do: creates all the Python connection and environment (check with Susan she is working on it now).
-The `spinup` is the landscape initialization event as described in [Overview](link to that section) section, where records are grown and burnt until a stabilization of the below ground carbon pools. The `cbmExnSpinup` function, int R folder of the [CBM_core]() module, set-ups the inputs and calls the Python function that defines the model structure ([cbm_exn_get_default_parameters](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters) and runs the carbon transfers necessary for the grow-burn cycle ([cbm_exn_spinup](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters)).
+#### init
+In this short event, the Python virtual environment is set up. If a suitable version of python is not available, it will be installed using the `reticulate` package. 
+If you are using a Windows computer with Git installed, the [pyenv-win](https://github.com/pyenv-win/pyenv-win) tool will be acquired and managed directly by [`reticulate`](https://rstudio.github.io/reticulate/). If you are using a Windows computer without Git installed, you will be prompted to allow the [pyenv-win](https://github.com/pyenv-win/pyenv-win) tool to be downloaded directly from Github to your local user application data directory (`tools::R_user_dir("CBMutils")`).
 
-postspinup: not sure what happens here anymore - check with Susan.
+#### spinup
+The main goal of this event is to initialize the lanscape by performing the [spinup function](https://predictiveecology.github.io/spadesCBM/#the-spinup-function). 
 
-The `annual` is where all the carbon transfers are applied. Disturbances are matches to the correct records, and the transfers listed in Table XX of the [Overview](link to overview correct section) are applied. Details of default transfer rates, which we use in our SK example used throughout this manual are in the following section.
+Cohort and stand data is prepared and passed to the [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function alongside growth curve data (from CBM_vol2biomass) and spinup default data (from CBM_defaults). The [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function sets up inputs, calls the [`cbm_exn_get_default_parameters`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters) python function that defines the model structure, and runs the carbon transfers necessary for the growth and burn cycle using [`cbm_exn_spinup`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters).
 
-`accumulateResults` is the event that saves the output as outline in the `globalSK.R`. In the case of our SK example, we output the `cbmPool` and the Net Primary Productivity estimate ([`NPP`](link to lexicon)) for each year simulated. These are in the project outputs folder ("~/GitHub/spadesCBM/outputs") .
+Once complete, outputs of the spinup are saved to the simlist. 
 
+#### postSpinup
+This short event does some basic data preparation to some of the spinup outputs to allow for use in this model. It also creates the simulation's initial [pixel groups](https://predictiveecology.github.io/spadesCBM/lexicon.html#pixel-groups). 
+
+#### annual
+This event is where are the carbon transfers are applied for each simulation year. Disturbances are matched to the correct records, and the transfers listed [here](https://predictiveecology.github.io/spadesCBM/index.html#order-of-operations) are applied. Details on transfer rates are found in the [following section](https://predictiveecology.github.io/spadesCBM/cbm_core.html#carbon-transfers).
+
+#### accumulateResults
+This final event is where outputs are saved. In the case of our example in Saskatchewan, we output and save cbmPools and Net Primary Production (NPP MAKE AND LINK TO LEXICON) for each simulation year. If paths are kept at default when running the global script, these outputs should be found here: `~/GitHub/spadesCBM/outputs`. 
 
 ### Carbon Transfers
 
