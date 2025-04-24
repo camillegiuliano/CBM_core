@@ -36,12 +36,11 @@ test_that("Module: SK-small 1998-2000", {
         saveTime   = sort(c(times$start, times$start + c(1:(times$end - times$start))))
       )),
 
-      masterRaster      = terra::rast(res = 30),
-      spatialDT         = file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv")         |> data.table::fread(),
+      spatialDT         = data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv"))[, area := 900],
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
+      disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK/input", "disturbanceMeta.csv")   |> data.table::fread(),
       gcMeta            = file.path(spadesTestPaths$testdata, "SK/input", "gcMeta.csv")            |> data.table::fread(),
       growth_increments = file.path(spadesTestPaths$testdata, "SK/input", "growth_increments.csv") |> data.table::fread(),
-      disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK/input", "disturbanceMeta.csv")   |> data.table::fread(),
       pooldef           = file.path(spadesTestPaths$testdata, "SK/input", "pooldef.txt")           |> readLines(),
       spinupSQL         = file.path(spadesTestPaths$testdata, "SK/input", "spinupSQL.csv")         |> data.table::fread()
     )
