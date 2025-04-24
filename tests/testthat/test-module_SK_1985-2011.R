@@ -29,8 +29,6 @@ test_that("Module: SK 1985-2011", {
         outputPath  = file.path(projectPath, "outputs")
       ),
 
-      require = "terra",
-
       outputs = as.data.frame(expand.grid(
         objectName = c("cbmPools", "NPP"),
         saveTime   = sort(c(times$start, times$start + c(1:(times$end - times$start))))
@@ -63,15 +61,13 @@ test_that("Module: SK 1985-2011", {
 
   ## Check outputs ----
 
-  # spinupResult
-  ## There should always be the same number of initial pixel groups.
+  # spinupInpit and spinupResult
+  ## There should always be the same number of spinup cohort groups.
+  expect_true(!is.null(simTest$spinupInput))
   expect_true(!is.null(simTest$spinupResult))
-
-  spinupResultValid <- data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "spinupResult.csv"))
-  expect_equal(nrow(simTest$spinupResult), nrow(spinupResultValid))
   expect_equal(
-    data.table::as.data.table(simTest$spinupResult)[order(Merch)],
-    spinupResultValid[order(Merch)],
+    data.table::as.data.table(simTest$spinupResult),
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "spinupResult.csv")),
     check.attributes = FALSE
   )
 
@@ -87,18 +83,23 @@ test_that("Module: SK 1985-2011", {
   expect_equal(
     data.table::as.data.table(simTest$emissionsProducts),
     data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "emissionsProducts.csv"))[
-      , colnames(simTest$emissionsProducts), with = FALSE]
+      , .SD, .SDcols = colnames(simTest$emissionsProducts)]
   )
 
+  # cbmPools
   expect_true(!is.null(simTest$cbmPools))
 
-  expect_true(!is.null(simTest$spinupInput))
-
-  expect_true(!is.null(simTest$cbm_vars))
-
+  # pixelGroupC
+  ## There should always be the same number of total cohort groups.
   expect_true(!is.null(simTest$pixelGroupC))
+  expect_equal(nrow(simTest$pixelGroupC), 1938)
 
+  # pixelKeep
   expect_true(!is.null(simTest$pixelKeep))
+  expect_identical(simTest$pixelKeep$pixelIndex,   simTest$spatialDT$pixelIndex)
+  expect_identical(simTest$pixelKeep$pixelIndex,   simTest$spatialDT$pixelIndex)
+  expect_true(all(simTest$pixelKeep$pixelGroup %in% simTest$pixelGroupC$pixelGroup))
+  expect_true(all(as.character(start(simTest):end(simTest)) %in% names(simTest$pixelKeep)))
 
 })
 

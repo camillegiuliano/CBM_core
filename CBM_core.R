@@ -465,14 +465,12 @@ annual <- function(sim) {
       sim$pixelKeep, distPixelCpools[, .(pixelIndex, pixelGroupNew = pixelGroup)],
       by = "pixelIndex", all.x = TRUE)
     sim$pixelKeep[, pixelGroup    := data.table::fcoalesce(pixelGroupNew, pixelGroupPrev)]
-    sim$pixelKeep[, pixelGroupNew := pixelGroup]
-    data.table::setnames(sim$pixelKeep, "pixelGroupNew", as.character(time(sim)))
+    sim$pixelKeep[, pixelGroupNew := NULL]
     setkey(sim$pixelKeep, pixelIndex)
 
     # Update pixelGroupC
-    ## Remove groups that no longer have any pixels
     sim$pixelGroupC <- rbind(
-      subset(sim$pixelGroupC, pixelGroup %in% sim$pixelKeep$pixelGroup),
+      sim$pixelGroupC,
       unique(distPixelCpools[, .SD, .SDcols = names(sim$pixelGroupC)]))
     data.table::setkey(sim$pixelGroupC, pixelGroup)
 
@@ -480,11 +478,14 @@ annual <- function(sim) {
 
   }
 
+  # Set cohort groups for the year
+  sim$pixelKeep[[as.character(time(sim))]] <- sim$pixelKeep$pixelGroup
+
 
   ## PREPARE PYTHON INPUTS ----
 
   # Get data for existing groups
-  cbm_vars <- lapply(sim$cbm_vars, function(tbl) subset(tbl, row_idx %in% sim$pixelGroupC$pixelGroup))
+  cbm_vars <- lapply(sim$cbm_vars, function(tbl) subset(tbl, row_idx %in% sim$pixelKeep$pixelGroup))
 
   # Set groups as undisturbed in current year
   ## This may contain the disturbance type from the previous year
@@ -638,9 +639,12 @@ annual <- function(sim) {
 
   # Update the final simulation horizon table with all the pools/year/pixelGroup
   sim$cbmPools <- cbind(
-    simYear = rep(as.integer(time(sim)), nrow(sim$pixelGroupC)), pixelCount,
-    age = sim$pixelGroupC$ages,
-    sim$cbm_vars$pools[, .SD, .SDcols = sim$pooldef]
+    simYear = as.integer(time(sim)),
+    merge(
+      pixelCount,
+      cbind(sim$cbm_vars$state, sim$cbm_vars$pools[,-1]),
+      by.x = "pixelGroup", by.y = "row_idx")[
+        , .SD, .SDcols = c(names(pixelCount), "age", sim$pooldef)]
   )
 
   # NPP
@@ -654,9 +658,12 @@ annual <- function(sim) {
     + sim$cbm_vars$flux$TurnoverCoarseLitterInput
     + sim$cbm_vars$flux$TurnoverFineLitterInput
   )
-  sim$NPP <- data.table(
-    simYear = rep(as.integer(time(sim)), nrow(sim$pixelGroupC)), pixelCount,
-    NPP = NPP
+  sim$NPP <- cbind(
+    simYear = as.integer(time(sim)),
+    merge(
+      pixelCount,
+      data.table::data.table(pixelGroup = sim$cbm_vars$flux$row_idx, NPP = NPP),
+      by = "pixelGroup")
   )
 
   ############# Update emissions and products
