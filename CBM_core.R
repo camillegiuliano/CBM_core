@@ -358,11 +358,6 @@ spinup <- function(sim) {
   )[, .SD, .SDcols = !c("cohortID", "pixelIndex")])
   data.table::setkey(sim$cohortGroups, cohortGroupID)
 
-  if (any(duplicated(sim$cohortDT$pixelIndex))) warning(
-    "emissions and product totals cannot yet be calculated" ,
-    "if there are multiple cohorts per stand. ",
-    "The 'emissionsProducts` output table has not be created.")
-
   # Return simList
   return(invisible(sim))
 }
@@ -674,53 +669,49 @@ annual <- function(sim) {
   ##TODO double-check with Scott Morken that the cbm_vars$flux are in metric
   ##tonnes of carbon per ha like the rest of the values produced.
 
-  if (!any(duplicated(sim$cohortDT$pixelIndex))){
+  # Summarize emissions
+  emissions <- sim$cbm_vars$flux[, .(
+    row_idx,
+    DisturbanceBioCO2Emission, DisturbanceBioCH4Emission,DisturbanceBioCOEmission,
+    DecayDOMCO2Emission,
+    DisturbanceDOMCO2Emission, DisturbanceDOMCH4Emission,DisturbanceDOMCOEmission)]
 
-    # Summarize emissions
-    emissions <- sim$cbm_vars$flux[, .(
-      row_idx,
-      DisturbanceBioCO2Emission, DisturbanceBioCH4Emission,DisturbanceBioCOEmission,
-      DecayDOMCO2Emission,
-      DisturbanceDOMCO2Emission, DisturbanceDOMCH4Emission,DisturbanceDOMCOEmission)]
-
-    emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
+  emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
                                  DisturbanceBioCOEmission + DecayDOMCO2Emission +
                                  DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
                                  DisturbanceDOMCOEmission))]
-    ##TODO: this combined emissions column might not be needed.
+  ##TODO: this combined emissions column might not be needed.
 
-    ##NOTE: SK: CH4 and CO are 0 in 1999 and 2000
-    emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
-    emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
-    emissions[, `:=`(CO,  (DisturbanceBioCOEmission  + DisturbanceDOMCOEmission))]
+  ##NOTE: SK: CH4 and CO are 0 in 1999 and 2000
+  emissions[, `:=`(CO2, (DisturbanceBioCO2Emission + DecayDOMCO2Emission + DisturbanceDOMCO2Emission))]
+  emissions[, `:=`(CH4, (DisturbanceBioCH4Emission + DisturbanceDOMCH4Emission))]
+  emissions[, `:=`(CO,  (DisturbanceBioCOEmission  + DisturbanceDOMCOEmission))]
 
-    ## Choose emissions columns
-    reqCols <- c("CO2", "CH4", "CO", "Emissions")
-    epCols  <- intersect(names(emissions), c(P(sim)$emissionsProductsCols, reqCols))
-    if (!identical(sort(P(sim)$emissionsProductsCols), sort(epCols))) warning(
-      "'emissionsProducts' including required columns: ", paste(shQuote(reqCols), collapse = ", "))
-    emissions <- emissions[, .SD, .SDcols = c("row_idx", epCols)]
+  ## Choose emissions columns
+  reqCols <- c("CO2", "CH4", "CO", "Emissions")
+  epCols  <- intersect(names(emissions), c(P(sim)$emissionsProductsCols, reqCols))
+  if (!identical(sort(P(sim)$emissionsProductsCols), sort(epCols))) warning(
+    "'emissionsProducts' including required columns: ", paste(shQuote(reqCols), collapse = ", "))
+  emissions <- emissions[, .SD, .SDcols = c("row_idx", epCols)]
 
-    # Merge with products
-    emissionsProducts <- merge(sim$cbm_vars$pools[, .(row_idx, Products)], emissions, by = "row_idx")
+  # Merge with products
+  emissionsProducts <- merge(sim$cbm_vars$pools[, .(row_idx, Products)], emissions, by = "row_idx")
 
-    # Multiply by group areas
-    if (!"area" %in% names(sim$standDT)) stop(
-      "standDT requires the \"area\" column to calculate emissions and product totals.")
+  # Multiply by group areas
+  if (!"area" %in% names(sim$standDT)) stop(
+    "standDT requires the \"area\" column to calculate emissions and product totals.")
 
-    groupAreas <- unique(merge(
-      sim$cohortGroupKeep[, .(pixelIndex, row_idx = cohortGroupID)],
-      sim$standDT[, .(pixelIndex, area)],
-      by = "pixelIndex", all.x = TRUE)[, pixelIndex := NULL][
-        , area := sum(area), by = row_idx])
+  groupAreas <- unique(merge(
+    sim$cohortGroupKeep[, .(pixelIndex, row_idx = cohortGroupID)],
+    sim$standDT[, .(pixelIndex, area)],
+    by = "pixelIndex", all.x = TRUE)[, pixelIndex := NULL][
+      , area := sum(area), by = row_idx])
 
-    emissionsProducts <- colSums(
-      emissionsProducts[, .SD, .SDcols = !"row_idx"] *
-        (groupAreas$area[match(emissionsProducts$row_idx, groupAreas$row_idx)] / 10000))
+  emissionsProducts <- colSums(
+    emissionsProducts[, .SD, .SDcols = !"row_idx"] *
+      (groupAreas$area[match(emissionsProducts$row_idx, groupAreas$row_idx)] / 10000))
 
-    sim$emissionsProducts <- rbind(sim$emissionsProducts, c(simYear = time(sim), emissionsProducts))
-
-  }
+  sim$emissionsProducts <- rbind(sim$emissionsProducts, c(simYear = time(sim), emissionsProducts))
 
   ##TODO Check if fluxes are per year Emissions should not define the
   #pixelGroups, they should be re-zeros every year. Both these values are most
