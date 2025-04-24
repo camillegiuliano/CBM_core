@@ -288,32 +288,41 @@ Init <- function(sim){
 
 spinup <- function(sim) {
 
-  # Prepare cohort and stand data into a table for spinup
-  cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
-  if ("delay" %in% names(sim$spatialDT)) cohortDT[, delay := spatialDT$delay]
-
-  # Use alternative ages for spinup
-  ##TODO: confirm if still the case where CBM_vol2biomass won't translate <3 years old
-  if ("ageSpinup" %in% names(sim$spatialDT)){
-    cohortDT[, agesReal := ages]
-    cohortDT[, ages     := sim$spatialDT$ageSpinup]
+  if(is.null(sim$cohortDT)){
+    # Prepare cohort and stand data into a table for spinup
+    cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
+    if ("delay" %in% names(sim$spatialDT)) cohortDT[, delay := spatialDT$delay]
+    
+    # Use alternative ages for spinup
+    ##TODO: confirm if still the case where CBM_vol2biomass won't translate <3 years old
+    if ("ageSpinup" %in% names(sim$spatialDT)){
+      cohortDT[, agesReal := ages]
+      cohortDT[, ages     := sim$spatialDT$ageSpinup]
+    }
+  } else {
+    cohortDT <- sim$cohortDT
+    sim$spatialDT <- sim$standDT
   }
-
-  standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
+  
+  if(is.null(sim$standDT)){
+    standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
+  } else {
+    standDT <- sim$standDT
+  }
+  
   if ("historical_disturbance_type" %in% names(sim$spatialDT)){
     standDT$historical_disturbance_type <- spatialDT$historical_disturbance_type
   }
   if ("last_pass_disturbance_type" %in% names(sim$spatialDT)){
     standDT$last_pass_disturbance_type <- spatialDT$last_pass_disturbance_type
   }
-
   if (!"delay" %in% names(cohortDT)) message(
     "Spinup using the default regeneration delay: ", P(sim)$default_delay)
   if (!"historical_disturbance_type" %in% names(standDT)) message(
     "Spinup using the default historical disturbance type ID: ", P(sim)$default_historical_disturbance_type)
   if (!"last_pass_disturbance_type"  %in% names(standDT)) message(
     "Spinup using the default last pass disturbance type ID: ", P(sim)$default_last_pass_disturbance_type)
-
+  
   ## Use an area of 1m for each pixel
   ## Results will later be multiplied by area to total emissions
   cohortSpinup <- cbmExnSpinupCohorts(
