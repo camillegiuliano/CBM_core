@@ -60,9 +60,11 @@ This is the only event in spadesCBM that is run more than once. This event is wh
 #### `accumulateResults`
 This final event is where outputs are saved. In the case of our example in Saskatchewan, we output and save [cbmPools](https://predictiveecology.github.io/spadesCBM/lexicon.html#cbmpools) and Net Primary Production ([NPP](https://predictiveecology.github.io/spadesCBM/lexicon.html#net-primary-productivity-npp)) for each simulation year. If paths are kept at default when running the global script, these outputs should be found here: `~/GitHub/spadesCBM/outputs`. 
 
-### Cohort Groups
+### Stands and Cohort Groups
 
-[`cohortGroupID`](https://predictiveecology.github.io/spadesCBM/lexicon.html) are unique combinations of age, growth curve (which equates to species), [spatial unit](https://predictiveecology.github.io/spadesCBM/lexicon.html) and [ecozone](https://predictiveecology.github.io/spadesCBM/lexicon.html). All pixels with cohorts that share an identical age, growth curve, spatial unit, and ecozone will share one `cohortGroupID` number. The object `allPixelDT` has all the pixels in the `masterRaster`. The  `cohortDT` object is the long-form where each simulated pixel has its own line (no NAs), and `cohortGroups` lists only the cohort groups. In our example there are 1 347 529 pixels simulated (i.e., 1 347 529 lines in `cohortDT`) which are grouped in 739 pixelGroups for processing. 
+[Cohort groups](https://predictiveecology.github.io/spadesCBM/lexicon.html#cohort-groups) are unique combinations of age, growth curve (which equates to species), [spatial unit](https://predictiveecology.github.io/spadesCBM/lexicon.html#ecozone-vs-spatial-unit) and [ecozone](https://predictiveecology.github.io/spadesCBM/lexicon.html#ecozone-vs-spatial-unit). in spadesCBM, forested pixels are simulated and represent a stand. Each stand (or pixel) can have one or many cohorts. All cohorts across stands that share an identical age, growth curve, spatial unit, and ecozone will share one unique `cohortGroupID` number. 
+
+The object `allPixDT` is a large table with a row corresponding to every pixel in the [`masterRaster`](https://predictiveecology.github.io/spadesCBM/lexicon.html#masterraster). The  `cohortDT` object is a long-form table where each simulated pixel (or stand) has its own row (no NAs), and `cohortGroups` lists only the cohort groups and their attributes. In our example there are 1 347 529 pixels simulated (i.e., 1 347 529 rows in `cohortDT`) which are grouped in 739 pixelGroups for processing (i.e. 739 rows in `cohortGroups`). 
 
 ### Carbon Transfers
 
