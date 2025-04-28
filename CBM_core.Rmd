@@ -48,9 +48,11 @@ There are 4 events in CBM_core. Each are run once, except for the `annual` event
 In this short event, the Python virtual environment is set up. If a suitable version of python is not available, it will be installed using the `reticulate` package. 
 
 #### `spinup`
-The main goal of this event is to initialize the landscape by performing the [spinup function](https://predictiveecology.github.io/spadesCBM/#the-spinup-function). 
+The main goal of this event is to initialize the landscape by performing the [spinup function](https://predictiveecology.github.io/spadesCBM/#the-spinup-function).
 
 Cohort and stand data is prepared and passed to the [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function alongside growth curve data (from CBM_vol2biomass) and spinup default data (from CBM_defaults). The [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function sets up inputs, calls the [`cbm_exn_get_default_parameters`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters) python function that defines the model structure, and runs the carbon transfers necessary for the growth and burn cycle using [`cbm_exn_spinup`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters).
+
+The spinup output data and cohort groups are then prepared for use in the `annual` event. 
 
 #### `annual`
 This is the only event in spadesCBM that is run more than once. This event is where are the carbon transfers are applied for each simulation year. Disturbances are matched to the correct records, and the transfers listed [here](https://predictiveecology.github.io/spadesCBM/index.html#order-of-operations) are applied. Details on transfer rates are found in the [following section below](https://predictiveecology.github.io/spadesCBM/cbm_core.html#carbon-transfers). 
