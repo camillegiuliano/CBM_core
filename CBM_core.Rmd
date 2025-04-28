@@ -60,9 +60,9 @@ This is the only event in spadesCBM that is run more than once. This event is wh
 #### `accumulateResults`
 This final event is where outputs are saved. In the case of our example in Saskatchewan, we output and save [cbmPools](https://predictiveecology.github.io/spadesCBM/lexicon.html#cbmpools) and Net Primary Production ([NPP](https://predictiveecology.github.io/spadesCBM/lexicon.html#net-primary-productivity-npp)) for each simulation year. If paths are kept at default when running the global script, these outputs should be found here: `~/GitHub/spadesCBM/outputs`. 
 
-### Pixel Groups
+### Cohort Groups
 
-[`pixelGroup`](https://predictiveecology.github.io/spadesCBM/lexicon.html) are unique combinations of age, growth curve (which means species), [spatial unit](https://predictiveecology.github.io/spadesCBM/lexicon.html) and [ecozone](https://predictiveecology.github.io/spadesCBM/lexicon.html). All pixels having identical age, growth curve, in the same spatial unit and ecozone share one `pixelGroup` number. The object `allPixelDT` has all the pixels in the `masterRaster`. The  `spatialDT` object is the long-form where each simulated pixel has its own line (no NAs), and `level3DT` lists only the pixel groups. In our example there are 1 347 529 pixels simulated (i.e., 1 347 529 lines in `spatialDT`) which are grouped in 739 pixelGroups for processing (i.e., 739 lines in `level3DT`). 
+[`cohortGroup`](https://predictiveecology.github.io/spadesCBM/lexicon.html) are unique combinations of age, growth curve (which equates to species), [spatial unit](https://predictiveecology.github.io/spadesCBM/lexicon.html) and [ecozone](https://predictiveecology.github.io/spadesCBM/lexicon.html). All pixels with cohorts that share an identical age, growth curve, spatial unit, and ecozone will share one `cohortGroup` number. The object `allPixelDT` has all the pixels in the `masterRaster`. The  `standDT` object is the long-form where each simulated pixel has its own line (no NAs), and `level3DT` lists only the cohort groups. In our example there are 1 347 529 pixels simulated (i.e., 1 347 529 lines in `standDT`) which are grouped in 739 pixelGroups for processing. 
 
 ### Carbon Transfers
 
