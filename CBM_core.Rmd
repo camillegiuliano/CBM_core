@@ -18,7 +18,7 @@ This documentation is work in progress. Potential discrepancies and omissions ma
 
 ## Overview
 
-[CBM_core](https://github.com/PredictiveEcology/CBM_core.git) is the central module of [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git). This is where all the carbon transfers are calculated at every time step, where disturbances are applied, and stocks are tracked. It cannot run on its own and it needs parameters from either [CBM_defaults](https://github.com/PredictiveEcology/CBM_defaults.git), [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git), and [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) (as per the provided example for managed forests of Saskatchewan) or the equivalent information from the user. In *SpaDES-speak*, this module has five events (`Init`, `spinup`, `postSpinup`, `annual`, `accumulateResults`). Only in two of these events do carbon transactions occur: `spinup` and `annual`. The other events are tools to enable these transactions. All events are scheduled only once except for the `annual` event, who schedules itself until the end of the simulation horizon. Only in this module are the Python functions from the [libcbm](https://github.com/cat-cfs/libcbm_py/tree/main) package called. The functions used in this module are the [libcbm cbm-exn](https://github.com/cat-cfs/libcbm_py/tree/main/libcbm/model/cbm_exn) functions exclusively, as these were designed to accept external biomass increments. These Python functions are used in the `spinup` and in the `annual` events only.
+[CBM_core](https://github.com/PredictiveEcology/CBM_core.git) is the central module of [spadesCBM](https://github.com/PredictiveEcology/spadesCBM.git). This is where all the carbon transfers are calculated at every time step, where disturbances are applied, and stocks are tracked. It cannot run on its own and it needs parameters from either [CBM_defaults](https://github.com/PredictiveEcology/CBM_defaults.git), [CBM_dataPrep_SK](https://github.com/PredictiveEcology/CBM_dataPrep_SK.git), and [CBM_vol2biomass](https://github.com/PredictiveEcology/CBM_vol2biomass.git) (as per the provided example for managed forests of Saskatchewan) or the equivalent information from the user. In *SpaDES-speak*, this module has four events (`Init`, `spinup`, `annual`, `accumulateResults`). Only in two of these events do carbon transactions occur: `spinup` and `annual`. The other events are tools to enable these transactions. All events are scheduled only once except for the `annual` event, who schedules itself until the end of the simulation horizon. Only in this module are the Python functions from the [libcbm](https://github.com/cat-cfs/libcbm_py/tree/main) package called. The functions used in this module are the [libcbm cbm-exn](https://github.com/cat-cfs/libcbm_py/tree/main/libcbm/model/cbm_exn) functions exclusively, as these were designed to accept external biomass increments. These Python functions are used in the `spinup` and in the `annual` events only.
 
 ## Background
 
@@ -42,7 +42,7 @@ In [CBM_core](https://github.com/PredictiveEcology/CBM_core.git), the approach d
 ## Module functioning
 
 ### Events
-There are 5 events in CBM_core. Each are run once, except for the `annual` event, which is repeated for each simulation year. 
+There are 4 events in CBM_core. Each are run once, except for the `annual` event, which is repeated for each simulation year. 
 
 #### `Init`
 In this short event, the Python virtual environment is set up. If a suitable version of python is not available, it will be installed using the `reticulate` package. 
@@ -51,9 +51,6 @@ In this short event, the Python virtual environment is set up. If a suitable ver
 The main goal of this event is to initialize the landscape by performing the [spinup function](https://predictiveecology.github.io/spadesCBM/#the-spinup-function). 
 
 Cohort and stand data is prepared and passed to the [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function alongside growth curve data (from CBM_vol2biomass) and spinup default data (from CBM_defaults). The [`cbmExnSpinup`](https://github.com/PredictiveEcology/CBM_core/blob/cf9c966e7bbbb29f8089411c73d030e21846ffe3/R/spinup.R#L5) function sets up inputs, calls the [`cbm_exn_get_default_parameters`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters) python function that defines the model structure, and runs the carbon transfers necessary for the growth and burn cycle using [`cbm_exn_spinup`](https://cat-cfs.github.io/libcbm_py/cbm_exn_custom_ops.html#Appendix-1:-CBM-EXN-Default-parameters).
-
-#### `postSpinup`
-This short event is responsible for some basic data preparation to some of the spinup outputs to allow for use in this model. It also creates the simulation's initial [pixel groups](https://predictiveecology.github.io/spadesCBM/lexicon.html#pixel-groups). 
 
 #### `annual`
 This is the only event in spadesCBM that is run more than once. This event is where are the carbon transfers are applied for each simulation year. Disturbances are matched to the correct records, and the transfers listed [here](https://predictiveecology.github.io/spadesCBM/index.html#order-of-operations) are applied. Details on transfer rates are found in the [following section below](https://predictiveecology.github.io/spadesCBM/cbm_core.html#carbon-transfers). 
