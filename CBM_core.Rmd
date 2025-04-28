@@ -62,7 +62,7 @@ This final event is where outputs are saved. In the case of our example in Saska
 
 ### Cohort Groups
 
-[`cohortGroup`](https://predictiveecology.github.io/spadesCBM/lexicon.html) are unique combinations of age, growth curve (which equates to species), [spatial unit](https://predictiveecology.github.io/spadesCBM/lexicon.html) and [ecozone](https://predictiveecology.github.io/spadesCBM/lexicon.html). All pixels with cohorts that share an identical age, growth curve, spatial unit, and ecozone will share one `cohortGroup` number. The object `allPixelDT` has all the pixels in the `masterRaster`. The  `standDT` object is the long-form where each simulated pixel has its own line (no NAs), and `level3DT` lists only the cohort groups. In our example there are 1 347 529 pixels simulated (i.e., 1 347 529 lines in `standDT`) which are grouped in 739 pixelGroups for processing. 
+[`cohortGroupID`](https://predictiveecology.github.io/spadesCBM/lexicon.html) are unique combinations of age, growth curve (which equates to species), [spatial unit](https://predictiveecology.github.io/spadesCBM/lexicon.html) and [ecozone](https://predictiveecology.github.io/spadesCBM/lexicon.html). All pixels with cohorts that share an identical age, growth curve, spatial unit, and ecozone will share one `cohortGroupID` number. The object `allPixelDT` has all the pixels in the `masterRaster`. The  `cohortDT` object is the long-form where each simulated pixel has its own line (no NAs), and `cohortGroups` lists only the cohort groups. In our example there are 1 347 529 pixels simulated (i.e., 1 347 529 lines in `cohortDT`) which are grouped in 739 pixelGroups for processing. 
 
 ### Carbon Transfers
 
