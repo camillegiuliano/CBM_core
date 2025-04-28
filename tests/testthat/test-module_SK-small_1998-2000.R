@@ -34,7 +34,8 @@ test_that("Module: SK-small 1998-2000", {
         saveTime   = sort(c(times$start, times$start + c(1:(times$end - times$start))))
       )),
 
-      spatialDT         = data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "spatialDT.csv"))[, area := 900],
+      standDT           = data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "standDT.csv"))[, area := 900],
+      cohortDT          = data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "cohortDT.csv")),
       disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
       disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK/input", "disturbanceMeta.csv")   |> data.table::fread(),
       gcMeta            = file.path(spadesTestPaths$testdata, "SK/input", "gcMeta.csv")            |> data.table::fread(),
@@ -95,17 +96,17 @@ test_that("Module: SK-small 1998-2000", {
       , .SD, .SDcols = names(simTest$cbmPools)]
   )
 
-  # pixelGroupC
+  # cohortGroups
   ## There should always be the same number of total cohort groups.
-  expect_true(!is.null(simTest$pixelGroupC))
-  expect_equal(nrow(simTest$pixelGroupC), 43)
+  expect_true(!is.null(simTest$cohortGroups))
+  expect_equal(nrow(simTest$cohortGroups), 43)
 
-  # pixelKeep
-  expect_true(!is.null(simTest$pixelKeep))
-  expect_identical(simTest$pixelKeep$pixelIndex,   simTest$spatialDT$pixelIndex)
-  expect_identical(simTest$pixelKeep$pixelIndex,   simTest$spatialDT$pixelIndex)
-  expect_true(all(simTest$pixelKeep$pixelGroup %in% simTest$pixelGroupC$pixelGroup))
-  expect_true(all(as.character(start(simTest):end(simTest)) %in% names(simTest$pixelKeep)))
+  # cohortGroupKeep
+  expect_true(!is.null(simTest$cohortGroupKeep))
+  expect_identical(simTest$cohortGroupKeep$cohortID,   simTest$cohortDT$cohortID)
+  expect_identical(simTest$cohortGroupKeep$pixelIndex, simTest$cohortDT$pixelIndex)
+  expect_true(all(simTest$cohortGroupKeep$cohortGroupID %in% simTest$cohortGroups$cohortGroupID))
+  expect_true(all(as.character(start(simTest):end(simTest)) %in% names(simTest$cohortGroupKeep)))
 
 })
 

@@ -45,18 +45,25 @@ defineModule(sim, list(
   ),
   inputObjects = bindrows(
     expectsInput(
-      objectName = "spatialDT", objectClass = "data.table", sourceURL = NA,
-      desc = "Table of pixel attributes",
+      objectName = "standDT", objectClass = "data.table", sourceURL = NA,
+      desc = "Table of stand attributes. Stands can have 1 or more cohorts.",
       columns = c(
         pixelIndex      = "Stand ID",
         area            = "Stand area in meters",
         spatial_unit_id = "CBM-CFS3 spatial unit ID",
-        gcids           = "Growth curve ID",
-        ages            = "Stand age at the simulation start year",
-        ageSpinup       = "Optional. Alternative stand age at the simulation start year to use in the spinup",
-        delay           = "Optional. Regeneration delay post disturbance in years. Defaults to the 'default_delay' parameter",
         historical_disturbance_type = "Historic CBM-CFS3 disturbance type ID. Defaults to the 'historical_disturbance_type' parameter",
         last_pass_disturbance_type  = "Last pass CBM-CFS3 disturbance type ID. Defaults to the 'last_pass_disturbance_type' parameter"
+      )),
+    expectsInput(
+      objectName = "cohortDT", objectClass = "data.table", sourceURL = NA,
+      desc = "Table of cohort attributes",
+      columns = c(
+        cohortID   = "Cohort ID",
+        pixelIndex = "Stand ID",
+        gcids      = "Growth curve ID",
+        ages       = "Cohort age at simulation start",
+        ageSpinup  = "Optional. Alternative cohort age at the simulation start year to use in the spinup",
+        delay      = "Optional. Regeneration delay post disturbance in years. Defaults to the 'default_delay' parameter"
       )),
     expectsInput(
       objectName = "gcMeta", objectClass = "data.table", sourceURL = NA,
@@ -125,28 +132,28 @@ defineModule(sim, list(
       desc = "Spinup results"),
     createsOutput(
       objectName = "cbmPools", objectClass = "data.frame",
-      desc = "Three parts: pixelGroup, Age, and Pools "),
+      desc = "Cohort group ages and pools"),
     createsOutput(
       objectName = "NPP", objectClass = "data.table",
-      desc = "NPP for each `pixelGroup`"),
+      desc = "Cohort group NPP"),
     createsOutput(
       objectName = "emissionsProducts", objectClass = "data.table",
       desc = paste(
         "Emissions and product totals for each simulation year.",
         "Choose which columns to return with the 'emissionsProductsCols' parameter.")),
     createsOutput(
+      objectName = "cohortGroups", objectClass = "data.table",
+      desc = "Cohort group shared attributes"),
+    createsOutput(
+      objectName = "cohortGroupKeep", objectClass = "data.table",
+      desc = paste(
+        "Key connecting `cohortID` with current and previous `cohortGroupID`",
+        "associations for each year of the simulation")),
+    createsOutput(
       objectName = "cbm_vars", objectClass = "list",
       desc = paste(
         "List of 4 data tables: parameters, pools, flux, and state.",
-        "This is created initially during the spinup and updated each year.")),
-    createsOutput(
-      objectName = "pixelKeep", objectClass = "data.table",
-      desc = paste(
-        "Key connecting `pixelIndex` with current and previous `pixelGroup`",
-        "associations for each year of the simulation")),
-    createsOutput(
-      objectName = "pixelGroupC", objectClass = "data.table",
-      desc = "Table of shared attributes for each pixel group")
+        "This is created initially during the spinup and updated each year."))
   )
 ))
 
@@ -249,8 +256,9 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
     savePools = {
 
-      colnames(sim$cbmPools) <- c(c("simYear", "pixelCount", "pixelGroup", "ages"), sim$pooldef)
-      write.csv(file = file.path(outputPath(sim), "cPoolsPixelYear.csv"), sim$cbmPools)
+      data.table::fwrite(
+        sim$cbmPools[, .SD, .SDcols = c("simYear", "cohortGroupID", "N", "age", sim$pooldef)],
+        file.path(outputPath(sim), "cPoolsPixelYear.csv"))
     },
 
     warning(noEventWarning(sim))
@@ -288,37 +296,26 @@ Init <- function(sim){
 
 spinup <- function(sim) {
 
-  # Prepare cohort and stand data into a table for spinup
-  cohortDT <- sim$spatialDT[, .(cohortID = pixelIndex, pixelIndex, ages, gcids)]
-  if ("delay" %in% names(sim$spatialDT)) cohortDT[, delay := spatialDT$delay]
+  if (!"delay" %in% names(sim$cohortDT)) message(
+    "Spinup using the default regeneration delay: ", P(sim)$default_delay)
+  if (!"historical_disturbance_type" %in% names(sim$standDT)) message(
+    "Spinup using the default historical disturbance type ID: ", P(sim)$default_historical_disturbance_type)
+  if (!"last_pass_disturbance_type"  %in% names(sim$standDT)) message(
+    "Spinup using the default last pass disturbance type ID: ", P(sim)$default_last_pass_disturbance_type)
 
   # Use alternative ages for spinup
   ##TODO: confirm if still the case where CBM_vol2biomass won't translate <3 years old
-  if ("ageSpinup" %in% names(sim$spatialDT)){
-    cohortDT[, agesReal := ages]
-    cohortDT[, ages     := sim$spatialDT$ageSpinup]
+  cohortDT <- sim$cohortDT
+  if ("ageSpinup" %in% names(sim$cohortDT)){
+    cohortDT <- data.table::copy(cohortDT)
+    data.table::setnames(cohortDT, c("ages", "ageSpinup"), c("agesReal", "ages"))
   }
-
-  standDT <- sim$spatialDT[, .(pixelIndex, spatial_unit_id)]
-  if ("historical_disturbance_type" %in% names(sim$spatialDT)){
-    standDT$historical_disturbance_type <- spatialDT$historical_disturbance_type
-  }
-  if ("last_pass_disturbance_type" %in% names(sim$spatialDT)){
-    standDT$last_pass_disturbance_type <- spatialDT$last_pass_disturbance_type
-  }
-
-  if (!"delay" %in% names(cohortDT)) message(
-    "Spinup using the default regeneration delay: ", P(sim)$default_delay)
-  if (!"historical_disturbance_type" %in% names(standDT)) message(
-    "Spinup using the default historical disturbance type ID: ", P(sim)$default_historical_disturbance_type)
-  if (!"last_pass_disturbance_type"  %in% names(standDT)) message(
-    "Spinup using the default last pass disturbance type ID: ", P(sim)$default_last_pass_disturbance_type)
 
   ## Use an area of 1m for each pixel
   ## Results will later be multiplied by area to total emissions
   cohortSpinup <- cbmExnSpinupCohorts(
     cohortDT      = cohortDT,
-    standDT       = standDT,
+    standDT       = sim$standDT[, .SD, .SD = setdiff(names(sim$standDT), "area")],
     gcMetaDT      = sim$gcMeta,
     gcIndex       = "gcids",
     default_area  = 1,
@@ -340,13 +337,13 @@ spinup <- function(sim) {
   sim$spinupResult <- spinupOut$output$pools
 
   # Save cohort group key
-  sim$pixelKeep <- spinupOut$key[, .(pixelIndex = cohortID, pixelGroup = cohortGroupID)]
-  sim$pixelKeep[, pixelGroupPrev := NA_integer_]
-  sim$pixelKeep[, spinup         := pixelGroup]
-  data.table::setkey(sim$pixelKeep, pixelIndex)
+  sim$cohortGroupKeep <- merge(spinupOut$key, sim$cohortDT, by = "cohortID")[, .(cohortID, pixelIndex, cohortGroupID)]
+  sim$cohortGroupKeep[, cohortGroupPrev := NA_integer_]
+  sim$cohortGroupKeep[, spinup          := cohortGroupID]
+  data.table::setkey(sim$cohortGroupKeep, cohortID)
 
   # Prepare spinup output data for annual event
-  ## data.table with row_idx to match pixelGroup
+  ## data.table with row_idx to match cohortGroupID
   sim$cbm_vars <- lapply(spinupOut$output, function(tbl){
     tbl <- data.table::data.table(row_idx = unique(spinupOut[["increments"]]$row_idx), tbl)
     data.table::setkey(tbl, row_idx)
@@ -354,10 +351,12 @@ spinup <- function(sim) {
   })
 
   # Prepare cohort group attributes for annual event
-  sim$pixelGroupC <- unique(
-    merge(sim$pixelKeep[, .(pixelIndex, pixelGroup)],
-          sim$spatialDT, by = "pixelIndex")[, -("pixelIndex")])
-  data.table::setkey(sim$pixelGroupC, pixelGroup)
+  sim$cohortGroups <- unique(merge(
+    sim$cohortGroupKeep[, .(cohortID, cohortGroupID)],
+    merge(sim$standDT[, .(pixelIndex, spatial_unit_id)], sim$cohortDT, by = "pixelIndex"),
+    by = "cohortID"
+  )[, .SD, .SDcols = !c("cohortID", "pixelIndex")])
+  data.table::setkey(sim$cohortGroups, cohortGroupID)
 
   # Return simList
   return(invisible(sim))
@@ -370,12 +369,13 @@ annual <- function(sim) {
   # Read disturbance metadata
   if (is.null(sim$disturbanceMeta)) stop("'disturbanceMeta' input not found")
   distMeta <- copy(sim$disturbanceMeta)
-  if ("eventID"  %in% names(distMeta)) distMeta[, "events" := eventID][,  eventID  := NULL]
-  if ("rasterID" %in% names(distMeta)) distMeta[, "events" := rasterID][, rasterID := NULL]
-  if (!"sw_hw"   %in% names(distMeta)) distMeta <- rbind(copy(distMeta)[, sw_hw := "sw"], copy(distMeta)[, sw_hw := "hw"])
+  data.table::setnames(distMeta, "rasterID", "eventID", skip_absent = TRUE)
+  if (!"sw_hw" %in% names(distMeta)) distMeta <- rbind(
+    copy(distMeta)[, sw_hw := "sw"], copy(distMeta)[, sw_hw := "hw"])
 
   ## Check that there is one disturbance_matrix_id for each SPU and disturbance type
-  distUnq <- c("spatial_unit_id", "sw_hw", "events")
+  ##TODO: this check doesn't need to happen yearly
+  distUnq <- c("spatial_unit_id", "sw_hw", "eventID")
   if (nrow(unique(distMeta[, c(distUnq, "disturbance_matrix_id"), with = FALSE])) >
       nrow(unique(distMeta[, distUnq, with = FALSE]))) stop(
         "'disturbanceMeta' must have only 1 'disturbance_matrix_id' each combination of ",
@@ -386,16 +386,12 @@ annual <- function(sim) {
   if (!all(c("pixelIndex", "year", "eventID") %in% names(sim$disturbanceEvents))) stop(
     "'disturbanceEvents' table requires columns: 'pixelIndex', year', 'eventID'")
 
-  distPixels <- subset(
-    sim$disturbanceEvents,
-    year == time(sim) & pixelIndex %in% sim$pixelKeep$pixelIndex
-  )
+  distCohorts <- merge(
+    sim$cohortGroupKeep[, .(cohortID, pixelIndex, cohortGroupID)],
+    subset(sim$disturbanceEvents, year == as.character(time(sim))),
+    by = "pixelIndex")
 
-  if (nrow(distPixels) > 0){
-
-    if (!inherits(distPixels, "data.table")){
-      distPixels <- data.table::as.data.table(distPixels)
-    }
+  if (nrow(distCohorts) > 0){
 
     # Choose events for each pixel based on priority
     if ("priority" %in% names(distMeta)){
@@ -405,15 +401,15 @@ annual <- function(sim) {
         stop("'disturbanceMeta' event \"priority\" must be the same for all spatial_unit_id")
       }
 
-      distPixels <- distPixels[eventPriority, on = "eventID"]
-      distPixels[order(pixelIndex, priority)]
+      distCohorts <- distCohorts[eventPriority, on = "eventID"]
+      distCohorts[order(cohortID, priority)]
 
-    }else if (any(duplicated(distPixels$pixelIndex))) warning(
+    }else if (any(duplicated(unique(distCohorts[, .(pixelIndex, eventID)])$pixelIndex))) warning(
       "Multiple disturbance events found in one or more pixels for year ", time(sim), ". ",
       "Use the 'disturbanceMeta' \"priority\" field to control event precendence.")
 
-    distPixels <- distPixels[, events := as.integer(first(eventID)), by = "pixelIndex"][
-      , .(pixelIndex, events)]
+    distCohorts <- distCohorts[, eventID := as.integer(first(eventID)), by = "cohortID"][
+      , .(cohortID, pixelIndex, cohortGroupID, eventID)]
 
   }else{
 
@@ -425,67 +421,66 @@ annual <- function(sim) {
 
   # Set previous group IDs
   ## Groups only change if disturbance(s) occur
-  sim$pixelKeep[, pixelGroupPrev := pixelGroup]
+  sim$cohortGroupKeep[, cohortGroupPrev := cohortGroupID]
 
-  if (nrow(distPixels) > 0){
+  if (nrow(distCohorts) > 0){
 
-    # Get attributes and disturbance information about disturbed pixels
-    distPixels <- merge(distPixels, sim$pixelKeep[, .(pixelIndex, pixelGroupPrev)], by = "pixelIndex")
-    distPixels <- merge(distPixels, sim$pixelGroupC, by.x = "pixelGroupPrev", by.y = "pixelGroup", all.x = TRUE)
-    distPixels <- merge(distPixels, sim$gcMeta[, .(gcids, sw_hw)], by = "gcids", all.x = TRUE)
-    distPixels <- merge(distPixels, distMeta, by = c("spatial_unit_id", "sw_hw", "events"), all.x = TRUE)
-    distPixels <- distPixels[, .SD, .SDcols = unique(c("pixelIndex", "pixelGroupPrev", names(distPixels)))]
-    data.table::setkey(distPixels, pixelIndex)
+    # Get attributes and disturbance information about disturbed cohorts
+    distCohorts <- merge(distCohorts, sim$cohortGroups, by = "cohortGroupID")
+    distCohorts <- merge(distCohorts, sim$gcMeta[, .(gcids, sw_hw)], by = "gcids", all.x = TRUE)
+    distCohorts <- merge(distCohorts, distMeta, by = c("spatial_unit_id", "sw_hw", "eventID"), all.x = TRUE)
+    distCohorts <- distCohorts[, .SD, .SDcols = unique(c("cohortID", "pixelIndex", "cohortGroupID", names(distCohorts)))]
+    data.table::setnames(distCohorts, "cohortGroupID", "cohortGroupPrev")
+    data.table::setkey(distCohorts, cohortID)
 
-    # Create new pixelGroups that includes events and carbon from
-    # previous pixel group since that changes the amount and destination of the
+    # Create new groups that include events and carbon from
+    # previous group since that changes the amount and destination of the
     # carbon being moved.
     cPoolNames <- c("Input", "Merch", "Foliage", "Other", "CoarseRoots", "FineRoots",
                     "AboveGroundVeryFastSoil", "BelowGroundVeryFastSoil",
                     "AboveGroundFastSoil", "BelowGroundFastSoil",
                     "MediumSoil", "AboveGroundSlowSoil", "BelowGroundSlowSoil",
                     "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
-    cohortGroupCols <- c(setdiff(names(sim$pixelGroupC), "pixelGroup"), "events", cPoolNames)
+    cohortGroupCols <- c(setdiff(names(sim$cohortGroups), "cohortGroupID"), "eventID", cPoolNames)
 
-    distPixelCpools <- merge(
-      distPixels, sim$cbm_vars$pools,
-      by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)
-    data.table::setkey(distPixelCpools, pixelIndex)
+    distCohortCpools <- merge(
+      distCohorts, sim$cbm_vars$pools,
+      by.x = "cohortGroupPrev", by.y = "row_idx", all.x = TRUE)
+    data.table::setkey(distCohortCpools, cohortID)
 
     ##TODO: Check why a bunch of extra columns are being created. remove
-    ##unnecessary cols from generatePixelGroups. Also this function changes the
-    ##value of pixelGroup to the newGroup.
-    distPixelCpools$pixelGroup <- LandR::generatePixelGroups(
-      distPixelCpools, maxPixelGroup = max(sim$pixelKeep$pixelGroupPrev),
+    ##unnecessary cols from generatePixelGroups.
+    distCohortCpools$cohortGroupNew <- LandR::generatePixelGroups(
+      distCohortCpools, maxPixelGroup = max(sim$cohortGroupKeep$cohortGroupPrev),
       columns = cohortGroupCols
     )
 
-    # Update pixelKeep
-    sim$pixelKeep <- merge(
-      sim$pixelKeep, distPixelCpools[, .(pixelIndex, pixelGroupNew = pixelGroup)],
-      by = "pixelIndex", all.x = TRUE)
-    sim$pixelKeep[, pixelGroup    := data.table::fcoalesce(pixelGroupNew, pixelGroupPrev)]
-    sim$pixelKeep[, pixelGroupNew := NULL]
-    setkey(sim$pixelKeep, pixelIndex)
+    # Update cohortGroupKeep
+    sim$cohortGroupKeep <- merge(
+      sim$cohortGroupKeep, distCohortCpools[, .(cohortID, cohortGroupNew)],
+      by = "cohortID", all.x = TRUE)
+    sim$cohortGroupKeep[, cohortGroupID  := data.table::fcoalesce(cohortGroupNew, cohortGroupPrev)]
+    sim$cohortGroupKeep[, cohortGroupNew := NULL]
+    setkey(sim$cohortGroupKeep, cohortID)
 
-    # Update pixelGroupC
-    sim$pixelGroupC <- rbind(
-      sim$pixelGroupC,
-      unique(distPixelCpools[, .SD, .SDcols = names(sim$pixelGroupC)]))
-    data.table::setkey(sim$pixelGroupC, pixelGroup)
+    # Update cohortGroups
+    sim$cohortGroups <- rbind(
+      sim$cohortGroups,
+      unique(distCohortCpools[, cohortGroupID := cohortGroupNew][, .SD, .SDcols = names(sim$cohortGroups)]))
+    data.table::setkey(sim$cohortGroups, cohortGroupID)
 
-    rm(distPixelCpools)
+    rm(distCohortCpools)
 
   }
 
   # Set cohort groups for the year
-  sim$pixelKeep[[as.character(time(sim))]] <- sim$pixelKeep$pixelGroup
+  sim$cohortGroupKeep[[as.character(time(sim))]] <- sim$cohortGroupKeep$cohortGroupID
 
 
   ## PREPARE PYTHON INPUTS ----
 
   # Get data for existing groups
-  cbm_vars <- lapply(sim$cbm_vars, function(tbl) subset(tbl, row_idx %in% sim$pixelKeep$pixelGroup))
+  cbm_vars <- lapply(sim$cbm_vars, function(tbl) subset(tbl, row_idx %in% sim$cohortGroupKeep$cohortGroupID))
 
   # Set groups as undisturbed in current year
   ## This may contain the disturbance type from the previous year
@@ -495,12 +490,13 @@ annual <- function(sim) {
   cbm_vars$parameters$age <- cbm_vars$state$age
 
   # Prepare data for new groups
-  if (nrow(distPixels) > 0){
+  if (nrow(distCohorts) > 0){
 
     cbm_vars_new <- list()
 
     newRowIDs <- unique(
-      subset(sim$pixelKeep, pixelGroup != pixelGroupPrev)[, .(row_idx = pixelGroup, pixelGroupPrev)]
+      subset(sim$cohortGroupKeep, cohortGroupID != cohortGroupPrev)[
+        , .(row_idx = cohortGroupID, cohortGroupPrev)]
     )
     data.table::setkey(newRowIDs, row_idx)
 
@@ -508,26 +504,26 @@ annual <- function(sim) {
     ## Set age = 1
     cbm_vars_new[["parameters"]] <- merge(
       newRowIDs[, .(row_idx)],
-      unique(merge(distPixels, sim$pixelKeep, by = "pixelIndex", all.x = TRUE)[
-        , .(row_idx = pixelGroup, age = 1L, disturbance_type = disturbance_type_id)]),
+      unique(merge(distCohorts, sim$cohortGroupKeep, by = "cohortID", all.x = TRUE)[
+        , .(row_idx = cohortGroupID, age = 1L, disturbance_type = disturbance_type_id)]),
       by = "row_idx", all.x = TRUE)
 
     # Set disturbed group pools from data of previous group
     ## Set Input = 1
     cbm_vars_new[["pools"]] <- merge(
-      newRowIDs, sim$cbm_vars[["pools"]], by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)[
+      newRowIDs, sim$cbm_vars[["pools"]], by.x = "cohortGroupPrev", by.y = "row_idx", all.x = TRUE)[
         , .SD, .SDcols = names(cbm_vars[["pools"]])]
     cbm_vars_new[["pools"]]$Input <- 1L
 
     # Set disturbed group flux from data of previous group
     cbm_vars_new[["flux"]]  <- merge(
-      newRowIDs, sim$cbm_vars[["flux"]], by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)[
+      newRowIDs, sim$cbm_vars[["flux"]], by.x = "cohortGroupPrev", by.y = "row_idx", all.x = TRUE)[
         , .SD, .SDcols = names(cbm_vars[["flux"]])]
 
     # Set disturbed group state from data of previous group
     ## Clear information about previous disturbances
     cbm_vars_new[["state"]] <- merge(
-      newRowIDs, sim$cbm_vars[["state"]], by.x = "pixelGroupPrev", by.y = "row_idx", all.x = TRUE)[
+      newRowIDs, sim$cbm_vars[["state"]], by.x = "cohortGroupPrev", by.y = "row_idx", all.x = TRUE)[
         , .SD, .SDcols = names(cbm_vars[["state"]])]
     cbm_vars_new[["state"]][, time_since_last_disturbance := NA_real_]
     cbm_vars_new[["state"]][, time_since_land_use_change  := NA_real_]
@@ -544,8 +540,8 @@ annual <- function(sim) {
   # Set mean annual temperature
   cbm_vars$parameters <- merge(
     cbm_vars$parameters[, .SD, .SDcols = !"mean_annual_temperature"],
-    merge(sim$pixelGroupC, sim$spinupSQL, by.x = "spatial_unit_id", by.y = "id")[
-      , .(row_idx = pixelGroup, mean_annual_temperature)],
+    merge(sim$cohortGroups, sim$spinupSQL, by.x = "spatial_unit_id", by.y = "id")[
+      , .(row_idx = cohortGroupID, mean_annual_temperature)],
     by = "row_idx", all.x = TRUE)
 
   # Set growth increments: join via spinup cohort group IDs and age
@@ -553,7 +549,7 @@ annual <- function(sim) {
   growthIncr <- sim$spinupInput$increments
   data.table::setkeyv(growthIncr, c("row_idx", "age"))
 
-  ## JAN 2025: This sets any ages <= 0 to 1. Without this fix we lose pixel groups
+  ## JAN 2025: This sets any ages <= 0 to 1. Without this fix we lose cohorts
   annualIncr$age <- replace(annualIncr$age, annualIncr$age <= 0, 1)
 
   ## Extend increments to maximum age found in parameters
@@ -577,8 +573,8 @@ annual <- function(sim) {
 
   annualIncr <- merge(
     annualIncr,
-    sim$pixelKeep[, .(pixelGroup, spinup)],
-    by.x = "row_idx", by.y = "pixelGroup",
+    unique(sim$cohortGroupKeep[, .(cohortGroupID, spinup)]),
+    by.x = "row_idx", by.y = "cohortGroupID",
     all.x = TRUE)
   annualIncr <- merge(
     annualIncr, growthIncr,
@@ -629,22 +625,22 @@ annual <- function(sim) {
   ## ASSEMBLE OUTPUTS -----
 
   # Set new cohort group ages
-  sim$pixelGroupC$ages <- sim$cbm_vars$state$age[
-    match(sim$pixelGroupC$pixelGroup, sim$cbm_vars$state$row_idx)
+  sim$cohortGroups$ages <- sim$cbm_vars$state$age[
+    match(sim$cohortGroups$cohortGroupID, sim$cbm_vars$state$row_idx)
   ]
 
-  # Set pixel count
-  pixelCount <- sim$pixelKeep[, .(pixelGroup)][, .N, by = pixelGroup]
-  data.table::setkey(pixelCount, pixelGroup)
+  # Set cohort count
+  cohortCount <- sim$cohortGroupKeep[, .(cohortGroupID)][, .N, by = cohortGroupID]
+  data.table::setkey(cohortCount, cohortGroupID)
 
-  # Update the final simulation horizon table with all the pools/year/pixelGroup
+  # Update the final simulation horizon table with all the pools/year/cohortGroupID
   sim$cbmPools <- cbind(
     simYear = as.integer(time(sim)),
     merge(
-      pixelCount,
+      cohortCount,
       cbind(sim$cbm_vars$state, sim$cbm_vars$pools[,-1]),
-      by.x = "pixelGroup", by.y = "row_idx")[
-        , .SD, .SDcols = c(names(pixelCount), "age", sim$pooldef)]
+      by.x = "cohortGroupID", by.y = "row_idx")[
+        , .SD, .SDcols = c(names(cohortCount), "age", sim$pooldef)]
   )
 
   # NPP
@@ -661,9 +657,9 @@ annual <- function(sim) {
   sim$NPP <- cbind(
     simYear = as.integer(time(sim)),
     merge(
-      pixelCount,
-      data.table::data.table(pixelGroup = sim$cbm_vars$flux$row_idx, NPP = NPP),
-      by = "pixelGroup")
+      cohortCount,
+      data.table::data.table(cohortGroupID = sim$cbm_vars$flux$row_idx, NPP = NPP),
+      by = "cohortGroupID")
   )
 
   ############# Update emissions and products
@@ -681,9 +677,9 @@ annual <- function(sim) {
     DisturbanceDOMCO2Emission, DisturbanceDOMCH4Emission,DisturbanceDOMCOEmission)]
 
   emissions[, `:=`(Emissions, (DisturbanceBioCO2Emission + DisturbanceBioCH4Emission +
-                               DisturbanceBioCOEmission + DecayDOMCO2Emission +
-                               DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
-                               DisturbanceDOMCOEmission))]
+                                 DisturbanceBioCOEmission + DecayDOMCO2Emission +
+                                 DisturbanceDOMCO2Emission + DisturbanceDOMCH4Emission +
+                                 DisturbanceDOMCOEmission))]
   ##TODO: this combined emissions column might not be needed.
 
   ##NOTE: SK: CH4 and CO are 0 in 1999 and 2000
@@ -702,12 +698,12 @@ annual <- function(sim) {
   emissionsProducts <- merge(sim$cbm_vars$pools[, .(row_idx, Products)], emissions, by = "row_idx")
 
   # Multiply by group areas
-  if (!"area" %in% names(sim$spatialDT)) stop(
-    "spatialDT requires the \"area\" column to calculate emissions and product totals.")
+  if (!"area" %in% names(sim$standDT)) stop(
+    "standDT requires the \"area\" column to calculate emissions and product totals.")
 
   groupAreas <- unique(merge(
-    sim$pixelKeep[, .(pixelIndex, row_idx = pixelGroup)],
-    sim$spatialDT[, .(pixelIndex, area)],
+    sim$cohortGroupKeep[, .(pixelIndex, row_idx = cohortGroupID)],
+    sim$standDT[, .(pixelIndex, area)],
     by = "pixelIndex", all.x = TRUE)[, pixelIndex := NULL][
       , area := sum(area), by = row_idx])
 
