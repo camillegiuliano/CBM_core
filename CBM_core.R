@@ -710,10 +710,6 @@ annual <- function(sim) {
 
   sim$emissionsProducts <- rbind(sim$emissionsProducts, c(simYear = time(sim), emissionsProducts))
 
-  ##TODO Check if fluxes are per year Emissions should not define the
-  #pixelGroups, they should be re-zeros every year. Both these values are most
-  #commonly required on a yearly basis.
-
   ##TODO need to track emissions and products. First check that cbm_vars$fluxes
   ##are yearly (question for Scott or we found out by mapping the Python
   ##functions ourselves)
