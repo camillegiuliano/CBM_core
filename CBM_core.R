@@ -436,12 +436,9 @@ annual <- function(sim) {
     # Create new groups that include events and carbon from
     # previous group since that changes the amount and destination of the
     # carbon being moved.
-    cPoolNames <- c("Input", "Merch", "Foliage", "Other", "CoarseRoots", "FineRoots",
-                    "AboveGroundVeryFastSoil", "BelowGroundVeryFastSoil",
-                    "AboveGroundFastSoil", "BelowGroundFastSoil",
-                    "MediumSoil", "AboveGroundSlowSoil", "BelowGroundSlowSoil",
-                    "StemSnag", "BranchSnag", "CO2", "CH4", "CO", "NO2", "Products")
-    cohortGroupCols <- c(setdiff(names(sim$cohortGroups), "cohortGroupID"), "eventID", cPoolNames)
+    cohortGroupCols <- c(
+      setdiff(names(sim$cohortGroups), "cohortGroupID"),
+      "eventID", sim$pooldef, "Products")
 
     distCohortCpools <- merge(
       distCohorts, sim$cbm_vars$pools,
