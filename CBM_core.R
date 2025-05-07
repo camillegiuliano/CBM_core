@@ -561,6 +561,9 @@ annual <- function(sim) {
   growthIncr <- sim$spinupInput$increments
   data.table::setkeyv(growthIncr, c("row_idx", "age"))
 
+  ## JAN 2025: This sets any ages <= 0 to 1. Without this fix we lose cohorts
+  annualIncr$age <- replace(annualIncr$age, annualIncr$age <= 0, 1)
+
   ## Extend increments to maximum age found in parameters
   ## This handles cases where the cohort ages exceed what is available in the increments
   maxIncr <- growthIncr[growthIncr[, .I[which.max(age)], by = c("gcids", "row_idx")]$V1,]
