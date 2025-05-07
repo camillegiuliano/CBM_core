@@ -125,9 +125,6 @@ defineModule(sim, list(
   ),
   outputObjects = bindrows(
     createsOutput(
-      objectName = "spinupInput", objectClass = "data.table",
-      desc = "Spinup inputs"),
-    createsOutput(
       objectName = "spinupResult", objectClass = "data.frame",
       desc = "Spinup results"),
     createsOutput(
@@ -332,8 +329,7 @@ spinup <- function(sim) {
     gcIndex    = "gcids"
   ) |> Cache()
 
-  # Save spinup input and output
-  sim$spinupInput  <- spinupOut["increments"]
+  # Save spinup output
   sim$spinupResult <- spinupOut$output$pools
 
   # Save cohort group key
@@ -542,13 +538,13 @@ annual <- function(sim) {
     by = "row_idx", all.x = TRUE)
 
   # Set growth increments: join via spinup cohort group IDs and age
-  annualIncr <- cbm_vars$parameters[, .(row_idx, age)]
-  growthIncr <- sim$spinupInput$increments
-  data.table::setkeyv(growthIncr, c("row_idx", "age"))
+  growthIncr <- sim$growth_increments
+  data.table::setkeyv(growthIncr, c("gcids", "age"))
 
   ## Extend increments to maximum age found in parameters
   ## This handles cases where the cohort ages exceed what is available in the increments
-  maxIncr <- growthIncr[growthIncr[, .I[which.max(age)], by = c("gcids", "row_idx")]$V1,]
+  maxIncr <- subset(growthIncr[growthIncr[, .I[which.max(age)], by = "gcids"]$V1,],
+                    gcids %in% sim$cohortGroups$gcids)
   if (any(maxIncr$age < max(cbm_vars$parameters$age))){
 
     warning("Cohort ages exceed growth increment ages. ",
@@ -560,23 +556,16 @@ annual <- function(sim) {
           cbind(age = (maxIncr[i,]$age + 1):(max(cbm_vars$parameters$age) + 250),
                 maxIncr[i,][, -("age")])
         }), use.names = TRUE))
-    data.table::setkeyv(growthIncr, c("row_idx", "age"))
+    data.table::setkeyv(growthIncr, c("gcids", "age"))
 
-    sim$spinupInput$increments <- growthIncr
+    sim$growth_increments <- growthIncr
   }
 
   annualIncr <- merge(
-    annualIncr,
-    unique(sim$cohortGroupKeep[, .(cohortGroupID, spinup)]),
-    by.x = "row_idx", by.y = "cohortGroupID",
-    all.x = TRUE)
-  annualIncr <- merge(
-    annualIncr, growthIncr,
-    by.x = c("spinup", "age"), by.y = c("row_idx", "age"),
-    all.x = TRUE)
-  annualIncr[annualIncr$age == 0, merch_inc   := 0]
-  annualIncr[annualIncr$age == 0, other_inc   := 0]
-  annualIncr[annualIncr$age == 0, foliage_inc := 0]
+    cbm_vars$parameters[, .(row_idx, age)],
+    sim$cohortGroups[, .(row_idx = cohortGroupID, gcids)],
+    by = "row_idx")
+  annualIncr <- merge(annualIncr, growthIncr, by = c("gcids", "age"), all.x = TRUE)
 
   cbm_vars$parameters <- merge(
     cbm_vars$parameters[, .SD, .SDcols = !c("merch_inc", "foliage_inc", "other_inc")],
