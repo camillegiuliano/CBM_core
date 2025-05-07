@@ -93,7 +93,7 @@ test_that("Module: SK 1985-2011", {
   # cohortGroups
   ## There should always be the same number of total cohort groups.
   expect_true(!is.null(simTest$cohortGroups))
-  expect_equal(nrow(simTest$cohortGroups), 1938)
+  expect_equal(nrow(simTest$cohortGroups), 1939)
 
   # cohortGroupKeep
   expect_true(!is.null(simTest$cohortGroupKeep))

@@ -574,16 +574,14 @@ annual <- function(sim) {
     annualIncr, growthIncr,
     by.x = c("spinup", "age"), by.y = c("row_idx", "age"),
     all.x = TRUE)
-  annualIncr <- unique(annualIncr[, .(row_idx, merch_inc, foliage_inc, other_inc)])
-
-  if (any(is.na(annualIncr))) stop(
-    "Growth increments not found for ID(s): ", paste(shQuote(as.character(
-      unique(subset(annualIncr, is.na(merch_inc) | is.na(foliage_inc) | is.na(other_inc))$gcids)
-    )), collapse = ", "))
+  annualIncr[annualIncr$age == 0, merch_inc   := 0]
+  annualIncr[annualIncr$age == 0, other_inc   := 0]
+  annualIncr[annualIncr$age == 0, foliage_inc := 0]
 
   cbm_vars$parameters <- merge(
-    cbm_vars$parameters[, .SD, .SDcols = -c("merch_inc", "foliage_inc", "other_inc")],
-    annualIncr, by = "row_idx", all.x = TRUE)
+    cbm_vars$parameters[, .SD, .SDcols = !c("merch_inc", "foliage_inc", "other_inc")],
+    unique(annualIncr[, .(row_idx, merch_inc, foliage_inc, other_inc)]),
+    by = "row_idx", all.x = TRUE)
   data.table::setkey(cbm_vars$parameters, row_idx)
 
   rm(annualIncr)
