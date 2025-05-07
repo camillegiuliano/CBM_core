@@ -87,7 +87,7 @@ $TempMod$ is a temperature modifier, as per **Equation 2**,  and $StandMod$ is a
 
 **Equation 2,**
 
-*TempMod = *$e^{((MAT_i -RefTemp)} X ln(Q_{10}) X 0.1)$
+*TempMod = *$e^{((MAT_i -RefTemp)} * ln(Q_{10}) X 0.1)$
 
 Where:
 
@@ -118,31 +118,31 @@ The amount of carbon in the `CoarseRoots` and `FineRoots` pools depends on the c
 
 **Equation 4.**
 
-$T_{hw}$ *=* $hw_a$ *X* $((Merch_{hw} + Foliage_{hw} + Other_{hw})$* X *$2)^{hw_b}$
+$T_{hw} = hw_a * ((Merch_{hw} + Foliage_{hw} + Other_{hw}) * 2)^{hw_b}$
 
 **Equation 5.**
 
-$T_{sw}$ *=* $sw_a$ *X* $((Merch_{sw} + Foliage_{sw} + Other_{sw})$* X *$2)$
+$T_{sw} = sw_a * ((Merch_{sw} + Foliage_{sw} + Other_{sw}) * 2)$
 
 **Equation 6.**
 
-$P_{fine}$ *=* $frp_a + frp_b$ *X* $e^{((-1/frp_c)X(T_{hw} + T_{sw}))}$
+$P_{fine} = frp_a + frp_b * e^{((-1/frp_c)*(T_{hw} + T_{sw}))}$
 
 **Equation 7.**
 
-$FineRoots_{hw}$ *=* $T_{hw}$ *X* $P_{fine}$ 
+$FineRoots_{hw} = T_{hw} * P_{fine}$ 
 
 **Equation 8.**
 
-$FineRoots_{sw}$ *=* $T_{sw}$ *X* $P_{fine}$ 
+$FineRoots_{sw} = T_{sw} * P_{fine}$ 
 
 **Equation 9.**
 
-$CoarseRoots_{hw}$ *=* $T_{hw}$ *X* $(1-P_{fine})$ 
+$CoarseRoots_{hw} = T_{hw} * (1-P_{fine})$ 
 
 **Equation 10.**
 
-$CoarseRoots_{sw}$ *=* $T_{sw}$ *X* $(1-P_{fine})$
+$CoarseRoots_{sw} = T_{sw} * (1-P_{fine})$
 
 On-going work to improve [CBM](https://predictiveecology.github.io/spadesCBM/lexicon.html#cbm-cfs3-vs-spadescbm) is targeting all [DOM](https://predictiveecology.github.io/spadesCBM/lexicon.html#dead-organic-matter) related parameters.  @hararuk2017 used data assimilation methods which brought improvements to the turnover rates to the `FineRoots` pool, but no change to the `CoarseRoots` pool. The allocation of carbon between above ground biomass (`Merch`, `Foliage`, and `Other`) to the roots (`FineRoots`, `CoarseRoots`) implemented in [CBM](https://predictiveecology.github.io/spadesCBM/lexicon.html#cbm-cfs3-vs-spadescbm) dates from the model development (@kurz2009, @li2003). Other methods for estimating below ground biomass from above ground have been implement to estimate carbon elsewhere (example @harris2021), and a user would be justified in wanting to explore the effects of changing these parameters (@błońska2022). In this R-based environment implementation and improvement of [CBM](https://predictiveecology.github.io/spadesCBM/lexicon.html#cbm-cfs3-vs-spadescbm), a user is free to change any of the parameters provided to the `cbm_exn_spinup()` and `cbm_exn_step()` Python functions.
 
