@@ -62,9 +62,8 @@ test_that("Module: SK-small 1998-2000", {
 
   ## Check outputs ----
 
-  # spinupInpit and spinupResult
+  # spinupResult
   ## There should always be the same number of spinup cohort groups.
-  expect_true(!is.null(simTest$spinupInput))
   expect_true(!is.null(simTest$spinupResult))
   expect_equal(
     data.table::as.data.table(simTest$spinupResult),
