@@ -175,7 +175,9 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       ##So, I am making this one until we figure out how to do both more
       ##generically
       sim <- scheduleEvent(sim, end(sim), "CBM_core", "accumulateResults", eventPriority = 11)
-      # sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot",  eventPriority = 12)
+
+      # Schedule plotting
+      sim <- scheduleEvent(sim, end(sim), "CBM_core", "plot", eventPriority = 12)
 
 
       #sim <- scheduleEvent(sim, P(sim)$.saveInitialTime, "CBM_core", "save")
@@ -208,7 +210,6 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
     },
 
     plot = {
-      ## TODO: spatial plots at .plotInterval; summary plots at end(sim) --> separate into 2 plot event types
       figPath <- file.path(outputPath(sim), "CBM_core_figures")
       if (time(sim) != start(sim)) {
         cPlot <- carbonOutPlot(
@@ -221,7 +222,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
         bPlot <- barPlot(
           cbmPools = sim$cbmPools)
-        SpaDES.core::Plots(bplot,
+        SpaDES.core::Plots(bPlot,
                            filename = "barPlot",
                            path = figPath,
                            ggsaveArgs = list(width = 7, height = 5, units = "in", dpi = 300),
@@ -229,26 +230,41 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
 
         if (!is.null(sim$masterRaster)){
           nPlot <- NPPplot(
-            spatialDT = sim$spatialDT,
+            cohortGroupKeep = sim$cohortGroupKeep,
             NPP = sim$NPP,
             masterRaster = sim$masterRaster)
           SpaDES.core::Plots(nPlot,
                              filename = "NPPTest",
                              path = figPath,
+                             ggsaveArgs = list(width = 7, height = 5, units = "in", dpi = 300),
                              types = "png")
         }
       }
 
       if (!is.null(sim$masterRaster)){
-        spatialPlot(
+        sPlotStart <- spatialPlot(
           cbmPools = sim$cbmPools,
-          years = time(sim),
+          years = start(sim),
           masterRaster = sim$masterRaster,
-          spatialDT = sim$spatialDT
+          cohortGroupKeep = sim$cohortGroupKeep
         )
+        SpaDES.core::Plots(sPlotStart,
+                           filename = "TotalCarbonStart",
+                           path = figPath,
+                           ggsaveArgs = list(width = 7, height = 5, units = "in", dpi = 300),
+                           types = "png")
+        sPlotEnd <- spatialPlot(
+          cbmPools = sim$cbmPools,
+          years = end(sim),
+          masterRaster = sim$masterRaster,
+          cohortGroupKeep = sim$cohortGroupKeep
+        )
+        SpaDES.core::Plots(sPlotEnd,
+                           filename = "TotalCarbonEnd",
+                           path = figPath,
+                           ggsaveArgs = list(width = 7, height = 5, units = "in", dpi = 300),
+                           types = "png")
       }
-
-      sim <- scheduleEvent(sim, time(sim) + P(sim)$.plotInterval, "CBM_core", "plot", eventPriority = 12)
     },
 
     savePools = {
@@ -469,7 +485,6 @@ annual <- function(sim) {
   # Set cohort groups for the year
   sim$cohortGroupKeep[[as.character(time(sim))]] <- sim$cohortGroupKeep$cohortGroupID
 
-
   ## PREPARE PYTHON INPUTS ----
 
   # Get data for existing groups
@@ -540,6 +555,9 @@ annual <- function(sim) {
   # Set growth increments: join via spinup cohort group IDs and age
   growthIncr <- sim$growth_increments
   data.table::setkeyv(growthIncr, c("gcids", "age"))
+
+  ## JAN 2025: This sets any ages <= 0 to 1. Without this fix we lose cohorts
+  annualIncr$age <- replace(annualIncr$age, annualIncr$age <= 0, 1)
 
   ## Extend increments to maximum age found in parameters
   ## This handles cases where the cohort ages exceed what is available in the increments
