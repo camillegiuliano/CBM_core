@@ -62,7 +62,8 @@ This event is where outputs are saved. In the case of our example in Saskatchewa
 
 #### `plot`
 This final event is where all plotting occurs. Plots will be saved as `.png` files in the project's outputs folder. Similar to in `accumulateResults`, if paths are kept at default when running our example global script, these outputs will be found here: 
-`~/GitHub/spadesCBM/outputs`. You can also view examples of these plots (here)[https://predictiveecology.github.io/spadesCBM/example-spadescbm-in-saskatchewan.html#viewing-results].
+`~/GitHub/spadesCBM/outputs`. You can also view examples of these plots [here](https://predictiveecology.github.io/spadesCBM/example-spadescbm-in-saskatchewan.html#viewing-results).
+
 ### Stands and Cohort Groups
 
 [Cohort groups](https://predictiveecology.github.io/spadesCBM/lexicon.html#cohort-groups) are unique combinations of age, growth curve (which equates to species as there is one growth curve per leading species in CBM), [spatial unit](https://predictiveecology.github.io/spadesCBM/lexicon.html#ecozone-vs-spatial-unit) and [ecozone](https://predictiveecology.github.io/spadesCBM/lexicon.html#ecozone-vs-spatial-unit). In spadesCBM, forested pixels are simulated and represent a stand. Each stand (or pixel) can have one or many cohorts. All cohorts across stands that share an identical age, growth curve, spatial unit, and ecozone will share one unique `cohortGroupID` number. 
