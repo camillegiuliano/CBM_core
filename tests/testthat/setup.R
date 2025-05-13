@@ -12,13 +12,14 @@ download.file(
   tempScript, quiet = TRUE)
 source(tempScript)
 
-# Set up testing global options
+# Set up testing directories and global options
 SpaDEStestSetGlobalOptions()
+spadesTestPaths <- SpaDEStestSetUpDirectories()
 
-# Set up testing directories
-spadesTestPaths <- SpaDEStestSetUpDirectories(require = "googledrive", copyModules = TRUE)
+# Install required packages
+withr::with_options(c(timeout = 600), Require::Install(
+  c(SpaDES.core::packages(modules = basename(getwd()), paths = "..")[[1]],
+    "SpaDES.project", "googledrive"),
+  repos = unique(c("predictiveecology.r-universe.dev", getOption("repos")))
+))
 
-# Try to authorize Google Drive
-if (!googledrive::drive_has_token()){
-  tryCatch(googledrive::drive_auth(), error = function(e) warning(e$message))
-}

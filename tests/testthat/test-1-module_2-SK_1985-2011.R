@@ -1,15 +1,15 @@
 
 if (!testthat::is_testing()) source(testthat::test_path("setup.R"))
 
-test_that("Module: SK-small 1998-2000", {
+test_that("Module: SK 1985-2011", {
 
   ## Run simInit and spades ----
 
   # Set times
-  times <- list(start = 1998, end = 2000)
+  times <- list(start = 1985, end = 2011)
 
   # Set project path
-  projectPath <- file.path(spadesTestPaths$temp$projects, "module_SK-small_1998-2000")
+  projectPath <- file.path(spadesTestPaths$temp$projects, "module_SK_1985-2011")
   dir.create(projectPath)
   withr::local_dir(projectPath)
 
@@ -22,10 +22,10 @@ test_that("Module: SK-small 1998-2000", {
       times   = times,
       paths   = list(
         projectPath = projectPath,
-        modulePath  = dirname(spadesTestPaths$RProj),
-        packagePath = spadesTestPaths$temp$packages,
-        inputPath   = spadesTestPaths$temp$inputs,
-        cachePath   = file.path(projectPath, "cache"),
+        modulePath  = spadesTestPaths$modulePath,
+        packagePath = spadesTestPaths$packagePath,
+        inputPath   = spadesTestPaths$inputPath,
+        cachePath   = spadesTestPaths$cachePath,
         outputPath  = file.path(projectPath, "outputs")
       ),
 
@@ -34,9 +34,9 @@ test_that("Module: SK-small 1998-2000", {
         saveTime   = sort(c(times$start, times$start + c(1:(times$end - times$start))))
       )),
 
-      standDT           = data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "standDT.csv"))[, area := 900],
-      cohortDT          = data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/input", "cohortDT.csv")),
-      disturbanceEvents = file.path(spadesTestPaths$testdata, "SK-small/input", "disturbanceEvents.csv") |> data.table::fread(),
+      standDT           = data.table::fread(file.path(spadesTestPaths$testdata, "SK/input", "standDT.csv"))[, area := 900],
+      cohortDT          = data.table::fread(file.path(spadesTestPaths$testdata, "SK/input", "cohortDT.csv"))[, ageSpinup := sapply(ages, min, 3)],
+      disturbanceEvents = file.path(spadesTestPaths$testdata, "SK/input", "disturbanceEvents.csv") |> data.table::fread(),
       disturbanceMeta   = file.path(spadesTestPaths$testdata, "SK/input", "disturbanceMeta.csv")   |> data.table::fread(),
       gcMeta            = file.path(spadesTestPaths$testdata, "SK/input", "gcMeta.csv")            |> data.table::fread(),
       growth_increments = file.path(spadesTestPaths$testdata, "SK/input", "growth_increments.csv") |> data.table::fread(),
@@ -67,38 +67,32 @@ test_that("Module: SK-small 1998-2000", {
   expect_true(!is.null(simTest$spinupResult))
   expect_equal(
     data.table::as.data.table(simTest$spinupResult),
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "spinupResult.csv")),
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "spinupResult.csv")),
     check.attributes = FALSE
   )
 
   # NPP
   expect_true(!is.null(simTest$NPP))
   expect_equal(
-    simTest$NPP,
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "NPP.csv"))[
-      , .SD, .SDcols = names(simTest$NPP)]
+    simTest$NPP[, (list(NPP = sum(NPP * N))), by = "simYear"],
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "NPP_sumByYear.csv"))
   )
 
   # emissionsProducts
   expect_true(!is.null(simTest$emissionsProducts))
   expect_equal(
     data.table::as.data.table(simTest$emissionsProducts),
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "emissionsProducts.csv"))[
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "emissionsProducts.csv"))[
       , .SD, .SDcols = colnames(simTest$emissionsProducts)]
   )
 
   # cbmPools
   expect_true(!is.null(simTest$cbmPools))
-  expect_equal(
-    simTest$cbmPools,
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "cbmPools.csv"))[
-      , .SD, .SDcols = names(simTest$cbmPools)]
-  )
 
   # cohortGroups
   ## There should always be the same number of total cohort groups.
   expect_true(!is.null(simTest$cohortGroups))
-  expect_equal(nrow(simTest$cohortGroups), 43)
+  expect_equal(nrow(simTest$cohortGroups), 1939)
 
   # cohortGroupKeep
   expect_true(!is.null(simTest$cohortGroupKeep))

@@ -12,9 +12,12 @@ test_that("Multi module: SK-small 1998-2000", {
   times <- list(start = 1998, end = 2000)
 
   # Set project path
-  projectPath <- file.path(spadesTestPaths$temp$projects, "multiModule_SK-small_1998-2000")
+  projectPath <- file.path(spadesTestPaths$temp$projects, "integration_SK-small_1998-2000")
   dir.create(projectPath)
   withr::local_dir(projectPath)
+
+  # Set Github repo branch
+  if (!nzchar(Sys.getenv("BRANCH_NAME"))) withr::local_envvar(BRANCH_NAME = "development")
 
   # Set up project
   simInitInput <- SpaDEStestMuffleOutput(
@@ -22,20 +25,19 @@ test_that("Multi module: SK-small 1998-2000", {
     SpaDES.project::setupProject(
 
       modules = c(
-        getOption("spades.test.modules", c(
-          CBM_defaults    = "PredictiveEcology/CBM_defaults@development",
-          CBM_vol2biomass = "PredictiveEcology/CBM_vol2biomass@development",
-          CBM_dataPrep_SK = "PredictiveEcology/CBM_dataPrep_SK@development"
-        ))[c("CBM_defaults", "CBM_vol2biomass", "CBM_dataPrep_SK")],
+        paste0("PredictiveEcology/CBM_defaults@",    Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_dataPrep_SK",  Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_vol2biomass@", Sys.getenv("BRANCH_NAME")),
         "CBM_core"
       ),
+
       times   = times,
       paths   = list(
         projectPath = projectPath,
         modulePath  = spadesTestPaths$temp$modules,
-        packagePath = spadesTestPaths$temp$packages,
-        inputPath   = spadesTestPaths$temp$inputs,
-        cachePath   = spadesTestPaths$temp$cache,
+        packagePath = spadesTestPaths$packagePath,
+        inputPath   = spadesTestPaths$inputPath,
+        cachePath   = spadesTestPaths$cachePath,
         outputPath  = file.path(projectPath, "outputs")
       ),
 
