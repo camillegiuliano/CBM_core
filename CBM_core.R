@@ -3,7 +3,7 @@ defineModule(sim, list(
   description = "Modules that simulated the annual events as described in the CBM-CFS model", # "insert module description here",
   keywords = c("carbon", "CBM-CFS"),
   authors = c(
-    person("Celine",  "Boisvenue", email = "celine.boisvenue@nrcan-rncan.gc.ca", role = c("aut", "cre")),
+    person("Céline",  "Boisvenue", email = "celine.boisvenue@nrcan-rncan.gc.ca", role = c("aut", "cre")),
     person("Camille", "Giuliano",  email = "camsgiu@gmail.com",                  role = c("ctb")),
     person("Susan",   "Murray",    email = "murray.e.susan@gmail.com",           role = c("ctb"))
   ),
