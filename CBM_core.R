@@ -113,15 +113,12 @@ defineModule(sim, list(
         "Table defining the disturbance event types.",
         "This associates CBM-CFS3 disturbances with the event IDs in the 'disturbanceEvents' table."),
       columns = c(
-        eventID               = "Event type ID",
-        wholeStand            = "Specifies if the whole stand is disturbed (1 = TRUE; 0 = FALSE)",
-        sw_hw                 = "Optional. Specifies if the disturbance applies to SW or HW",
-        priority              = "Optional. Priority of event assignment to a pixel if more than one event occurs.",
-        spatial_unit_id       = "Spatial unit ID",
-        disturbance_type_id   = "Disturbance type ID",
-        disturbance_matrix_id = "Disturbance matrix ID",
-        name                  = "Disturbance name",
-        description           = "Disturbance description"
+        eventID             = "Event type ID",
+        disturbance_type_id = "CBM-CFS3 disturbance type ID",
+        priority            = "Optional. Priority of event assignment to a pixel if more than one event occurs.",
+        name                = "Optional. Disturbance name",
+        description         = "Optional. Disturbance description",
+        wholeStand          = "Optional. Specifies if the whole stand is disturbed (1 = TRUE; 0 = FALSE)"
       )),
     expectsInput(
       objectName = "masterRaster", objectClass = "raster",
@@ -382,50 +379,50 @@ annual <- function(sim) {
 
   ## READ DISTURBANCES ----
 
-  # Read disturbance metadata
-  if (is.null(sim$disturbanceMeta)) stop("'disturbanceMeta' input not found")
-  distMeta <- copy(sim$disturbanceMeta)
-  data.table::setnames(distMeta, "rasterID", "eventID", skip_absent = TRUE)
-  if (!"sw_hw" %in% names(distMeta)) distMeta <- rbind(
-    copy(distMeta)[, sw_hw := "sw"], copy(distMeta)[, sw_hw := "hw"])
-
-  ## Check that there is one disturbance_matrix_id for each SPU and disturbance type
-  ##TODO: this check doesn't need to happen yearly
-  distUnq <- c("spatial_unit_id", "sw_hw", "eventID")
-  if (nrow(unique(distMeta[, c(distUnq, "disturbance_matrix_id"), with = FALSE])) >
-      nrow(unique(distMeta[, distUnq, with = FALSE]))) stop(
-        "'disturbanceMeta' must have only 1 'disturbance_matrix_id' each combination of ",
-        paste(sQuote(distUnq), collapse = ", "))
-
   # Read disturbance events
-  if (is.null(sim$disturbanceEvents)) stop("'disturbanceEvents' input not found")
-  if (!all(c("pixelIndex", "year", "eventID") %in% names(sim$disturbanceEvents))) stop(
-    "'disturbanceEvents' table requires columns: 'pixelIndex', year', 'eventID'")
+  if (!is.null(sim$disturbanceEvents)){
 
-  distCohorts <- merge(
-    sim$cohortGroupKeep[, .(cohortID, pixelIndex, cohortGroupID)],
-    subset(sim$disturbanceEvents, year == as.character(time(sim))),
-    by = "pixelIndex")
+    if (!all(c("pixelIndex", "year", "eventID") %in% names(sim$disturbanceEvents))) stop(
+      "'disturbanceEvents' table requires columns: 'pixelIndex', year', 'eventID'")
 
-  if (nrow(distCohorts) > 0){
+    distStands <- subset(sim$disturbanceEvents, year == as.character(time(sim)))
 
-    # Choose events for each pixel based on priority
-    if ("priority" %in% names(distMeta)){
+  }else distStands <- data.table()
 
-      eventPriority <- unique(distMeta[, .(eventID, priority)])
-      if (any(duplicated(eventPriority$eventID))){
-        stop("'disturbanceMeta' event \"priority\" must be the same for all spatial_unit_id")
-      }
+  if (nrow(distStands) > 0){
 
-      distCohorts <- distCohorts[eventPriority, on = "eventID"]
-      distCohorts[order(cohortID, priority)]
+    # Read disturbance metadata
+    if (is.null(sim$disturbanceMeta)) stop("'disturbanceMeta' input not found")
+    if (!all(c("eventID", "disturbance_type_id") %in% names(sim$disturbanceMeta))) stop(
+      "'disturbanceMeta' table requires columns: 'eventID', 'disturbance_type_id'")
 
-    }else if (any(duplicated(unique(distCohorts[, .(pixelIndex, eventID)])$pixelIndex))) warning(
-      "Multiple disturbance events found in one or more pixels for year ", time(sim), ". ",
-      "Use the 'disturbanceMeta' \"priority\" field to control event precendence.")
+    if ("priority" %in% names(sim$disturbanceMeta)){
+      distMeta <- unique(sim$disturbanceMeta[, .(eventID, disturbance_type_id, priority)])
+    }else{
+      distMeta <- unique(sim$disturbanceMeta[, .(eventID, disturbance_type_id, priority = 1)])
+    }
 
-    distCohorts <- distCohorts[, eventID := as.integer(first(eventID)), by = "cohortID"][
-      , .(cohortID, pixelIndex, cohortGroupID, eventID)]
+    # Choose disturbance events by priority
+    distStands <- merge(
+      distStands[, .(pixelIndex, eventID)],
+      distMeta[,   .(eventID, priority)],
+      by = "eventID", all.x = TRUE)
+
+    if (any(duplicated(distStands$pixelIndex))){
+
+      distStands <- merge(
+        distStands,
+        distStands[, .(priority = max(priority)), by = pixelIndex],
+        by  = c("pixelIndex", "priority"),
+        all = FALSE)
+
+      if (any(duplicated(distStands$pixelIndex))) stop(
+        "Multiple disturbance events found in one or more pixels for year ", time(sim), ". ",
+        "Use the 'disturbanceMeta' \"priority\" field to set event precendence.")
+    }
+
+    distStands <- merge(distStands, distMeta, by = "eventID")[, .(
+      pixelIndex, disturbance_type_id)]
 
   }else{
 
@@ -439,14 +436,14 @@ annual <- function(sim) {
   ## Groups only change if disturbance(s) occur
   sim$cohortGroupKeep[, cohortGroupPrev := cohortGroupID]
 
-  if (nrow(distCohorts) > 0){
+  if (nrow(distStands) > 0){
 
-    # Get attributes and disturbance information about disturbed cohorts
-    distCohorts <- merge(distCohorts, sim$cohortGroups, by = "cohortGroupID")
-    distCohorts <- merge(distCohorts, sim$gcMeta[, .(gcids, sw_hw)], by = "gcids", all.x = TRUE)
-    distCohorts <- merge(distCohorts, distMeta, by = c("spatial_unit_id", "sw_hw", "eventID"), all.x = TRUE)
-    distCohorts <- distCohorts[, .SD, .SDcols = unique(c("cohortID", "pixelIndex", "cohortGroupID", names(distCohorts)))]
-    data.table::setnames(distCohorts, "cohortGroupID", "cohortGroupPrev")
+    # Get attributes for disturbed cohorts
+    distCohorts <- merge(
+      sim$cohortGroupKeep[, .(cohortID, pixelIndex, cohortGroupPrev)],
+      distStands,
+      by = "pixelIndex")
+    distCohorts <- merge(distCohorts, sim$cohortGroups, by.x = "cohortGroupPrev", by.y = "cohortGroupID")
     data.table::setkey(distCohorts, cohortID)
 
     # Create new groups that include events and carbon from
@@ -454,7 +451,7 @@ annual <- function(sim) {
     # carbon being moved.
     cohortGroupCols <- c(
       setdiff(names(sim$cohortGroups), "cohortGroupID"),
-      "eventID", sim$pooldef, "Products")
+      "disturbance_type_id", sim$pooldef, "Products")
 
     distCohortCpools <- merge(
       distCohorts, sim$cbm_vars$pools,
@@ -489,6 +486,7 @@ annual <- function(sim) {
   # Set cohort groups for the year
   sim$cohortGroupKeep[[as.character(time(sim))]] <- sim$cohortGroupKeep$cohortGroupID
 
+
   ## PREPARE PYTHON INPUTS ----
 
   # Get data for existing groups
@@ -502,7 +500,7 @@ annual <- function(sim) {
   cbm_vars$parameters$age <- cbm_vars$state$age
 
   # Prepare data for new groups
-  if (nrow(distCohorts) > 0){
+  if (nrow(distStands) > 0){
 
     cbm_vars_new <- list()
 
