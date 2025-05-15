@@ -5,9 +5,6 @@ test_that("Multi module: SK-small 1998-2000", {
 
   ## Run simInit and spades ----
 
-  # Skip if Google Drive is not authorized
-  testthat::skip_if(!googledrive::drive_has_token())
-
   # Set times
   times <- list(start = 1998, end = 2000)
 
@@ -26,7 +23,7 @@ test_that("Multi module: SK-small 1998-2000", {
 
       modules = c(
         paste0("PredictiveEcology/CBM_defaults@",    Sys.getenv("BRANCH_NAME")),
-        paste0("PredictiveEcology/CBM_dataPrep_SK",  Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_dataPrep_SK@", Sys.getenv("BRANCH_NAME")),
         paste0("PredictiveEcology/CBM_vol2biomass@", Sys.getenv("BRANCH_NAME")),
         "CBM_core"
       ),
