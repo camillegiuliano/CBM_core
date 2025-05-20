@@ -91,7 +91,7 @@ $TempMod$ is a temperature modifier, as per **Equation 2**,  and $StandMod$ is a
 
 **Equation 2,**
 
-*TempMod = *$e^{((MAT_i -RefTemp)} * ln(Q_{10}) X 0.1)$
+*TempMod = *$e^{((MAT_i -RefTemp) * ln(Q_{10}) * 0.1)}$
 
 Where:
 
