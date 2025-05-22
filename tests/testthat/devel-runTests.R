@@ -28,12 +28,12 @@
 ## RUN TEST SUBSETS ----
 
   # Run module tests
-  testthat::test_dir("tests/testthat", filter = "^module")
+  testthat::test_dir("tests/testthat", filter = "module")
 
-  # Run multi module integration tests
-  testthat::test_dir("tests/testthat", filter = "^multiModule")
+  # Run integration tests
+  testthat::test_dir("tests/testthat", filter = "integration")
 
-  # Run SK-small tests
+  # Run all SK-small tests
   testthat::test_dir("tests/testthat", filter = "SK-small")
 
 
