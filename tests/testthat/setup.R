@@ -4,6 +4,10 @@ if (!testthat::is_testing()){
   testthat::source_test_helpers(env = globalenv())
 }
 
+# 2025-05: Install latest quickPlot from Github required by LandR
+## Otherwise SpaDES.core will install and load an older version from CRAN first
+Require::Install("PredictiveEcology/quickPlot@development (>= 1.0.2.9001)")
+
 # Source work in progress SpaDES module testing functions
 suppressPackageStartupMessages(library(SpaDES.core))
 tempScript <- tempfile(fileext = ".R")
@@ -12,13 +16,14 @@ download.file(
   tempScript, quiet = TRUE)
 source(tempScript)
 
-# Set up testing global options
+# Set up testing directories and global options
 SpaDEStestSetGlobalOptions()
+spadesTestPaths <- SpaDEStestSetUpDirectories()
 
-# Set up testing directories
-spadesTestPaths <- SpaDEStestSetUpDirectories(require = "googledrive", copyModules = TRUE)
+# Install required packages
+withr::with_options(c(timeout = 600), Require::Install(
+  c(SpaDES.core::packages(modules = basename(getwd()), paths = "..")[[1]],
+    "SpaDES.project", "googledrive"),
+  repos = unique(c("predictiveecology.r-universe.dev", getOption("repos")))
+))
 
-# Try to authorize Google Drive
-if (!googledrive::drive_has_token()){
-  tryCatch(googledrive::drive_auth(), error = function(e) warning(e$message))
-}

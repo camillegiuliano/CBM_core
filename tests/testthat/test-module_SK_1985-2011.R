@@ -22,10 +22,10 @@ test_that("Module: SK 1985-2011", {
       times   = times,
       paths   = list(
         projectPath = projectPath,
-        modulePath  = dirname(spadesTestPaths$RProj),
-        packagePath = spadesTestPaths$temp$packages,
-        inputPath   = spadesTestPaths$temp$inputs,
-        cachePath   = file.path(projectPath, "cache"),
+        modulePath  = spadesTestPaths$modulePath,
+        packagePath = spadesTestPaths$packagePath,
+        inputPath   = spadesTestPaths$inputPath,
+        cachePath   = spadesTestPaths$cachePath,
         outputPath  = file.path(projectPath, "outputs")
       ),
 
