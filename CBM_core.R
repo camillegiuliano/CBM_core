@@ -515,7 +515,7 @@ annual <- function(sim) {
     cbm_vars_new[["parameters"]] <- merge(
       newRowIDs[, .(row_idx)],
       unique(merge(distCohorts, sim$cohortGroupKeep, by = "cohortID", all.x = TRUE)[
-        , .(row_idx = cohortGroupID, age = 1L, disturbance_type = disturbance_type_id)]),
+        , .(row_idx = cohortGroupID, age = 0L, disturbance_type = disturbance_type_id)]),
       by = "row_idx", all.x = TRUE)
 
     # Set disturbed group pools from data of previous group
@@ -593,12 +593,18 @@ annual <- function(sim) {
   rm(annualIncr)
   rm(growthIncr)
 
-
   ## RUN PYTHON -----
-
   # Temporarily remove row_idx column
   row_idx <- cbm_vars$pools$row_idx
   cbm_vars <- lapply(cbm_vars, function(tbl) tbl[, -("row_idx")])
+
+  #implement delay
+  if (any(cbm_vars$state$time_since_last_disturbance < 5)) {
+    delayRows <- cbm_vars$state$time_since_last_disturbance < 5
+    cbm_vars$state$age[delayRows] <- 0
+    delayGrowth <- c("age", "merch_inc", "foliage_inc", "other_inc")
+    cbm_vars$parameters[delayRows, delayGrowth] <- 0
+  }
 
   # Call Python
   mod$libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
