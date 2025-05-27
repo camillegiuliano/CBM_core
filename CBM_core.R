@@ -21,7 +21,7 @@ defineModule(sim, list(
   ),
   parameters = rbind(
     defineParameter(
-      "default_delay", "integer", default = 0L, min = 0L, max = NA_integer_, desc = paste(
+      "default_delay", "integer", default = 5L, min = 0L, max = NA_integer_, desc = paste(
         "The default regeneration delay post disturbance.",
         "This can instead be set for each cohort with the spatialDT 'delay' column."
       )),
@@ -599,7 +599,7 @@ annual <- function(sim) {
   cbm_vars <- lapply(cbm_vars, function(tbl) tbl[, -("row_idx")])
 
   #implement delay
-  if (any(cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay)) {
+  if (any(cbm_vars$state$time_since_last_disturbance < as.numeric(P(sim)$default_delay))) {
     delayRows <- cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay
     cbm_vars$state$age[delayRows] <- 0
     delayGrowth <- c("age", "merch_inc", "foliage_inc", "other_inc")
