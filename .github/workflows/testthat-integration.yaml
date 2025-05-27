@@ -1,0 +1,73 @@
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+name: testthat-integration
+
+jobs:
+  testthat-module:
+    if: "!contains(github.event.commits[0].message, '[skip-ci]')"
+    runs-on: ${{ matrix.config.os }}
+
+    name: ${{ matrix.config.os }} (${{ matrix.config.r }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - {os: windows-latest, r: 'release'}
+          - {os: windows-latest, r: 'devel'}
+          - {os: ubuntu-latest,  r: 'release'}
+          - {os: ubuntu-latest,  r: 'devel'}
+          #- {os: macOS-latest,   r: 'release'}
+
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+      GOOGLE_AUTH: ${{ secrets.GOOGLE_AUTH }}
+      BRANCH_NAME: ${{ github.base_ref || github.ref_name }}
+      R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
+
+    steps:
+
+      - name: Check for Google Authorization
+        if: ${{ env.GOOGLE_AUTH == '' }}
+        run: exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: PredictiveEcology/actions/install-spatial-deps@v0.2
+
+      - name: Install extra Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt -y install libfontconfig1-dev
+        shell: bash
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: ${{ matrix.config.r }}
+          use-public-rspm: true
+          Ncpus: 2
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+         packages: |
+          any::testthat
+          any::googledrive
+
+      - uses: PredictiveEcology/actions/install-Require@v0.2
+        with:
+          GitTag: 'development'
+
+      - uses: PredictiveEcology/actions/install-SpaDES@v0.2
+
+      - name: Run tests
+        run: |
+          googledrive::drive_auth(path = Sys.getenv("GOOGLE_AUTH"))
+          testthat::test_dir("tests/testthat", filter = "integration", stop_on_failure = TRUE)
+        shell: Rscript {0}
+

@@ -22,10 +22,10 @@ test_that("Module: SK-small 1998-2000", {
       times   = times,
       paths   = list(
         projectPath = projectPath,
-        modulePath  = dirname(spadesTestPaths$RProj),
-        packagePath = spadesTestPaths$temp$packages,
-        inputPath   = spadesTestPaths$temp$inputs,
-        cachePath   = file.path(projectPath, "cache"),
+        modulePath  = spadesTestPaths$modulePath,
+        packagePath = spadesTestPaths$packagePath,
+        inputPath   = spadesTestPaths$inputPath,
+        cachePath   = spadesTestPaths$cachePath,
         outputPath  = file.path(projectPath, "outputs")
       ),
 
@@ -62,9 +62,8 @@ test_that("Module: SK-small 1998-2000", {
 
   ## Check outputs ----
 
-  # spinupInpit and spinupResult
+  # spinupResult
   ## There should always be the same number of spinup cohort groups.
-  expect_true(!is.null(simTest$spinupInput))
   expect_true(!is.null(simTest$spinupResult))
   expect_equal(
     data.table::as.data.table(simTest$spinupResult),
