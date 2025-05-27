@@ -599,8 +599,8 @@ annual <- function(sim) {
   cbm_vars <- lapply(cbm_vars, function(tbl) tbl[, -("row_idx")])
 
   #implement delay
-  if (any(cbm_vars$state$time_since_last_disturbance < as.numeric(P(sim)$default_delay))) {
-    delayRows <- cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay
+  delayRows <- is.na(cbm_vars$state$time_since_last_disturbance) | cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay
+  if (any(delayRows)) {
     cbm_vars$state$age[delayRows] <- 0
     delayGrowth <- c("age", "merch_inc", "foliage_inc", "other_inc")
     cbm_vars$parameters[delayRows, delayGrowth] <- 0
