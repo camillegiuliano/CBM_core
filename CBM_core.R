@@ -325,7 +325,7 @@ spinup <- function(sim) {
     data.table::setnames(cohortDT, c("ages", "ageSpinup"), c("agesReal", "ages"))
   }
 
-  ## Use an area of 1m for each pixel
+  ## Use an area of 1ha for each pixel
   ## Results will later be multiplied by area to total emissions
   cohortSpinup <- cbmExnSpinupCohorts(
     cohortDT      = cohortDT,
