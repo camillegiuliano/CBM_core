@@ -515,7 +515,7 @@ annual <- function(sim) {
     cbm_vars_new[["parameters"]] <- merge(
       newRowIDs[, .(row_idx)],
       unique(merge(distCohorts, sim$cohortGroupKeep, by = "cohortID", all.x = TRUE)[
-        , .(row_idx = cohortGroupID, age = 0L, disturbance_type = disturbance_type_id)]),
+        , .(row_idx = cohortGroupID, age = 1L, disturbance_type = disturbance_type_id)]),
       by = "row_idx", all.x = TRUE)
 
     # Set disturbed group pools from data of previous group
