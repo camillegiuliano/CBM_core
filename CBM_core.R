@@ -598,14 +598,6 @@ annual <- function(sim) {
   row_idx <- cbm_vars$pools$row_idx
   cbm_vars <- lapply(cbm_vars, function(tbl) tbl[, -("row_idx")])
 
-  #implement delay
-  delayRows <- is.na(cbm_vars$state$time_since_last_disturbance) | cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay
-  if (any(delayRows)) {
-    cbm_vars$state$age[delayRows] <- 0
-    delayGrowth <- c("age", "merch_inc", "foliage_inc", "other_inc")
-    cbm_vars$parameters[delayRows, delayGrowth] <- 0
-  }
-
   # Call Python
   mod$libcbm_default_model_config <- libcbmr::cbm_exn_get_default_parameters()
   step_ops <- libcbmr::cbm_exn_step_ops(cbm_vars, mod$libcbm_default_model_config)
@@ -617,6 +609,14 @@ annual <- function(sim) {
     libcbmr::cbm_exn_get_step_ops_sequence(),
     mod$libcbm_default_model_config
   )
+
+  #implement delay
+  delayRows <- is.na(cbm_vars$state$time_since_last_disturbance) | cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay
+  if (any(delayRows)) {
+    cbm_vars$state$age[delayRows] <- 0
+    delayGrowth <- c("age", "merch_inc", "foliage_inc", "other_inc")
+    cbm_vars$parameters[delayRows, delayGrowth] <- 0
+  }
 
   # Prepare output data for next annual event
   sim$cbm_vars <- lapply(cbm_vars, function(tbl){
