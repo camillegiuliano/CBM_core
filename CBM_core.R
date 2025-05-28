@@ -371,6 +371,8 @@ spinup <- function(sim) {
   )[, .SD, .SDcols = !c("cohortID", "pixelIndex")])
   data.table::setkey(sim$cohortGroups, cohortGroupID)
 
+  sim$cohortGroups$delay <- spinupOut$parameters$delay
+
   # Return simList
   return(invisible(sim))
 }

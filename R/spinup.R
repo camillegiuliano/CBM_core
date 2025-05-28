@@ -77,7 +77,8 @@ cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gcIndex = "gcIndex"){
   # Return input and results
   list(
     key        = cohortDT[, .(cohortID, cohortGroupID)],
-    increments = growthIncrGroups,
+    parameters = spinup_input$parameters,
+    increments = spinup_input$increments,
     output     = cbm_vars
   )
 }
