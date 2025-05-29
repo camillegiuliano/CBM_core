@@ -21,9 +21,14 @@ defineModule(sim, list(
   ),
   parameters = rbind(
     defineParameter(
-      "default_delay", "integer", default = 5L, min = 0L, max = NA_integer_, desc = paste(
+      "default_delay_spinup", "integer", default = 0L, min = 0L, max = NA_integer_, desc = paste(
+        "The default spinup delay.",
+        "This can instead be set for each cohort with the spatialDT 'delaySpinup' column."
+      )),
+    defineParameter(
+      "default_delay_regen", "integer", default = 0L, min = 0L, max = NA_integer_, desc = paste(
         "The default regeneration delay post disturbance.",
-        "This can instead be set for each cohort with the spatialDT 'delay' column."
+        "This can instead be set for each cohort with the spatialDT 'delayRegen' column."
       )),
     defineParameter(
       "default_historical_disturbance_type", "integer", default = 1L, NA_integer_, NA_integer_, desc = paste(
@@ -311,7 +316,7 @@ Init <- function(sim){
 spinup <- function(sim) {
 
   if (!"delay" %in% names(sim$cohortDT)) message(
-    "Spinup using the default regeneration delay: ", P(sim)$default_delay)
+    "Spinup using the default regeneration delay: ", P(sim)$default_delay_spinup)
   if (!"historical_disturbance_type" %in% names(sim$standDT)) message(
     "Spinup using the default historical disturbance type ID: ", P(sim)$default_historical_disturbance_type)
   if (!"last_pass_disturbance_type"  %in% names(sim$standDT)) message(
@@ -333,7 +338,7 @@ spinup <- function(sim) {
     gcMetaDT      = sim$gcMeta,
     gcIndex       = "gcids",
     default_area  = 1,
-    default_delay = P(sim)$default_delay,
+    default_delay = P(sim)$default_delay_spinup,
     default_historical_disturbance_type = P(sim)$default_historical_disturbance_type,
     default_last_pass_disturbance_type  = P(sim)$default_last_pass_disturbance_type
   )
@@ -611,7 +616,7 @@ annual <- function(sim) {
   )
 
   #implement delay
-  delayRows <- is.na(cbm_vars$state$time_since_last_disturbance) | cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay
+  delayRows <- is.na(cbm_vars$state$time_since_last_disturbance) | cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay_regen
   if (any(delayRows)) {
     cbm_vars$state$age[delayRows] <- 0
     delayGrowth <- c("age", "merch_inc", "foliage_inc", "other_inc")
