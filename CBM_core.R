@@ -167,7 +167,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- scheduleEvent(sim, start(sim), "CBM_core", "spinup")
 
       # Schedule annual event
-      sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual")
+      sim <- scheduleEvent(sim, start(sim), "CBM_core", "annual", eventPriority = 8)
 
       # need this to be after the saving of outputs -- so very low priority
       ##TODO this is not happening because P(sim)$.plotInterval is NULL
@@ -194,7 +194,7 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
     annual = {
 
       sim <- annual(sim)
-      sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual")
+      sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual", eventPriority = 8)
     },
 
     accumulateResults = {
