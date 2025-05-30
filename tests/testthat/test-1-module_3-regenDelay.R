@@ -3,13 +3,13 @@ if (!testthat::is_testing()) source(testthat::test_path("setup.R"))
 
 test_that("Module: with regeneration delay", {
 
-  ## Test: regeneration delay set by parameter ----
+  ## Test: regeneration delay set by cohortDT column ----
 
   # Set times
   times <- list(start = 2000, end = 2002)
 
   # Set project path
-  projectPath <- file.path(spadesTestPaths$temp$projects, "module_regenDelayParam")
+  projectPath <- file.path(spadesTestPaths$temp$projects, "module_regenDelayCol")
   dir.create(projectPath)
   withr::local_dir(projectPath)
 
@@ -34,10 +34,6 @@ test_that("Module: with regeneration delay", {
         saveTime   = sort(c(times$start, times$start + c(1:(times$end - times$start))))
       )),
 
-      params = list(CBM_core = list(
-        default_delay_regen = 2
-      )),
-
       standDT = data.table::data.table(
         pixelIndex      = c(1, 2),
         spatial_unit_id = 28,
@@ -47,10 +43,11 @@ test_that("Module: with regeneration delay", {
         cohortID   = c(1, 2),
         pixelIndex = c(1, 2),
         gcids      = 1,
-        ages       = 10
+        ages       = 10,
+        delayRegen = c(0, 2)
       ),
       disturbanceEvents = data.table::data.table(
-        pixelIndex = 2,
+        pixelIndex = c(1, 2),
         year       = 2000,
         eventID    = 1
       ),
@@ -88,40 +85,45 @@ test_that("Module: with regeneration delay", {
   expect_s4_class(simTest, "simList")
 
   # Check result
-  expect_equal(subset(simTest$cbmPools, cohortGroupID == 2)$age, c(0, 0, 1))
+  expect_equal(subset(simTest$cbmPools, cohortGroupID == min(cohortGroupID))$age, c(1, 2, 3))
+  expect_equal(subset(simTest$cbmPools, cohortGroupID == max(cohortGroupID))$age, c(0, 0, 1))
   expect_true(all(
     subset(simTest$NPP, cohortGroupID == 2)$NPP < subset(simTest$NPP, cohortGroupID == 1)$NPP
   ))
 
 
-  ## Test: regeneration delay set by cohortDT column ----
+  ## Test: regeneration delay set by parameter ----
 
   # Set project path
-  projectPath <- file.path(spadesTestPaths$temp$projects, "module_regenDelayCol")
+  projectPath <- file.path(spadesTestPaths$temp$projects, "module_regenDelayParam")
   dir.create(projectPath)
   withr::local_dir(projectPath)
 
   # Set up project
-  simInitInputCol <- simInitInput
-  simInitInputCol$params$CBM_core$default_delay_regen <- 0
-  simInitInputCol$cohortDT$delayRegen <- 2
+  simInitInputParam <- simInitInput
+  simInitInputParam$params$CBM_core$default_delay_regen <- 2
+  simInitInputParam$cohortDT$delayRegen <- NULL
 
   # Run simInit
-  simTestInitCol <- SpaDEStestMuffleOutput(
-    SpaDES.core::simInit2(simInitInputCol)
+  simTestInitParam <- SpaDEStestMuffleOutput(
+    SpaDES.core::simInit2(simInitInputParam)
   )
-  expect_s4_class(simTestInitCol, "simList")
+  expect_s4_class(simTestInitParam, "simList")
 
   # Run spades
-  simTestCol <- SpaDEStestMuffleOutput(
-    SpaDES.core::spades(simTestInitCol)
+  simTestParam <- SpaDEStestMuffleOutput(
+    SpaDES.core::spades(simTestInitParam)
   )
-  expect_s4_class(simTestCol, "simList")
+  expect_s4_class(simTestParam, "simList")
 
   # Check result
-  expect_equal(simTestCol$cbmPools, simTest$cbmPools)
-  expect_equal(simTestCol$NPP,      simTest$NPP)
-  expect_equal(simTestCol$emissionsProducts, simTest$emissionsProducts)
+  expect_equal(simTestParam$cbmPools$age, c(0, 0, 1))
+  expect_equal(
+    simTestParam$cbmPools[, .SD, .SDcols = !c("cohortGroupID", "N")],
+    subset(simTest$cbmPools, cohortGroupID == max(cohortGroupID))[, .SD, .SDcols = !c("cohortGroupID", "N")])
+  expect_equal(
+    simTestParam$NPP[, .SD, .SDcols = !c("cohortGroupID", "N")],
+    subset(simTest$NPP, cohortGroupID == max(cohortGroupID))[, .SD, .SDcols = !c("cohortGroupID", "N")])
 
 })
 
