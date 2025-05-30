@@ -23,22 +23,22 @@ defineModule(sim, list(
     defineParameter(
       "default_delay_spinup", "integer", default = 0L, min = 0L, max = NA_integer_, desc = paste(
         "The default spinup delay.",
-        "This can instead be set for each cohort with the spatialDT 'delaySpinup' column."
+        "This can instead be set for each cohort with the cohortDT 'delaySpinup' column."
       )),
     defineParameter(
       "default_delay_regen", "integer", default = 0L, min = 0L, max = NA_integer_, desc = paste(
         "The default regeneration delay post disturbance.",
-        "This can instead be set for each cohort with the spatialDT 'delayRegen' column."
+        "This can instead be set for each cohort with the cohortDT 'delayRegen' column."
       )),
     defineParameter(
       "default_historical_disturbance_type", "integer", default = 1L, NA_integer_, NA_integer_, desc = paste(
         "The default historical disturbance type ID. Examples: 1 = wildfire; 2 = clearcut.",
-        "This can instead be set for each stand with the spatialDT 'historical_disturbance_type' column."
+        "This can instead be set for each stand with the cohortDT 'historical_disturbance_type' column."
       )),
     defineParameter(
       "default_last_pass_disturbance_type", "numeric", default = 1L, NA_integer_, NA_integer_, desc = paste(
         "The default last pass disturbance type ID. Examples: 1 = wildfire; 2 = clearcut.",
-        "This can instead be set for each stand with the spatialDT 'last_pass_disturbance_type' column."
+        "This can instead be set for each stand with the cohortDT 'last_pass_disturbance_type' column."
       )),
     defineParameter(
       "emissionsProductsCols", "character", c("CO2", "CH4", "CO", "Emissions"), NA_character_, NA_character_,
@@ -67,12 +67,13 @@ defineModule(sim, list(
       objectName = "cohortDT", objectClass = "data.table", sourceURL = NA,
       desc = "Table of cohort attributes",
       columns = c(
-        cohortID   = "Cohort ID",
-        pixelIndex = "Stand ID",
-        gcids      = "Growth curve ID",
-        ages       = "Cohort age at simulation start",
-        ageSpinup  = "Optional. Alternative cohort age at the simulation start year to use in the spinup",
-        delay      = "Optional. Regeneration delay post disturbance in years. Defaults to the 'default_delay' parameter"
+        cohortID    = "Cohort ID",
+        pixelIndex  = "Stand ID",
+        gcids       = "Growth curve ID",
+        ages        = "Cohort age at simulation start",
+        ageSpinup   = "Optional. Alternative cohort age at the simulation start year to use in the spinup",
+        delaySpinup = "Optional. Spinup delay. Defaults to the 'default_delay_spinup' parameter",
+        delayRegen  = "Optional. Regeneration delay post disturbance in years. Defaults to the 'default_delay_regen' parameter"
       )),
     expectsInput(
       objectName = "gcMeta", objectClass = "data.table", sourceURL = NA,
@@ -315,8 +316,8 @@ Init <- function(sim){
 
 spinup <- function(sim) {
 
-  if (!"delay" %in% names(sim$cohortDT)) message(
-    "Spinup using the default regeneration delay: ", P(sim)$default_delay_spinup)
+  if (!"delaySpinup" %in% names(sim$cohortDT)) message(
+    "Spinup using the default delay: ", P(sim)$default_delay_spinup)
   if (!"historical_disturbance_type" %in% names(sim$standDT)) message(
     "Spinup using the default historical disturbance type ID: ", P(sim)$default_historical_disturbance_type)
   if (!"last_pass_disturbance_type"  %in% names(sim$standDT)) message(
@@ -360,6 +361,14 @@ spinup <- function(sim) {
   sim$cohortGroupKeep[, spinup          := cohortGroupID]
   data.table::setkey(sim$cohortGroupKeep, cohortID)
 
+  # Prepare cohort group attributes for annual event
+  sim$cohortGroups <- unique(merge(
+    sim$cohortGroupKeep[, .(cohortID, cohortGroupID)],
+    merge(sim$standDT[, .(pixelIndex, spatial_unit_id)], sim$cohortDT, by = "pixelIndex"),
+    by = "cohortID"
+  )[, .SD, .SDcols = !c("cohortID", "pixelIndex")])
+  data.table::setkey(sim$cohortGroups, cohortGroupID)
+
   # Prepare spinup output data for annual event
   ## data.table with row_idx to match cohortGroupID
   sim$cbm_vars <- lapply(spinupOut$output, function(tbl){
@@ -368,13 +377,12 @@ spinup <- function(sim) {
     tbl
   })
 
-  # Prepare cohort group attributes for annual event
-  sim$cohortGroups <- unique(merge(
-    sim$cohortGroupKeep[, .(cohortID, cohortGroupID)],
-    merge(sim$standDT[, .(pixelIndex, spatial_unit_id)], sim$cohortDT, by = "pixelIndex"),
-    by = "cohortID"
-  )[, .SD, .SDcols = !c("cohortID", "pixelIndex")])
-  data.table::setkey(sim$cohortGroups, cohortGroupID)
+  if ("delayRegen" %in% names(sim$cohortGroups)){
+    sim$cbm_vars$state$delay <- sim$cohortGroups$delayRegen
+    sim$cbm_vars$state[is.na(delay), delay := P(sim)$default_delay_regen]
+  }else{
+    sim$cbm_vars$state$delay <- P(sim)$default_delay_regen
+  }
 
   # Return simList
   return(invisible(sim))
@@ -598,7 +606,9 @@ annual <- function(sim) {
   rm(annualIncr)
   rm(growthIncr)
 
+
   ## RUN PYTHON -----
+
   # Temporarily remove row_idx column
   row_idx <- cbm_vars$pools$row_idx
   cbm_vars <- lapply(cbm_vars, function(tbl) tbl[, -("row_idx")])
@@ -616,12 +626,13 @@ annual <- function(sim) {
   )
 
   #implement delay
-  delayRows <- is.na(cbm_vars$state$time_since_last_disturbance) | cbm_vars$state$time_since_last_disturbance < P(sim)$default_delay_regen
+  delayRows <- with(cbm_vars$state, is.na(time_since_last_disturbance) | time_since_last_disturbance <= delay)
   if (any(delayRows)) {
     cbm_vars$state$age[delayRows] <- 0
     delayGrowth <- c("age", "merch_inc", "foliage_inc", "other_inc")
     cbm_vars$parameters[delayRows, delayGrowth] <- 0
   }
+  rm(delayRows)
 
   # Prepare output data for next annual event
   sim$cbm_vars <- lapply(cbm_vars, function(tbl){
