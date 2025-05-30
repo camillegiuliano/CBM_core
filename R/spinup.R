@@ -88,7 +88,7 @@ cbmExnSpinup <- function(cohortDT, spinupSQL, growthIncr, gcIndex = "gcIndex"){
 #' Prepare cohort, stand, and growth curve data into a table ready for spinup.
 cbmExnSpinupCohorts <- function(
     cohortDT, standDT, gcMetaDT,
-    gcIndex         = "gcIndex",
+    gcIndex       = "gcIndex",
     default_area  = 1,
     default_delay = 0L,
     default_historical_disturbance_type = 1L,
@@ -152,6 +152,7 @@ cbmExnSpinupCohorts <- function(
     standDT$area <- default_area
   }
 
+  if ("delaySpinup" %in% names(cohortDT)) data.table::setnames(cohortDT, "delaySpinup", "delay")
   if (!"delay" %in% names(cohortDT)){
     cohortDT$delay <- default_delay
   }else{
