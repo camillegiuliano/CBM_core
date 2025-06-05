@@ -731,6 +731,11 @@ annual <- function(sim) {
     emissionsProducts[, .SD, .SDcols = !"row_idx"] *
       (groupAreas$area[match(emissionsProducts$row_idx, groupAreas$row_idx)] / 10000))
 
+  # making Products yearly rather than cumulative
+  if (!is.null(sim$emissionsProducts)){
+    emissionsProducts["Products"] <- (emissionsProducts["Products"]) - (sum(sim$emissionsProducts[, "Products"]))
+  }
+
   sim$emissionsProducts <- rbind(sim$emissionsProducts, c(simYear = time(sim), emissionsProducts))
 
   ##TODO need to track emissions and products. First check that cbm_vars$fluxes
