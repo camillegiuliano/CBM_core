@@ -22,9 +22,10 @@ test_that("Multi module: SK-small 1998-2000", {
     SpaDES.project::setupProject(
 
       modules = c(
-        paste0("PredictiveEcology/CBM_defaults@",    Sys.getenv("BRANCH_NAME")),
-        paste0("PredictiveEcology/CBM_dataPrep_SK@", Sys.getenv("BRANCH_NAME")),
-        paste0("PredictiveEcology/CBM_vol2biomass@", Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_defaults@",       Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_dataPrep_SK@",    Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_dataPrep@",       Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_vol2biomass_SK@", Sys.getenv("BRANCH_NAME")),
         "CBM_core"
       ),
 
