@@ -36,4 +36,5 @@
   # Run all SK-small tests
   testthat::test_dir("tests/testthat", filter = "SK-small")
 
-
+  # Run LandRCBM tests
+  testthat::test_dir("tests/testthat", filter = "LandRCBM")

@@ -1,0 +1,3 @@
+species,Area,longevity,sexualmature,shadetolerance,firetolerance,seeddistance_eff,seeddistance_max,resproutprob,resproutage_min,resproutage_max,postfireregen,leaflongevity,wooddecayrate,mortalityshape,growthcurve,leafLignin,hardsoft,speciesCode
+Abie_las,MC,240,20,3,1,75,100,0,0,0,none,2,0.02,15,0,0.2,soft,Abie_las
+Pinu_con,MC,335,15,1,2,60,200,0,0,0,serotiny,3,0.02,15,0,0.2,soft,Pinu_con
