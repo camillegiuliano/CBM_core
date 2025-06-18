@@ -639,8 +639,10 @@ annual_preprocessing <- function(sim) {
   return(invisible(sim))
 }
 
-## RUN PYTHON -----
 annual_carbonDynamics <- function(sim) {
+
+  ## RUN PYTHON -----
+
   cbm_vars <- sim$cbm_vars
 
   # Temporarily remove row_idx column
