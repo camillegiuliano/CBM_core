@@ -71,6 +71,14 @@ test_that("Module: SK-small 1998-2000", {
     check.attributes = FALSE
   )
 
+  # cbmPools
+  expect_true(!is.null(simTest$cbmPools))
+  expect_equal(
+    simTest$cbmPools,
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "cbmPools.csv"))[
+      , .SD, .SDcols = names(simTest$cbmPools)]
+  )
+
   # NPP
   expect_true(!is.null(simTest$NPP))
   expect_equal(
@@ -85,14 +93,6 @@ test_that("Module: SK-small 1998-2000", {
     data.table::as.data.table(simTest$emissionsProducts),
     data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "emissionsProducts.csv"))[
       , .SD, .SDcols = colnames(simTest$emissionsProducts)]
-  )
-
-  # cbmPools
-  expect_true(!is.null(simTest$cbmPools))
-  expect_equal(
-    simTest$cbmPools,
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK-small/valid", "cbmPools.csv"))[
-      , .SD, .SDcols = names(simTest$cbmPools)]
   )
 
   # cohortGroups

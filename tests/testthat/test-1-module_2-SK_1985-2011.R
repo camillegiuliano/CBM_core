@@ -71,6 +71,9 @@ test_that("Module: SK 1985-2011", {
     check.attributes = FALSE
   )
 
+  # cbmPools
+  expect_true(!is.null(simTest$cbmPools))
+
   # NPP
   expect_true(!is.null(simTest$NPP))
   expect_equal(
@@ -85,9 +88,6 @@ test_that("Module: SK 1985-2011", {
     data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "emissionsProducts.csv"))[
       , .SD, .SDcols = colnames(simTest$emissionsProducts)]
   )
-
-  # cbmPools
-  expect_true(!is.null(simTest$cbmPools))
 
   # cohortGroups
   ## There should always be the same number of total cohort groups.
