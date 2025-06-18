@@ -2,30 +2,30 @@
 if (!testthat::is_testing()) source(testthat::test_path("setup.R"))
 
 test_that("Multi module: RIA-small with LandR 2000-2002", {
-  
+
   ## Run simInit and spades ----
   # Set times
   times <- list(start = 2000, end = 2021)
-  
+
   # Set project path
   projectPath <- file.path(spadesTestPaths$temp$projects, "integration_LandRCBM_RIA-small_2000-2002")
   dir.create(projectPath)
   withr::local_dir(projectPath)
-  
+
   # Set Github repo branch
   if (!nzchar(Sys.getenv("BRANCH_NAME"))) withr::local_envvar(BRANCH_NAME = "development")
-  
+
   # Set up project
   simInitInput <- SpaDEStestMuffleOutput(
-    
+
     SpaDES.project::setupProject(
-      
+
       modules = c(
         paste0("PredictiveEcology/Biomass_core@",    Sys.getenv("BRANCH_NAME")),
         paste0("DominiqueCaron/LandRCBM_split3pools@run-with-CBM"),
         "CBM_core"
       ),
-      
+
       times   = times,
       paths   = list(
         projectPath = projectPath,
@@ -35,22 +35,22 @@ test_that("Multi module: RIA-small with LandR 2000-2002", {
         cachePath   = spadesTestPaths$cachePath,
         outputPath  = file.path(projectPath, "outputs")
       ),
-      
+
       require = c("terra", "reproducible"),
 
       # Prepare input objects
       studyArea             = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "studyArea.shp") |> sf::st_read(),
       rasterToMatch         = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "rasterToMatch.tif") |> terra::rast(),
       standDT               = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "standDT.csv") |> data.table::fread(),
-      biomassMap            = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "biomassMap.tif") |> terra::rast(), 
+      biomassMap            = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "biomassMap.tif") |> terra::rast(),
       cohortData            = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "cohortData.csv") |> data.table::fread(stringsAsFactors = TRUE),
       pixelGroupMap         = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "pixelGroupMap.tif") |> terra::rast(),
       speciesLayers         = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "speciesLayers.tif") |> terra::rast(),
       ecoregionMap          = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "ecoregionMap.tif") |> terra::rast(),
       minRelativeB          = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "minRelativeB.csv") |> data.table::fread(stringsAsFactors = TRUE),
-      ecoregion             = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "ecoregion.csv") |> 
+      ecoregion             = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "ecoregion.csv") |>
         data.table::fread(colClasses = list(factor = c("ecoregionGroup"))),
-      species               = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "species.csv") |> 
+      species               = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "species.csv") |>
         data.table::fread(colClasses = list(factor = c("Area", "postfireregen", "hardsoft", "speciesCode"))),
       speciesEcoregion      = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "speciesEcoregion.csv") |> data.table::fread(stringsAsFactors = TRUE),
       yieldTablesCumulative = file.path(spadesTestPaths$testdata, "LandRCBM-RIA-small/input", "yieldTablesCumulative.csv") |> data.table::fread(),
@@ -64,13 +64,13 @@ test_that("Multi module: RIA-small with LandR 2000-2002", {
         sppEquiv <- LandR::sppEquivalencies_CA[LandR %in% species]
         sppEquiv <- sppEquiv[KNN != "" & LANDIS_traits != ""]
       },
-      
-      
+
+
       outputs = as.data.frame(expand.grid(
         objectName = c("cbmPools", "NPP"),
         saveTime   = sort(c(times$start, times$start + c(1:(times$end - times$start))))
       )),
-      
+
       # Parameters
       params = list(
         .globals = list(
@@ -81,23 +81,23 @@ test_that("Multi module: RIA-small with LandR 2000-2002", {
           skipCohortGroupHandling = TRUE,
           skipPrepareCBMvars = TRUE
         ))
-      
+
     )
   )
-  
+
   # Run simInit
   simTestInit <- SpaDEStestMuffleOutput(
     SpaDES.core::simInit2(simInitInput)
   )
-  
+
   expect_s4_class(simTestInit, "simList")
-  
+
   # Run spades
   simTest <- SpaDEStestMuffleOutput(
     SpaDES.core::spades(simTestInit)
   )
   expect_s4_class(simTest, "simList")
-  
+
   ## Check completed events ----
 
   # Check that all modules initiated in the correct order
@@ -105,7 +105,7 @@ test_that("Multi module: RIA-small with LandR 2000-2002", {
     tail(completed(simTest)[eventType == "init", ]$moduleName, 3),
     c("CBM_core", "Biomass_core", "LandRCBM_split3pools")
   )
-  
+
   # CBM_core module: Check events completed in expected order
   with(
     list(
@@ -114,7 +114,7 @@ test_that("Multi module: RIA-small with LandR 2000-2002", {
         "init"              = times$start,
         "spinup"            = times$start,
         setNames(
-          rep(times$start:times$end, each = 2), 
+          rep(times$start:times$end, each = 2),
           rep(c("annual_preprocessing", "annual_carbonDynamics"), length(times$star:times$end))
         ),
         "accumulateResults" = times$end,
@@ -131,12 +131,12 @@ test_that("Multi module: RIA-small with LandR 2000-2002", {
   with(
     list(
       expectedEventOrder  = c(
-        "spinup", 
+        "spinup",
         "postSpinupAdjustBiomass",
-        "mortalityAndGrowth", 
-        "annualIncrements", 
-        "annual_preprocessing", 
-        "prepareCBMvars", 
+        "mortalityAndGrowth",
+        "annualIncrements",
+        "annual_preprocessing",
+        "prepareCBMvars",
         "annual_carbonDynamics",
         "postAnnualChecks")
     ),
