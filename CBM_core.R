@@ -47,10 +47,10 @@ defineModule(sim, list(
       "poolsToPlot", "character", default = "totalCarbon", NA, NA,
       desc = "which carbon pools to plot, if any. Defaults to total carbon"),
     defineParameter(
-      "skipCohortGroupHandling", "boolean", default = FALSE, NA, NA,
+      "skipCohortGroupHandling", "logical", default = FALSE, NA, NA,
       desc = "Whether cohort groups are handled by other modules. E.g., LandRCBM_split3pools."),
     defineParameter(
-      "skipPrepareCBMvars", "boolean", default = FALSE, NA, NA,
+      "skipPrepareCBMvars", "logical", default = FALSE, NA, NA,
       desc = "Whether the inputs for the cbm annual events are prepared by another module.E.g., LandRCBM_split3pools."),
     defineParameter(".plotInitialTime", "numeric", start(sim), NA, NA, "Simulation time when the first plot event should occur"),
     defineParameter(".plotInterval",    "numeric", 1L,         NA, NA, "Time interval between plot events"),
