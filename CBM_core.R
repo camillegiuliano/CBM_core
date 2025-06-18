@@ -785,7 +785,7 @@ annual_carbonDynamics <- function(sim) {
 
 .inputObjects <- function(sim){
 
-  return(sim)
+  return(invisible(sim))
 }
 
 
