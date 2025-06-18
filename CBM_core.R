@@ -209,9 +209,9 @@ doEvent.CBM_core <- function(sim, eventTime, eventType, debug = FALSE) {
       sim <- annual_preprocessing(sim)
       sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual_preprocessing", eventPriority = 8)
     },
-    
+
     annual_carbonDynamics = {
-      
+
       sim <- annual_carbonDynamics(sim)
       sim <- scheduleEvent(sim, time(sim) + 1, "CBM_core", "annual_carbonDynamics", eventPriority = 8.5)
     },
@@ -364,18 +364,18 @@ spinup <- function(sim) {
     growthIncr = sim$growth_increments,
     gcIndex    = "gcids"
   ) |> Cache()
-  
+
   sim$spinupResult <- spinupOut
-  
+
   # Skip cohort group handling
-  
+
   if(!P(sim)$skipCohortGroupHandling) {
     # Save cohort group key
     sim$cohortGroupKeep <- merge(spinupOut$key, sim$cohortDT, by = "cohortID")[, .(cohortID, pixelIndex, cohortGroupID)]
     sim$cohortGroupKeep[, cohortGroupPrev := NA_integer_]
     sim$cohortGroupKeep[, spinup          := cohortGroupID]
     data.table::setkey(sim$cohortGroupKeep, cohortID)
-    
+
     # Prepare cohort group attributes for annual event
     sim$cohortGroups <- unique(merge(
       sim$cohortGroupKeep[, .(cohortID, cohortGroupID)],
@@ -383,7 +383,7 @@ spinup <- function(sim) {
       by = "cohortID"
     )[, .SD, .SDcols = !c("cohortID", "pixelIndex")])
     data.table::setkey(sim$cohortGroups, cohortGroupID)
-    
+
     # Prepare spinup output data for annual event
     ## data.table with row_idx to match cohortGroupID
     sim$cbm_vars <- lapply(spinupOut$output, function(tbl){
@@ -398,7 +398,7 @@ spinup <- function(sim) {
 }
 
 annual_preprocessing <- function(sim) {
-  
+
   # Add delay
   if ("delayRegen" %in% names(sim$cohortGroups)) {
     if (!("delay" %in% names(sim$cbm_vars$state))) {
@@ -408,7 +408,7 @@ annual_preprocessing <- function(sim) {
   } else{
     sim$cbm_vars$state$delay <- P(sim)$default_delay_regen
   }
-  
+
   ## READ DISTURBANCES ----
 
   # Read disturbance events
@@ -463,13 +463,13 @@ annual_preprocessing <- function(sim) {
 
 
   ## SET COHORT GROUPS ----
-  
+
   if(!P(sim)$skipCohortGroupHandling) {
     # Set previous group IDs
     sim$cohortGroupKeep[, cohortGroupPrev := cohortGroupID]
-    
+
     if (nrow(distStands) > 0){ # In standard CBM, cohorts change if disturbed.
-      
+
       # Get attributes for disturbed cohorts
       distCohorts <- merge(
         sim$cohortGroupKeep[, .(cohortID, pixelIndex, cohortGroupPrev)],
@@ -477,26 +477,26 @@ annual_preprocessing <- function(sim) {
         by = "pixelIndex")
       distCohorts <- merge(distCohorts, sim$cohortGroups, by.x = "cohortGroupPrev", by.y = "cohortGroupID")
       data.table::setkey(distCohorts, cohortID)
-      
+
       # Create new groups that include events and carbon from
       # previous group since that changes the amount and destination of the
       # carbon being moved.
       cohortGroupCols <- c(
         setdiff(names(sim$cohortGroups), "cohortGroupID"),
         "disturbance_type_id", sim$pooldef, "Products")
-      
+
       distCohortCpools <- merge(
         distCohorts, sim$cbm_vars$pools,
         by.x = "cohortGroupPrev", by.y = "row_idx", all.x = TRUE)
       data.table::setkey(distCohortCpools, cohortID)
-      
+
       ##TODO: Check why a bunch of extra columns are being created. remove
       ##unnecessary cols from generatePixelGroups.
       distCohortCpools$cohortGroupNew <- LandR::generatePixelGroups(
         distCohortCpools, maxPixelGroup = max(sim$cohortGroupKeep$cohortGroupPrev),
         columns = cohortGroupCols
       )
-      
+
       # Update cohortGroupKeep
       sim$cohortGroupKeep <- merge(
         sim$cohortGroupKeep, distCohortCpools[, .(cohortID, cohortGroupNew)],
@@ -504,17 +504,17 @@ annual_preprocessing <- function(sim) {
       sim$cohortGroupKeep[, cohortGroupID  := data.table::fcoalesce(cohortGroupNew, cohortGroupPrev)]
       sim$cohortGroupKeep[, cohortGroupNew := NULL]
       setkey(sim$cohortGroupKeep, cohortID)
-      
+
       # Update cohortGroups
       sim$cohortGroups <- rbind(
         sim$cohortGroups,
         unique(distCohortCpools[, cohortGroupID := cohortGroupNew][, .SD, .SDcols = names(sim$cohortGroups)]))
       data.table::setkey(sim$cohortGroups, cohortGroupID)
-      
+
       rm(distCohortCpools)
-      
+
     }
-    
+
     # Set cohort groups for the year
     sim$cohortGroupKeep[[as.character(time(sim))]] <- sim$cohortGroupKeep$cohortGroupID
   }
@@ -625,7 +625,7 @@ annual_preprocessing <- function(sim) {
 
   rm(annualIncr)
   rm(growthIncr)
-  
+
   sim$cbm_vars <- cbm_vars
   } else {
     # add disturbed stands to simList
@@ -634,7 +634,7 @@ annual_preprocessing <- function(sim) {
       sim$standDT[distStands$pixelIndex, "disturbance_type_id"] <- distStands$disturbance_type_id
     }
   }
-  
+
   # Return simList
   return(invisible(sim))
 }
@@ -677,12 +677,12 @@ annual_carbonDynamics <- function(sim) {
 
 
   ## ASSEMBLE OUTPUTS -----
-  
+
   # Set new cohort group ages
   sim$cohortGroups$ages <- sim$cbm_vars$state$age[
     match(sim$cohortGroups$cohortGroupID, sim$cbm_vars$state$row_idx)
   ]
-  
+
   # Set cohort count
   cohortCount <- unique(sim$cohortGroupKeep[, .(pixelIndex, cohortGroupID)])[, .N, by = cohortGroupID]
   data.table::setkey(cohortCount, cohortGroupID)
