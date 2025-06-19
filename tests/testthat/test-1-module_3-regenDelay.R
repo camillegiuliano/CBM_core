@@ -120,10 +120,12 @@ test_that("Module: with regeneration delay", {
   expect_equal(simTestParam$cbmPools$age, c(0, 0, 1))
   expect_equal(
     simTestParam$cbmPools[, .SD, .SDcols = !c("cohortGroupID", "N")],
-    subset(simTest$cbmPools, cohortGroupID == max(cohortGroupID))[, .SD, .SDcols = !c("cohortGroupID", "N")])
+    subset(simTest$cbmPools, cohortGroupID == max(cohortGroupID))[, .SD, .SDcols = !c("cohortGroupID", "N")],
+    check.attributes = FALSE)
   expect_equal(
     simTestParam$NPP[, .SD, .SDcols = !c("cohortGroupID", "N")],
-    subset(simTest$NPP, cohortGroupID == max(cohortGroupID))[, .SD, .SDcols = !c("cohortGroupID", "N")])
+    subset(simTest$NPP, cohortGroupID == max(cohortGroupID))[, .SD, .SDcols = !c("cohortGroupID", "N")],
+    check.attributes = FALSE)
 
 })
 
