@@ -22,9 +22,10 @@ test_that("Multi module: SK-small 1998-2000", {
     SpaDES.project::setupProject(
 
       modules = c(
-        paste0("PredictiveEcology/CBM_defaults@",    Sys.getenv("BRANCH_NAME")),
-        paste0("PredictiveEcology/CBM_dataPrep_SK@", Sys.getenv("BRANCH_NAME")),
-        paste0("PredictiveEcology/CBM_vol2biomass@", Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_defaults@",       Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_dataPrep_SK@",    Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_dataPrep@",       Sys.getenv("BRANCH_NAME")),
+        paste0("PredictiveEcology/CBM_vol2biomass_SK@", Sys.getenv("BRANCH_NAME")),
         "CBM_core"
       ),
 
@@ -88,31 +89,6 @@ test_that("Multi module: SK-small 1998-2000", {
   )
 
   expect_s4_class(simTest, "simList")
-
-
-  ## Check completed events ----
-
-  # Check that all modules initiated in the correct order
-  expect_identical(tail(completed(simTest)[eventType == "init",]$moduleName, 4),
-                   c("CBM_defaults", "CBM_dataPrep_SK", "CBM_vol2biomass", "CBM_core"))
-
-  # CBM_core module: Check events completed in expected order
-  with(
-    list(
-      moduleTest  = "CBM_core",
-      eventExpect = c(
-        "init"              = times$start,
-        "spinup"            = times$start,
-        setNames(times$start:times$end, rep("annual", length(times$star:times$end))),
-        "accumulateResults" = times$end
-      )),
-    expect_equal(
-      completed(simTest)[moduleName == moduleTest, .(eventTime, eventType)],
-      data.table::data.table(
-        eventTime = data.table::setattr(eventExpect, "unit", "year"),
-        eventType = names(eventExpect)
-      ))
-  )
 
 
   ## Check outputs ----

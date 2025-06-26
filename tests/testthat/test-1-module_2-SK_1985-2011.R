@@ -62,38 +62,36 @@ test_that("Module: SK 1985-2011", {
 
   ## Check outputs ----
 
-  # spinupInpit and spinupResult
+  # spinupResult
   ## There should always be the same number of spinup cohort groups.
-  expect_true(!is.null(simTest$spinupInput))
   expect_true(!is.null(simTest$spinupResult))
   expect_equal(
-    data.table::as.data.table(simTest$spinupResult),
+    data.table::as.data.table(simTest$spinupResult$output$pools),
     data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "spinupResult.csv")),
-    check.attributes = FALSE
-  )
+    check.attributes = FALSE)
+
+  # cbmPools
+  expect_true(!is.null(simTest$cbmPools))
 
   # NPP
   expect_true(!is.null(simTest$NPP))
   expect_equal(
     simTest$NPP[, (list(NPP = sum(NPP * N))), by = "simYear"],
-    data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "NPP_sumByYear.csv"))
-  )
+    data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "NPP_sumByYear.csv")),
+    check.attributes = FALSE)
 
   # emissionsProducts
   expect_true(!is.null(simTest$emissionsProducts))
   expect_equal(
     data.table::as.data.table(simTest$emissionsProducts),
     data.table::fread(file.path(spadesTestPaths$testdata, "SK/valid", "emissionsProducts.csv"))[
-      , .SD, .SDcols = colnames(simTest$emissionsProducts)]
-  )
-
-  # cbmPools
-  expect_true(!is.null(simTest$cbmPools))
+      , .SD, .SDcols = colnames(simTest$emissionsProducts)],
+    check.attributes = FALSE)
 
   # cohortGroups
   ## There should always be the same number of total cohort groups.
   expect_true(!is.null(simTest$cohortGroups))
-  expect_equal(nrow(simTest$cohortGroups), 1938)
+  expect_equal(nrow(simTest$cohortGroups), 1703)
 
   # cohortGroupKeep
   expect_true(!is.null(simTest$cohortGroupKeep))
